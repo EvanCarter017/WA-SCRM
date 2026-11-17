@@ -1,85 +1,81 @@
   // ============================================================================
-  // WhatsApp SCRM Full Customer Lifecycle Closed-Loop Engine (v0.6)
-  // Stages: 新进线 -> 需求澄明 -> 报价推进 -> 成交履约 -> 复购培育 <-> 沉睡唤醒 / 流失归档
+  // WhatsApp SCRM Customer Lifecycle Engine (v0.7)
+  // Stages come from configurable pipelines (data.pipelines, see fidelity-pipelines.js).
+  // Logic keys off stage category, entry capture and pipeline roles — never stage names.
   // ============================================================================
 
-  const LC_STAGES = [
-    {
-      id: '新进线', name: '新进线', code: 'S1', short: '新进线', zone: 'funnel', tone: 'blue', icon: 'UserRoundPlus',
-      goal: '黄金首响破冰，核实进线来源、语言偏好与初步咨询意图',
-      sop: '15分钟内首响 · 确认英/西语与收件地区 · 建立首次跟进计划',
-      exitRule: '客户回复并表达明确咨询方向 → 推进至「需求澄明」',
-      next: '需求澄明', defaultTask: '首响破冰与确认客户来意', defaultHours: 4,
-    },
-    {
-      id: '需求澄明', name: '需求澄明', code: 'S2', short: '需求澄明', zone: 'funnel', tone: 'jade', icon: 'Compass',
-      goal: '补全客户需求画像（规格偏好、采购规模、时效要求），发送匹配目录资料',
-      sop: '发送对应语种目录 · 记录预算/体量区间 · 识别潜在跨号撞单',
-      exitRule: '客户确认具体需求并询价 → 推进至「报价推进」',
-      next: '报价推进', defaultTask: '跟进目录查看反馈与具体需求', defaultHours: 24,
-    },
-    {
-      id: '报价推进', name: '报价推进', code: 'S3', short: '报价推进', zone: 'funnel', tone: 'gold', icon: 'FileSpreadsheet',
-      goal: '发出结构化报价方案，跟进价格、运费与时效异议，推动拍板成交',
-      sop: '登记报价单金额与有效期 · 24-48h 内跟进反馈 · 消解核心顾虑',
-      exitRule: '确认付款下单 → 「成交履约」；明确放弃 → 记录原因归入「流失归档」',
-      next: '成交履约', defaultTask: '跟进报价单确认情况与异议解答', defaultHours: 24,
-    },
-    {
-      id: '成交履约', name: '成交履约', code: 'S4', short: '成交履约', zone: 'value', tone: 'purple', icon: 'PackageCheck',
-      goal: '登记成交订单与外部单号，主动同步发货与物流轨迹直至安心签收',
-      sop: '核对收款与订单号 · WhatsApp 同步物流单号 · 签收后做满意度回访',
-      exitRule: '客户确认签收且体验良好 → 自动计算复购周期并转入「复购培育」',
-      next: '复购培育', defaultTask: '同步发货单号并跟进物流签收', defaultHours: 48,
-    },
-    {
-      id: '复购培育', name: '复购培育', code: 'S5', short: '复购培育', zone: 'value', tone: 'jade', icon: 'Repeat',
-      goal: '围绕老客消耗/补货周期持续维护关系，在复购窗口期精准触达促成连单',
-      sop: '跟踪预计复购日期 · 窗口前 5 天主动关怀询单 · 新询盘直接创建复购报价',
-      exitRule: '产生复购新单 → 循环履约累加 LTV；超期未互动 → 预警转入「沉睡唤醒」',
-      next: '报价推进', defaultTask: '复购窗口期老客关怀与补货确认', defaultHours: 120,
-    },
-    {
-      id: '沉睡唤醒', name: '沉睡唤醒', code: 'S6', short: '沉睡唤醒', zone: 'recovery', tone: 'peach', icon: 'BellRing',
-      goal: '针对超期未复购老客或长期已读不回潜客，执行低打扰价值触达唤醒',
-      sop: '区分老客断购与潜客静默 · 发送近况关怀或新版目录 · 避免高频骚扰',
-      exitRule: '客户回复互动 → 一键重激活回流至活跃阶段；确认无需求 → 「流失归档」',
-      next: '需求澄明', defaultTask: '执行沉睡客户关怀唤醒触达', defaultHours: 72,
-    },
-    {
-      id: '流失归档', name: '流失归档', code: 'S7', short: '流失归档', zone: 'recovery', tone: 'slate', icon: 'Archive',
-      goal: '沉淀结构化流失原因与竞品/价格反馈，对暂缓型客户保留观察期回流入口',
-      sop: '必填真实未成交主因 · 自动清理无效日常待办 · 客户复联支持一键重激活',
-      exitRule: 'WhatsApp 再次来信或观察期满重评 → 一键重激活回流（保留完整历史）',
-      next: '需求澄明', defaultTask: '流失观察期满复盘回访', defaultHours: 720,
-    },
-  ];
-
-  const LC_STAGE_MAP = new Map(LC_STAGES.map((s, idx) => [s.id, { ...s, index: idx }]));
-  const LC_ACTIVE_STAGES = new Set(['新进线', '需求澄明', '报价推进', '成交履约', '复购培育']);
-  const LC_RECOVERY_STAGES = new Set(['沉睡唤醒', '流失归档']);
-  const LC_LEGACY_STAGE_ALIAS = {
-    '新客户': '新进线',
-    '跟进中': '需求澄明',
-    '已报价': '报价推进',
-    '已成交': '复购培育',
-    '培育中': '沉睡唤醒',
+  const lcPipelines = () => data.pipelines || [];
+  const lcDefaultPipeline = () => lcPipelines().find(p => p.isDefault) || lcPipelines()[0];
+  const lcPipeline = id => lcPipelines().find(p => p.id === id) || lcDefaultPipeline();
+  const lcCustomerPipeline = c => lcPipeline(c?.pipelineId);
+  function lcStageLookup(stageId) {
+    for (const pipeline of lcPipelines()) {
+      const index = pipeline.stages.findIndex(s => s.id === stageId);
+      if (index >= 0) return { pipeline, stage: pipeline.stages[index], index };
+    }
+    return null;
+  }
+  function lcDecorate(pipeline, stage, index) {
+    return { ...stage, index, code: 'S' + (index + 1), short: stage.name, pipelineId: pipeline.id, pipelineName: pipeline.name };
+  }
+  function lcStageMeta(stageId) {
+    const hit = lcStageLookup(stageId);
+    if (hit) return lcDecorate(hit.pipeline, hit.stage, hit.index);
+    const p = lcDefaultPipeline();
+    return lcDecorate(p, p.stages[0], 0);
+  }
+  const lcStages = pipeline => (pipeline?.stages || []).map((s, i) => lcDecorate(pipeline, s, i));
+  const lcStageName = stageId => lcStageLookup(stageId)?.stage.name || '未知阶段';
+  const lcCategory = stageId => LC_CATEGORIES[lcStageLookup(stageId)?.stage.category] || LC_CATEGORIES.open;
+  const lcIsActive = stageId => lcCategory(stageId).active;
+  const lcIsRecovery = stageId => lcCategory(stageId).recovery;
+  const lcIsCategory = (stageId, category) => lcStageLookup(stageId)?.stage.category === category;
+  const lcRoleStage = (pipeline, role) => {
+    const target = pipeline?.roles?.[role] || '';
+    return pipeline?.stages.some(s => s.id === target) ? target : '';
   };
-  const LC_LOST_REASONS = [
-    '需求暂缓/预算延后',
-    '价格敏感/超出预算',
-    '交付时效或物流不符',
-    '已选择其他供应商',
-    '长期失联未回复',
-    '非目标客群/无效咨询',
-  ];
+  const lcHasRole = (c, role) => Boolean(c) && c.stage === lcRoleStage(lcCustomerPipeline(c), role);
+  const lcIntakeStage = pipeline => lcRoleStage(pipeline, 'intake') || pipeline?.stages[0]?.id || '';
+  function lcReactivateTarget(c) {
+    const pipeline = lcCustomerPipeline(c);
+    return lcRoleStage(pipeline, 'reactivate')
+      || pipeline.stages.find(s => LC_CATEGORIES[s.category]?.active && s.id !== lcRoleStage(pipeline, 'intake'))?.id
+      || lcIntakeStage(pipeline);
+  }
+  const lcLostReasons = c => lcCustomerPipeline(c)?.lostReasons?.length ? lcCustomerPipeline(c).lostReasons : ['其他原因'];
+  const lcNewId = prefix => prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const lcChain = pipeline => (pipeline?.stages || []).map(s => s.name).join(' → ');
+
+  // Map a customer onto a valid pipeline + stage id, migrating legacy stage names.
+  function lcNormalizeCustomer(c) {
+    const hit = lcStageLookup(c.stage);
+    if (hit) {
+      c.pipelineId = hit.pipeline.id;
+      return;
+    }
+    const pipeline = lcPipelines().find(p => p.id === c.pipelineId) || lcDefaultPipeline();
+    c.pipelineId = pipeline.id;
+    const legacy = LC_LEGACY_STAGE_IDS[c.stage];
+    const byName = pipeline.stages.find(s => s.name === c.stage);
+    c.stage = (legacy && pipeline.stages.some(s => s.id === legacy) && legacy) || byName?.id || lcIntakeStage(pipeline);
+  }
+
+  function lcStageBadge(stage, clickableId = '') {
+    const meta = lcStageMeta(stage);
+    if (clickableId) {
+      return `<button type="button" class="lc-stage-badge ${meta.tone}" data-action="lcAdvance" ${fidActionID(clickableId)} title="点击推进或变更阶段（${esc(meta.pipelineName)}）">${icon(meta.icon)}${esc(meta.name)}</button>`;
+    }
+    return `<span class="lc-stage-badge ${meta.tone}">${icon(meta.icon)}${esc(meta.name)}</span>`;
+  }
+
   const LC_INTENT_LEVELS = ['高意向', '中意向', '了解中'];
-  const LC_TASK_TYPES = ['首响破冰', '需求跟进', '报价催单', '履约回访', '复购关怀', '沉睡唤醒'];
 
   const lcMoneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const lcMoney = n => lcMoneyFmt.format(Number(n) || 0);
 
   const lcState = {
+    pipeline: '',
+    cfgPipeline: '',
     mode: 'board',
     stageFilter: 'all',
     radar: 'all',
@@ -93,19 +89,6 @@
     dossierTab: 'overview',
     timelineFilter: 'all',
   };
-
-  function lcNormalizeStage(stage) {
-    if (LC_STAGE_MAP.has(stage)) return stage;
-    return LC_LEGACY_STAGE_ALIAS[stage] || '新进线';
-  }
-  const lcStageMeta = stage => LC_STAGE_MAP.get(lcNormalizeStage(stage)) || LC_STAGES[0];
-  function lcStageBadge(stage, clickableId = '') {
-    const meta = lcStageMeta(stage);
-    if (clickableId) {
-      return `<button type="button" class="lc-stage-badge ${meta.tone}" data-action="lcAdvance" ${fidActionID(clickableId)} title="点击推进或变更阶段">${icon(meta.icon)}${esc(meta.name)}</button>`;
-    }
-    return `<span class="lc-stage-badge ${meta.tone}">${icon(meta.icon)}${esc(meta.name)}</span>`;
-  }
 
   function lcDaysBetween(fromIso, toIso = new Date().toISOString()) {
     if (!fromIso) return 0;
@@ -129,6 +112,7 @@
   function lcSeed() {
     data.quotes ??= [];
     data.orders ??= [];
+    if (!Array.isArray(data.pipelines) || !data.pipelines.length) data.pipelines = lcPresetPipelines();
 
     // Seed additional lifecycle-complete demo customers once so all 7 stages have realistic cases
     if (!data.lcSeededV06) {
@@ -136,7 +120,7 @@
         {
           id: 'c9', name: 'Brandon Miller', initials: 'BM', color: 'blue',
           phone: '+1 (737) 555-0162', country: 'US', city: 'Austin', timezone: 'America/Chicago',
-          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: '新进线',
+          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: 'rt_new',
           source: 'Facebook 广告', campaign: 'US · 目录直达广告 D', ad: '规格答疑 · 素材 04',
           unread: 2, star: true, last: '10 分钟前',
           preview: 'Hi! Just added your WhatsApp from the ad. Do you ship to Texas and have a price list?',
@@ -156,7 +140,7 @@
         {
           id: 'c10', name: 'Harper Davis', initials: 'HD', color: 'gold',
           phone: '+1 (312) 555-0168', country: 'US', city: 'Chicago', timezone: 'America/Chicago',
-          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: '报价推进',
+          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: 'rt_quote',
           source: 'Facebook 广告', campaign: 'US · 咨询广告 A', ad: '目录介绍 · 素材 02',
           unread: 0, star: false, last: '2 天前',
           preview: 'Got the quote PDF, let me review the quantities with my partner.',
@@ -176,7 +160,7 @@
         {
           id: 'c11', name: 'Carlos Vega', initials: 'CV', color: 'purple',
           phone: '+1 (787) 555-0173', country: 'PR', city: 'Bayamón', timezone: 'America/Puerto_Rico',
-          language: '西班牙语', owner: 'lin', account: 'a2', tags: [], stage: '成交履约',
+          language: '西班牙语', owner: 'lin', account: 'a2', tags: [], stage: 'rt_fulfill',
           source: 'Instagram 广告', campaign: 'PR · 西语私域引流', ad: '西语客服直连 · 03',
           unread: 0, star: true, last: '昨天',
           preview: '¡Perfecto! Quedo atento a la entrega del paquete esta semana.',
@@ -196,7 +180,7 @@
         {
           id: 'c12', name: 'Rachel Green', initials: 'RG', color: 'slate',
           phone: '+1 (602) 555-0184', country: 'US', city: 'Phoenix', timezone: 'America/Phoenix',
-          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: '流失归档',
+          language: '英语', owner: 'lin', account: 'a1', tags: [], stage: 'rt_lost',
           source: 'Facebook 广告', campaign: 'US · 咨询广告 A', ad: '目录介绍 · 素材 01',
           unread: 0, star: false, last: '12 天前',
           preview: 'We need to pause purchasing until next month’s budget opens up.',
@@ -243,7 +227,7 @@
       // Enrich existing c1-c8 stages & SCRM profiles
       const enrichMap = {
         c1: {
-          stage: '需求澄明', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
+          stage: 'rt_qualify', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
           qualification: {
             demand: '索取最新产品总目录，对比常规规格与批次交付周期',
             volume: '$1,200 - $2,000 / 首单',
@@ -253,7 +237,7 @@
           },
         },
         c2: {
-          stage: '新进线', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
+          stage: 'rt_new', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
           qualification: {
             demand: '确认波多黎各（San Juan）是否支持稳定直发与时效',
             volume: '待确认具体采购量',
@@ -263,7 +247,7 @@
           },
         },
         c3: {
-          stage: '复购培育', stageEnteredAt: fidDay(-22), intentLevel: '高意向',
+          stage: 'rt_nurture', stageEnteredAt: fidDay(-22), intentLevel: '高意向',
           repurchaseCycleDays: 25, nextRepurchaseAt: fidDay(2), reactivatedCount: 1,
           qualification: {
             demand: '长期稳定老客（已完成 2 单），按月固定补货常规组合',
@@ -274,7 +258,7 @@
           },
         },
         c4: {
-          stage: '报价推进', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
+          stage: 'rt_quote', stageEnteredAt: fidDay(-1), intentLevel: '高意向',
           qualification: {
             demand: '已发首批标准方案报价 $1,680，正在核实加州签收时效',
             volume: '$1,680（首单报价确认中）',
@@ -284,7 +268,7 @@
           },
         },
         c5: {
-          stage: '需求澄明', stageEnteredAt: fidDay(-2), intentLevel: '中意向',
+          stage: 'rt_qualify', stageEnteredAt: fidDay(-2), intentLevel: '中意向',
           qualification: {
             demand: '需要全套西语版说明手册与入门规格建议',
             volume: '$600 - $1,000 / 试单',
@@ -294,7 +278,7 @@
           },
         },
         c6: {
-          stage: '沉睡唤醒', stageEnteredAt: fidDay(-10), intentLevel: '中意向',
+          stage: 'rt_dormant', stageEnteredAt: fidDay(-10), intentLevel: '中意向',
           repurchaseCycleDays: 25, nextRepurchaseAt: fidDay(-15),
           qualification: {
             demand: '老客转介绍试单客户（首单 $890 已签收 40 天），发新版目录后未回',
@@ -304,8 +288,8 @@
             commWindow: '美东工作时间',
           },
         },
-        c7: { stage: '需求澄明', stageEnteredAt: fidDay(-1), intentLevel: '高意向' },
-        c8: { stage: '报价推进', stageEnteredAt: fidDay(-2), intentLevel: '高意向' },
+        c7: { stage: 'rt_qualify', stageEnteredAt: fidDay(-1), intentLevel: '高意向' },
+        c8: { stage: 'rt_quote', stageEnteredAt: fidDay(-2), intentLevel: '高意向' },
       };
       for (const [cid, patch] of Object.entries(enrichMap)) {
         const target = customer(cid);
@@ -413,9 +397,21 @@
       data.lcSeededV06 = true;
     }
 
+    // v0.7: move the dealer-style demo customer into the B2B pipeline once.
+    if (!data.lcPipelinesV07) {
+      const dealer = customer('c10');
+      if (dealer) lcNormalizeCustomer(dealer);
+      if (dealer?.stage === 'rt_quote' && lcStageLookup('b2b_quote')) {
+        dealer.pipelineId = 'b2b';
+        dealer.stage = 'b2b_quote';
+        dealer.clientType ||= '新增线索-实时';
+      }
+      data.lcPipelinesV07 = true;
+    }
+
     // Ensure every customer has normalized stage & safe defaults
     for (const c of data.customers) {
-      c.stage = lcNormalizeStage(c.stage);
+      lcNormalizeCustomer(c);
       c.stageEnteredAt ||= c.updatedAt || c.createdAt || fidDay(-2);
       c.intentLevel ||= '中意向';
       c.reactivatedCount ??= 0;
@@ -444,7 +440,7 @@
   fidResetExtras = function() {
     lcOrigResetExtras();
     Object.assign(lcState, {
-      mode: 'board', stageFilter: 'all', radar: 'all', account: 'all', query: '',
+      pipeline: '', cfgPipeline: '', mode: 'board', stageFilter: 'all', radar: 'all', account: 'all', query: '',
       dealsTab: 'quotes', dealsQuery: '', followTab: 'todo', customerHealthFilter: 'all',
     });
     lcSeed();
@@ -463,17 +459,19 @@
   const lcNextTask = cid => data.tasks.filter(t => t.customer === cid && !t.done).sort((a, b) => new Date(a.due) - new Date(b.due))[0] || null;
 
   function lcHealth(c) {
-    const stage = lcNormalizeStage(c.stage);
+    const stage = c.stage;
     const nextTask = lcNextTask(c.id);
     const openQuote = lcCustomerQuotes(c.id).find(q => q.status === '待确认');
     const inTransitOrder = lcCustomerOrders(c.id).find(o => o.fulfillmentStatus !== '已签收');
     const repDays = lcDaysUntil(c.nextRepurchaseAt);
-    const inboundReactivate = LC_RECOVERY_STAGES.has(stage) && c.unread > 0;
-    const firstResponse = stage === '新进线' && (c.unread > 0 || (conversationMessages(c).at(-1)?.side === 'in'));
+    const isDormant = lcIsCategory(stage, 'dormant');
+    const isLost = lcIsCategory(stage, 'lost');
+    const inboundReactivate = lcIsRecovery(stage) && c.unread > 0;
+    const firstResponse = lcHasRole(c, 'intake') && (c.unread > 0 || (conversationMessages(c).at(-1)?.side === 'in'));
     const overdue = Boolean(nextTask && beforeToday(nextTask.due));
-    const noPlan = LC_ACTIVE_STAGES.has(stage) && !nextTask;
-    const repurchaseSoon = stage === '复购培育' && repDays !== null && repDays <= 5;
-    const dormantWatch = stage === '沉睡唤醒' || (stage === '流失归档' && c.reactivateWatchAt && lcDaysUntil(c.reactivateWatchAt) <= 3);
+    const noPlan = lcIsActive(stage) && !nextTask;
+    const repurchaseSoon = lcHasRole(c, 'nurture') && repDays !== null && repDays <= 5;
+    const dormantWatch = isDormant || (isLost && c.reactivateWatchAt && lcDaysUntil(c.reactivateWatchAt) <= 3);
 
     let primary = { key: 'healthy', label: '推进正常', tone: 'ok', icon: 'BadgeCheck' };
     if (inboundReactivate) primary = { key: 'reactivate', label: '复联待重激活', tone: 'hot', icon: 'Flame' };
@@ -483,8 +481,8 @@
     else if (repurchaseSoon) primary = { key: 'repurchase', label: repDays < 0 ? `复购超期 ${Math.abs(repDays)}天` : `复购窗口 (${repDays === 0 ? '今天' : repDays + '天后'})`, tone: 'info', icon: 'Repeat' };
     else if (openQuote) primary = { key: 'quote', label: `报价待确认 ${lcMoney(openQuote.amount)}`, tone: 'info', icon: 'FileSpreadsheet' };
     else if (inTransitOrder) primary = { key: 'fulfill', label: `履约 · ${inTransitOrder.fulfillmentStatus}`, tone: 'info', icon: 'Truck' };
-    else if (dormantWatch) primary = { key: 'dormant', label: stage === '沉睡唤醒' ? '待关怀唤醒' : '观察期可回访', tone: 'neutral', icon: 'BellRing' };
-    else if (stage === '流失归档') primary = { key: 'archived', label: c.lostReason || '已流失归档', tone: 'neutral', icon: 'Archive' };
+    else if (dormantWatch) primary = { key: 'dormant', label: isDormant ? '待关怀唤醒' : '观察期可回访', tone: 'neutral', icon: 'BellRing' };
+    else if (isLost) primary = { key: 'archived', label: c.lostReason || '已流失归档', tone: 'neutral', icon: 'Archive' };
 
     return {
       primary,
@@ -556,6 +554,7 @@
     team: 'Network',
     members: 'UsersRound',
     scope: 'SlidersHorizontal',
+    pipelines: 'GitBranch',
   }[id] || 'FileText');
 
   menuHTML = function(mobile = false) {
@@ -583,6 +582,7 @@
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
+      renderItem('pipelines', views.pipelines) +
       renderItem('scope', views.scope)
     );
   };
@@ -593,25 +593,35 @@
   function lcMatchesRadar(c, radar) {
     if (radar === 'all') return true;
     const h = lcHealth(c);
-    if (radar === 'reactivate') return h.inboundReactivate || LC_RECOVERY_STAGES.has(c.stage);
+    if (radar === 'reactivate') return h.inboundReactivate || lcIsRecovery(c.stage);
     if (radar === 'first') return h.firstResponse;
     if (radar === 'overdue') return h.overdue;
     if (radar === 'noplan') return h.noPlan;
     if (radar === 'quote') return h.quoteOpen;
-    if (radar === 'repurchase') return h.repurchaseSoon || c.stage === '复购培育';
+    if (radar === 'repurchase') return h.repurchaseSoon || lcHasRole(c, 'nurture');
     return true;
   }
 
-  function lcFilteredCustomers() {
+  // Board scope: the selected pipeline (falls back to the default one).
+  function lcBoardPipeline() {
+    const p = lcPipelines().find(x => x.id === lcState.pipeline) || lcDefaultPipeline();
+    lcState.pipeline = p.id;
+    return p;
+  }
+
+  function lcMatchesFilters(c, { ignoreStage = false } = {}) {
     const q = lcState.query.trim().toLowerCase();
-    return myCustomers().filter(c => {
-      if (lcState.stageFilter !== 'all' && c.stage !== lcState.stageFilter) return false;
-      if (lcState.account !== 'all' && c.account !== lcState.account) return false;
-      if (!lcMatchesRadar(c, lcState.radar)) return false;
-      if (!q) return true;
-      return [c.name, c.phone, c.source, c.notes, c.qualification?.demand, account(c.account)?.name]
-        .filter(Boolean).join(' ').toLowerCase().includes(q);
-    });
+    if (!ignoreStage && lcState.stageFilter !== 'all' && c.stage !== lcState.stageFilter) return false;
+    if (lcState.account !== 'all' && c.account !== lcState.account) return false;
+    if (!lcMatchesRadar(c, lcState.radar)) return false;
+    if (!q) return true;
+    return [c.name, c.phone, c.source, c.notes, c.qualification?.demand, account(c.account)?.name]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  }
+
+  function lcFilteredCustomers() {
+    const pipeline = lcBoardPipeline();
+    return myCustomers().filter(c => c.pipelineId === pipeline.id && lcMatchesFilters(c));
   }
 
   function lcCardHTML(c) {
@@ -621,7 +631,7 @@
     const openQuoteVal = lcOpenQuotesValue(c.id);
     const dwell = lcDwellDays(c);
     const cardTone = h.primary.tone === 'hot' ? 'has-hot' : h.primary.tone === 'warn' ? 'has-warn' : ltv > 0 ? 'has-good' : '';
-    const summaryText = c.stage === '流失归档'
+    const summaryText = lcIsCategory(c.stage, 'lost')
       ? `流失原因：${c.lostReason || '未注明'}${c.lostDetail ? ' · ' + c.lostDetail : ''}`
       : (c.qualification?.demand || c.notes || c.preview || '待补充客户核心需求画像');
 
@@ -633,15 +643,15 @@
 
     const nextLine = h.nextTask
       ? `${icon(h.overdue ? 'ClockAlert' : 'CalendarClock')}<span>${esc(dateLabel(h.nextTask.due))} · ${esc(h.nextTask.title)}</span>`
-      : LC_ACTIVE_STAGES.has(c.stage)
+      : lcIsActive(c.stage)
         ? `${icon('TriangleAlert')}<span>未安排下一步跟进（点击补排防断档）</span>`
         : `${icon('RotateCcw')}<span>${c.reactivateWatchAt ? '观察复盘：' + esc(dateLabel(c.reactivateWatchAt, false)) : '收到新消息可随时一键重激活'}</span>`;
 
-    const primaryBtn = LC_RECOVERY_STAGES.has(c.stage)
-      ? fidButton(h.inboundReactivate ? '立即重激活' : '重激活回流', 'lcAdvance', 'RotateCcw', h.inboundReactivate ? 'blue' : 'tint', `${fidActionID(c.id)} data-target="需求澄明"`)
+    const primaryBtn = lcIsRecovery(c.stage)
+      ? fidButton(h.inboundReactivate ? '立即重激活' : '重激活回流', 'lcAdvance', 'RotateCcw', h.inboundReactivate ? 'blue' : 'tint', `${fidActionID(c.id)} data-target="${esc(lcReactivateTarget(c))}"`)
       : fidButton('推进阶段', 'lcAdvance', 'ArrowRight', 'tint', fidActionID(c.id));
 
-    const extraRecoveryBtn = LC_RECOVERY_STAGES.has(c.stage) && !h.inboundReactivate
+    const extraRecoveryBtn = lcIsRecovery(c.stage) && !h.inboundReactivate
       ? `<button type="button" class="icon-button" data-action="lcSimReply" ${fidActionID(c.id)} aria-label="模拟${esc(c.name)}发来复联消息">${icon('MessageSquareReply')}</button>`
       : `<button type="button" class="icon-button" data-action="followup" ${fidActionID(c.id)} aria-label="为${esc(c.name)}安排跟进">${icon('CalendarPlus')}</button>`;
 
@@ -688,7 +698,7 @@
         <td>${oq ? `<strong style="color:var(--fid-royal)">报价 ${lcMoney(oq)}</strong>` : ''}${oq && ltv ? '<br>' : ''}${ltv ? `<strong style="color:var(--fid-mint)">成交 ${lcMoney(ltv)}</strong>` : (!oq ? '—' : '')}</td>
         <td style="text-align:left"><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due) + ' · ' + h.nextTask.title) : '暂无待办跟进'}</span></td>
         <td><div class="fid-icon-actions">
-          ${fidButton(LC_RECOVERY_STAGES.has(c.stage) ? '重激活' : '推进', 'lcAdvance', 'ArrowRight', 'slim tint', fidActionID(c.id))}
+          ${fidButton(lcIsRecovery(c.stage) ? '重激活' : '推进', 'lcAdvance', 'ArrowRight', 'slim tint', fidActionID(c.id))}
           ${fidIcon('打开会话', 'openConversation', 'MessageCircle', c.id)}
           ${fidIcon('360° 客户档案', 'profile', 'ContactRound', c.id)}
         </div></td>
@@ -697,55 +707,83 @@
     return `<div class="fid-table-card">${fidTable('lc-stage-table', cols, rows, '当前筛选条件下没有匹配的客户', true, 'Kanban')}</div>`;
   }
 
+  // Figure shown for a stage, chosen by the stage's configured metric.
+  function lcStageMetric(stage, list, { prefix = false } = {}) {
+    if (stage.metric === 'quotes') return (prefix ? '在途 ' : '') + lcMoney(list.reduce((s, c) => s + lcOpenQuotesValue(c.id), 0));
+    if (stage.metric === 'ltv') return (prefix ? 'LTV ' : '') + lcMoney(list.reduce((s, c) => s + lcCustomerLtv(c.id), 0));
+    return `${list.filter(c => c.unread > 0).length} 未读`;
+  }
+
+  function lcPipelineTabs(active, action, counts) {
+    return `<div class="lc-subtabs lc-pipeline-tabs" role="tablist" aria-label="客户流程">
+      ${lcPipelines().map(p => `<button type="button" class="lc-subtab" role="tab" data-action="${action}" ${fidActionID(p.id)} aria-selected="${p.id === active.id}" aria-pressed="${p.id === active.id}">${icon('GitBranch')}${esc(p.name)}<b>${counts(p)}</b></button>`).join('')}
+    </div>`;
+  }
+
   function renderLifecycle() {
-    const all = myCustomers();
+    const pipeline = lcBoardPipeline();
+    const stages = lcStages(pipeline);
+    const everyone = myCustomers();
+    const all = everyone.filter(c => c.pipelineId === pipeline.id);
     const list = lcFilteredCustomers();
-    const funnelStages = LC_STAGES.slice(0, 5);
-    const dormantCount = all.filter(c => c.stage === '沉睡唤醒').length;
-    const lostCount = all.filter(c => c.stage === '流失归档').length;
+    const funnelStages = stages.filter(s => LC_CATEGORIES[s.category]?.active);
+    const recoveryStages = stages.filter(s => LC_CATEGORIES[s.category]?.recovery);
+    if (lcState.stageFilter !== 'all' && !stages.some(s => s.id === lcState.stageFilter)) lcState.stageFilter = 'all';
     const reactivatedTotal = all.reduce((s, c) => s + (c.reactivatedCount || 0), 0);
     const totalQuotePool = all.reduce((s, c) => s + lcOpenQuotesValue(c.id), 0);
     const totalLtv = all.reduce((s, c) => s + lcCustomerLtv(c.id), 0);
 
     const radarCounts = {
       all: all.length,
-      reactivate: all.filter(c => lcHealth(c).inboundReactivate || LC_RECOVERY_STAGES.has(c.stage)).length,
+      reactivate: all.filter(c => lcHealth(c).inboundReactivate || lcIsRecovery(c.stage)).length,
       first: all.filter(c => lcHealth(c).firstResponse).length,
       overdue: all.filter(c => lcHealth(c).overdue).length,
       noplan: all.filter(c => lcHealth(c).noPlan).length,
       quote: all.filter(c => lcHealth(c).quoteOpen).length,
-      repurchase: all.filter(c => lcHealth(c).repurchaseSoon || c.stage === '复购培育').length,
+      repurchase: all.filter(c => lcHealth(c).repurchaseSoon || lcHasRole(c, 'nurture')).length,
     };
     const hotReactivate = all.filter(c => lcHealth(c).inboundReactivate).length;
 
     const funnelHTML = funnelStages.map(st => {
       const stageCustomers = all.filter(c => c.stage === st.id);
-      const val = st.id === '报价推进'
-        ? lcMoney(stageCustomers.reduce((s, c) => s + lcOpenQuotesValue(c.id), 0))
-        : (st.id === '成交履约' || st.id === '复购培育')
-          ? lcMoney(stageCustomers.reduce((s, c) => s + lcCustomerLtv(c.id), 0))
-          : `${stageCustomers.filter(c => c.unread > 0).length} 未读`;
       const active = lcState.stageFilter === st.id;
       return `<button type="button" class="lc-step-card ${active ? 'active' : ''}" data-action="lcStageFilter" ${fidActionID(st.id)} aria-pressed="${active}">
         <span class="lc-step-top"><span class="lc-step-code">${st.code}</span>${icon(st.icon)}</span>
         <span class="lc-step-name">${esc(st.name)}</span>
-        <span class="lc-step-metrics"><b>${stageCustomers.length}</b><small>${esc(val)}</small></span>
+        <span class="lc-step-metrics"><b>${stageCustomers.length}</b><small>${esc(lcStageMetric(st, stageCustomers))}</small></span>
       </button>`;
     }).join('');
+
+    const recoveryHTML = recoveryStages.length ? `<div class="lc-recovery-box">
+            <div class="lc-recovery-head">
+              <span>${icon('RotateCcw')}休眠唤醒与战败回流环</span>
+              <small>闭环池</small>
+            </div>
+            <div class="lc-recovery-grid" style="--lc-cols:${Math.min(recoveryStages.length, 3)}">
+              ${recoveryStages.map(st => `<button type="button" class="lc-recovery-pill ${lcState.stageFilter === st.id ? 'active' : ''}" data-action="lcStageFilter" ${fidActionID(st.id)}>
+                <span>${esc(st.code)} · ${esc(st.name)}</span><strong>${all.filter(c => c.stage === st.id).length}</strong>
+              </button>`).join('')}
+            </div>
+            <div class="lc-recovery-foot">
+              <span>累计唤醒/回流激活：<b>${reactivatedTotal} 人次</b></span>
+              ${lcState.stageFilter !== 'all' ? `<button type="button" class="fid-link" data-action="lcStageFilter" data-id="all">清除阶段筛选</button>` : ''}
+            </div>
+          </div>` : '';
 
     const activeSopMeta = lcState.stageFilter !== 'all' ? lcStageMeta(lcState.stageFilter) : null;
     const sopHTML = lcState.sopOpen ? `<div class="lc-sop-strip" role="region" aria-label="阶段推进准则">
       ${activeSopMeta
         ? `<strong>${icon(activeSopMeta.icon)}${esc(activeSopMeta.code + ' · ' + activeSopMeta.name)} SOP：</strong>
-           <span class="lc-sop-item">目标：${esc(activeSopMeta.goal)}</span>
-           <span class="lc-sop-item">动作：${esc(activeSopMeta.sop)}</span>
-           <span class="lc-sop-item">出口：${esc(activeSopMeta.exitRule)}</span>
-           <button type="button" class="fid-link" data-action="lcStageFilter" data-id="all">显示全部 7 阶段</button>`
-        : `<strong>${icon('Sparkles')}全生命周期闭环规则：</strong>
-           <span class="lc-sop-item">1. 新客加微进线自动立首响待办</span>
+           ${activeSopMeta.goal ? `<span class="lc-sop-item">目标：${esc(activeSopMeta.goal)}</span>` : ''}
+           ${activeSopMeta.sop ? `<span class="lc-sop-item">动作：${esc(activeSopMeta.sop)}</span>` : ''}
+           ${activeSopMeta.exitRule ? `<span class="lc-sop-item">出口：${esc(activeSopMeta.exitRule)}</span>` : ''}
+           <button type="button" class="fid-link" data-action="lcStageFilter" data-id="all">显示全部 ${stages.length} 个阶段</button>`
+        : `<strong>${icon('Sparkles')}「${esc(pipeline.name)}」流程规则：</strong>
+           <span class="lc-sop-item">1. 新客进线自动进入「${esc(lcStageName(lcIntakeStage(pipeline)))}」并立首响待办</span>
            <span class="lc-sop-item">2. 每次完成跟进必衔接下一步计划（防断档）</span>
-           <span class="lc-sop-item">3. 报价→订单→签收自动转入复购周期</span>
+           <span class="lc-sop-item">3. 报价、订单与签收按流程配置自动流转</span>
            <span class="lc-sop-item">4. 沉睡/流失客户来信即刻触发回流重激活</span>
+           <button type="button" class="fid-link" data-nav="pipelines">调整流程配置</button>
            <button type="button" class="fid-link" data-action="lcToggleSop">收起提示</button>`}
     </div>` : '';
 
@@ -759,22 +797,27 @@
       ['reactivate', hotReactivate ? `复联待激活(${hotReactivate})` : '沉睡与回流池', 'RotateCcw', hotReactivate ? 'is-hot' : ''],
     ];
 
-    const visibleStages = lcState.stageFilter === 'all' ? LC_STAGES : LC_STAGES.filter(s => s.id === lcState.stageFilter);
-    const boardHTML = `<div class="lc-board" style="grid-template-columns:repeat(${visibleStages.length},minmax(240px,1fr))">
+    // Customers matching the current filters in other pipelines, so nothing hides behind the tab.
+    const elsewhere = lcPipelines().filter(p => p.id !== pipeline.id).map(p => ({
+      p, n: everyone.filter(c => c.pipelineId === p.id && lcMatchesFilters(c, { ignoreStage: true })).length,
+    })).filter(x => x.n && (lcState.radar !== 'all' || lcState.query || lcState.account !== 'all'));
+    const elsewhereHTML = elsewhere.length
+      ? `<p class="lc-elsewhere">${icon('Info')}其他流程中还有匹配客户：${elsewhere.map(x => `<button type="button" class="fid-link" data-action="lcPipeline" ${fidActionID(x.p.id)}>${esc(x.p.name)} ${x.n} 位</button>`).join(' · ')}</p>`
+      : '';
+
+    const visibleStages = lcState.stageFilter === 'all' ? stages : stages.filter(s => s.id === lcState.stageFilter);
+    const boardHTML = `<div class="lc-board" style="--lc-cols:${visibleStages.length}">
       ${visibleStages.map(st => {
         const cards = list.filter(c => c.stage === st.id);
-        const stageVal = st.id === '报价推进'
-          ? `在途 ${lcMoney(cards.reduce((s, c) => s + lcOpenQuotesValue(c.id), 0))}`
-          : ['成交履约', '复购培育'].includes(st.id)
-            ? `LTV ${lcMoney(cards.reduce((s, c) => s + lcCustomerLtv(c.id), 0))}`
-            : st.zone === 'recovery' ? '支持随时回流重激活' : '点击卡片可快速推进';
-        return `<section class="lc-col ${st.zone === 'recovery' ? 'is-recovery' : ''}" aria-label="${esc(st.name)}阶段列">
+        const recovery = LC_CATEGORIES[st.category]?.recovery;
+        const stageVal = st.metric === 'unread' ? (recovery ? '支持随时回流重激活' : '点击卡片可快速推进') : lcStageMetric(st, cards, { prefix: true });
+        return `<section class="lc-col ${recovery ? 'is-recovery' : ''}" aria-label="${esc(st.name)}阶段列">
           <header class="lc-col-head">
             <div class="lc-col-title">
               <strong>${icon(st.icon)}${esc(st.name)}</strong>
               <span class="lc-col-count">${cards.length}</span>
             </div>
-            <div class="lc-col-sub"><span>${esc(st.code)}</span><span>${esc(stageVal)}</span></div>
+            <div class="lc-col-sub"><span>${esc(st.code)} · ${esc(LC_CATEGORIES[st.category]?.label || '')}</span><span>${esc(stageVal)}</span></div>
           </header>
           <div class="lc-col-body">
             ${cards.length ? cards.map(lcCardHTML).join('') : '<div class="lc-col-empty">当前无匹配客户</div>'}
@@ -788,7 +831,7 @@
         <header class="lc-hero">
           <div class="lc-hero-title">
             <h1 id="lc-page-title">${icon('Kanban')}WhatsApp 客户全生命周期看板</h1>
-            <p>围绕「加微进线 → 需求澄明 → 报价推进 → 成交履约 → 复购培育 ⇄ 沉睡唤醒/流失回流」构建无断点私域管理闭环。</p>
+            <p>当前流程「${esc(pipeline.name)}」：${esc(lcChain(pipeline))}。阶段、自动流转与流失原因均可在「流程配置」中调整。</p>
           </div>
           <div class="lc-hero-actions">
             ${fidButton('模拟新客加微进线', 'lcSimLeadOpen', 'Sparkles', 'tint')}
@@ -801,32 +844,20 @@
           </div>
         </header>
 
-        <div class="lc-loop-banner">
+        <div class="lc-pipeline-bar">
+          ${lcPipelineTabs(pipeline, 'lcPipeline', p => everyone.filter(c => c.pipelineId === p.id).length)}
+          ${fidButton('流程配置', '', 'Settings2', 'slim', 'data-nav="pipelines"')}
+        </div>
+
+        <div class="lc-loop-banner ${recoveryHTML ? '' : 'no-recovery'}">
           <div class="lc-loop-main">
             <div class="lc-loop-caption">
-              <strong>${icon('TrendingUp')}前半程转化漏斗 & 存量复购价值链</strong>
+              <strong>${icon('TrendingUp')}转化漏斗 & 存量价值链</strong>
               <span>在途报价池：<b>${lcMoney(totalQuotePool)}</b> · 历史累计成交 LTV：<b>${lcMoney(totalLtv)}</b></span>
             </div>
-            <div class="lc-funnel-steps">${funnelHTML}</div>
+            <div class="lc-funnel-steps" style="--lc-cols:${Math.max(1, funnelStages.length)}">${funnelHTML}</div>
           </div>
-          <div class="lc-recovery-box">
-            <div class="lc-recovery-head">
-              <span>${icon('RotateCcw')}休眠唤醒与战败回流环</span>
-              <small>闭环池</small>
-            </div>
-            <div class="lc-recovery-grid">
-              <button type="button" class="lc-recovery-pill ${lcState.stageFilter === '沉睡唤醒' ? 'active' : ''}" data-action="lcStageFilter" data-id="沉睡唤醒">
-                <span>S6 · 沉睡唤醒</span><strong>${dormantCount}</strong>
-              </button>
-              <button type="button" class="lc-recovery-pill ${lcState.stageFilter === '流失归档' ? 'active' : ''}" data-action="lcStageFilter" data-id="流失归档">
-                <span>S7 · 流失归档</span><strong>${lostCount}</strong>
-              </button>
-            </div>
-            <div class="lc-recovery-foot">
-              <span>累计唤醒/回流激活：<b>${reactivatedTotal} 人次</b></span>
-              ${lcState.stageFilter !== 'all' ? `<button type="button" class="fid-link" data-action="lcStageFilter" data-id="all">清除阶段筛选</button>` : ''}
-            </div>
-          </div>
+          ${recoveryHTML}
         </div>
 
         ${sopHTML}
@@ -847,6 +878,7 @@
               ? fidButton('重置筛选', 'lcResetFilters', 'RotateCw', 'slim') : ''}
           </div>
         </div>
+        ${elsewhereHTML}
 
         ${lcState.mode === 'board' ? boardHTML : renderLifecycleTable(list)}
       </div>
@@ -858,39 +890,42 @@
   // ============================================================================
   function lcTransitionDynamicFields(c, targetStage) {
     const meta = lcStageMeta(targetStage);
-    const isReactivating = LC_RECOVERY_STAGES.has(c.stage) && LC_ACTIVE_STAGES.has(targetStage);
+    const isReactivating = lcIsRecovery(c.stage) && lcIsActive(targetStage);
+    const crossPipeline = meta.pipelineId !== c.pipelineId;
     const openQuote = lcCustomerQuotes(c.id).find(q => q.status === '待确认');
-    const dueDefault = inputDate(new Date(Date.now() + meta.defaultHours * 3600000).toISOString());
+    const dueDefault = inputDate(new Date(Date.now() + (Number(meta.defaultHours) || 24) * 3600000).toISOString());
+    const lostReasons = lcPipeline(meta.pipelineId).lostReasons?.length ? lcPipeline(meta.pipelineId).lostReasons : ['其他原因'];
+    const reasonOptions = c.lostReason && !lostReasons.includes(c.lostReason) ? [c.lostReason, ...lostReasons] : lostReasons;
 
     let stageSpecific = '';
-    if (targetStage === '需求澄明') {
+    if (meta.capture === 'qualify') {
       stageSpecific = `
         ${fidFormRow('意向度', `<select class="fid-select" name="intentLevel" style="width:100%">${LC_INTENT_LEVELS.map(x => option(x, x, c.intentLevel)).join('')}</select>`)}
         ${fidFormRow('核心需求', `<input class="fid-input" style="width:100%" name="demand" value="${esc(c.qualification?.demand || '')}" placeholder="如：常规规格咨询、目标数量、包装要求" required>`, '', true)}
         ${fidFormRow('预计体量', `<input class="fid-input" style="width:100%" name="volume" value="${esc(c.qualification?.volume || '')}" placeholder="如：$1,000 - $2,000 / 首批">`)}`;
-    } else if (targetStage === '报价推进') {
+    } else if (meta.capture === 'quote') {
       stageSpecific = `
         ${fidFormRow('报价金额', `<input class="fid-input" style="width:100%" type="number" min="1" step="1" name="quoteAmount" value="${esc(openQuote?.amount || '')}" placeholder="输入 USD 金额（如 1680）" required>`, '', true)}
         ${fidFormRow('报价方案', `<input class="fid-input" style="width:100%" name="quoteSummary" value="${esc(openQuote?.summary || c.qualification?.demand || '')}" placeholder="如：首批标准组合含优先快递" required>`, '', true)}
         ${fidFormRow('客户顾虑', `<input class="fid-input" style="width:100%" name="objection" value="${esc(openQuote?.objectionNote || c.qualification?.objection || '')}" placeholder="选填：价格对比 / 时效确认 / 合伙人审批">`)}`;
-    } else if (targetStage === '成交履约') {
+    } else if (meta.capture === 'order') {
       const priorOrders = lcCustomerOrders(c.id).length;
       stageSpecific = `
         ${fidFormRow('成交金额', `<input class="fid-input" style="width:100%" type="number" min="1" step="1" name="orderAmount" value="${esc(openQuote?.amount || '')}" placeholder="输入实收 USD 金额" required>`, '', true)}
         ${fidFormRow('订单属性', `<select class="fid-select" name="orderType" style="width:100%">${fidOption(['首单', '复购'], priorOrders > 0 ? '复购' : '首单')}</select>`)}
         ${fidFormRow('履约状态', `<select class="fid-select" name="fulfillmentStatus" style="width:100%">${fidOption(['待发货', '运输中', '已签收'], '待发货')}</select>`)}
         ${fidFormRow('交付备注', `<input class="fid-input" style="width:100%" name="carrierNote" placeholder="外部订单号或物流说明（如 USPS / FedEx）">`)}`;
-    } else if (targetStage === '复购培育') {
+    } else if (meta.capture === 'repurchase') {
       stageSpecific = `
         ${fidFormRow('复购周期', `<select class="fid-select" name="repurchaseCycleDays" style="width:100%">${fidOption([['15', '15 天（高频补货）'], ['25', '25 天（标准周期）'], ['30', '30 天（月度复购）'], ['45', '45 天（中长周期）'], ['60', '60 天（季度补货）']], String(c.repurchaseCycleDays || 30))}</select>`)}
         ${fidFormRow('维护备注', `<input class="fid-input" style="width:100%" name="transitionNote" placeholder="记录签收反馈或下次预计补货偏好">`)}`;
-    } else if (targetStage === '沉睡唤醒') {
+    } else if (meta.capture === 'dormant') {
       stageSpecific = `
         ${fidFormRow('沉睡原因', `<select class="fid-select" name="dormantReason" style="width:100%">${fidOption(['老客超复购期未下单', '发目录/报价后长期静默', '已读未回转低频培育'], '发目录/报价后长期静默')}</select>`)}
         ${fidFormRow('唤醒方向', `<input class="fid-input" style="width:100%" name="transitionNote" placeholder="如：下周发送新版资料或节日问候">`)}`;
-    } else if (targetStage === '流失归档') {
+    } else if (meta.capture === 'lost') {
       stageSpecific = `
-        ${fidFormRow('流失主因', `<select class="fid-select" name="lostReason" style="width:100%" required>${LC_LOST_REASONS.map(r => option(r, r, c.lostReason || LC_LOST_REASONS[0])).join('')}</select>`, '', true)}
+        ${fidFormRow('流失主因', `<select class="fid-select" name="lostReason" style="width:100%" required>${reasonOptions.map(r => option(r, r, c.lostReason || reasonOptions[0])).join('')}</select>`, '', true)}
         ${fidFormRow('详细说明', `<input class="fid-input" style="width:100%" name="lostDetail" value="${esc(c.lostDetail || '')}" placeholder="记录具体异议或竞品情况，便于后续复盘" required>`, '', true)}
         ${fidFormRow('回流观察', `<select class="fid-select" name="watchDays" style="width:100%">${fidOption([['30', '30 天后提醒观察复盘（推荐暂缓型客户）'], ['14', '14 天后短期复盘'], ['0', '不设观察提醒（仅客户主动来信时唤醒）']], '30')}</select>`)}`;
     } else {
@@ -903,9 +938,12 @@
            <small style="display:block;margin-top:3px;color:var(--fid-ink)">系统将保留该客户全部历史聊天、报价与订单档案，回流计数 +1，并重新纳入活跃跟进防漏保护。</small>
          </div>`
       : '';
+    const crossBanner = crossPipeline
+      ? `<p class="fid-field-help lc-cross-pipeline">${icon('GitBranch')}客户将从「${esc(lcCustomerPipeline(c).name)}」转入「${esc(meta.pipelineName)}」流程，历史聊天、报价与订单全部保留。</p>`
+      : '';
 
-    const followupBlock = targetStage === '流失归档'
-      ? `<p class="fid-field-help">归入「流失归档」将自动结清该客户名下过期的日常待办，避免干扰每日活跃工作队列。</p>`
+    const followupBlock = meta.capture === 'lost'
+      ? `<p class="fid-field-help">归入「${esc(meta.name)}」将自动结清该客户名下未完成的待办，避免干扰每日活跃工作队列。</p>`
       : `<div class="lc-card-block" style="background:var(--color-surface-alt)">
            <label style="display:flex;align-items:center;gap:6px;font-weight:650;font-size:12px;margin-bottom:8px">
              <input type="checkbox" name="createNextTask" value="1" checked> 自动衔接本阶段下一步跟进待办（防断档）
@@ -913,12 +951,12 @@
            <div class="lc-qual-grid">
              <label class="lc-field full"><span>跟进事项</span><input class="fid-input" name="nextTaskTitle" value="${esc(meta.defaultTask)}"></label>
              <label class="lc-field"><span>计划时间</span><input class="fid-input" type="datetime-local" name="nextTaskDue" value="${dueDefault}"></label>
-             <label class="lc-field"><span>优先级</span><select class="fid-select" name="nextTaskPriority">${fidOption([['normal', '普通'], ['high', '重点优先']], targetStage === '报价推进' || isReactivating ? 'high' : 'normal')}</select></label>
+             <label class="lc-field"><span>优先级</span><select class="fid-select" name="nextTaskPriority">${fidOption([['normal', '普通'], ['high', '重点优先']], meta.capture === 'quote' || isReactivating ? 'high' : 'normal')}</select></label>
            </div>
          </div>`;
 
-    return `${reactivateBanner}
-      <p class="fid-field-help" style="margin:0 0 12px">${icon('Info')} 阶段目标：${esc(meta.goal)}</p>
+    return `${reactivateBanner}${crossBanner}
+      ${meta.goal ? `<p class="fid-field-help" style="margin:0 0 12px">${icon('Info')} 阶段目标：${esc(meta.goal)}</p>` : ''}
       ${stageSpecific}
       ${followupBlock}`;
   }
@@ -927,17 +965,23 @@
     const c = customer(id);
     if (!c || !myCustomers().includes(c)) return;
     const currentMeta = lcStageMeta(c.stage);
-    const targetStage = explicitTarget && LC_STAGE_MAP.has(explicitTarget) ? explicitTarget : currentMeta.next;
+    const own = lcCustomerPipeline(c);
+    const fallback = lcStageLookup(currentMeta.next) ? currentMeta.next
+      : lcIsRecovery(c.stage) ? lcReactivateTarget(c)
+      : (own.stages[currentMeta.index + 1] || own.stages[currentMeta.index]).id;
+    const targetStage = explicitTarget && lcStageLookup(explicitTarget) ? explicitTarget : fallback;
+    const stageOptions = `<optgroup label="${esc(own.name)}（当前流程）">${lcStages(own).map(s => option(s.id, `${s.code} · ${s.name}`, targetStage)).join('')}</optgroup>`
+      + lcPipelines().filter(p => p.id !== own.id).map(p => `<optgroup label="转入「${esc(p.name)}」流程">${lcStages(p).map(s => option(s.id, `${p.name} · ${s.code} · ${s.name}`, targetStage)).join('')}</optgroup>`).join('');
 
     fidForm(
-      LC_RECOVERY_STAGES.has(c.stage) && LC_ACTIVE_STAGES.has(targetStage) ? `重激活客户 · ${c.name}` : `推进客户生命周期 · ${c.name}`,
+      lcIsRecovery(c.stage) && lcIsActive(targetStage) ? `重激活客户 · ${c.name}` : `推进客户生命周期 · ${c.name}`,
       'lc-transition',
       `<input type="hidden" name="customerId" value="${esc(c.id)}">
        <div class="lc-transition-banner">
          ${lcStageBadge(c.stage)}
          ${icon('ArrowRight')}
          <select class="fid-select" id="lc-target-stage" name="targetStage" aria-label="目标生命周期阶段" data-customer="${esc(c.id)}">
-           ${LC_STAGES.map(s => option(s.id, `${s.code} · ${s.name}`, targetStage)).join('')}
+           ${stageOptions}
          </select>
        </div>
        <div id="lc-transition-dynamic">${lcTransitionDynamicFields(c, targetStage)}</div>`,
@@ -958,11 +1002,13 @@
     const ltv = lcCustomerLtv(c.id);
     const openQuoteVal = lcOpenQuotesValue(c.id);
     const currentIdx = lcStageMeta(c.stage).index;
+    const pipeline = lcCustomerPipeline(c);
+    const pipelineStages = lcStages(pipeline);
     const tab = lcState.dossierTab || 'overview';
     const dirtyNote = Object.hasOwn(ui.noteDrafts, c.id);
 
-    const stepper = LC_STAGES.map((st, idx) => {
-      const cls = st.id === c.stage ? 'current' : (idx < currentIdx && st.zone !== 'recovery' && !LC_RECOVERY_STAGES.has(c.stage) ? 'passed' : '');
+    const stepper = pipelineStages.map((st, idx) => {
+      const cls = st.id === c.stage ? 'current' : (idx < currentIdx && !LC_CATEGORIES[st.category]?.recovery && !lcIsRecovery(c.stage) ? 'passed' : '');
       return `<button type="button" class="lc-stepper-btn ${cls}" data-action="lcAdvance" ${fidActionID(c.id)} data-target="${esc(st.id)}" title="切换到 ${esc(st.name)}">
         <span>${st.code}</span><small>${esc(st.short)}</small>
       </button>`;
@@ -982,20 +1028,20 @@
              <p style="font-size:13px;font-weight:650">${esc(h.nextTask.title)}</p>
              <small style="color:var(--color-text-muted)">计划时间：${esc(dateLabel(h.nextTask.due))} · 类型：${esc(h.nextTask.taskType || '需求跟进')}</small>
            </div>`
-        : LC_ACTIVE_STAGES.has(c.stage)
+        : lcIsActive(c.stage)
           ? `<div class="lc-card-block warn-block">
                <div class="lc-block-head">
                  <h3>${icon('TriangleAlert')}漏跟进断档预警</h3>
                  ${fidButton('立即补排跟进', 'followup', 'CalendarPlus', 'slim blue', fidActionID(c.id))}
                </div>
-               <p style="font-size:12px;color:var(--fid-ink)">该客户处于活跃阶段「${esc(c.stage)}」，但尚未设置下一次跟进时间，极易造成意向流失。</p>
+               <p style="font-size:12px;color:var(--fid-ink)">该客户处于活跃阶段「${esc(lcStageName(c.stage))}」，但尚未设置下一次跟进时间，极易造成意向流失。</p>
              </div>`
           : `<div class="lc-card-block">
                <div class="lc-block-head">
-                 <h3>${icon('RotateCcw')}${c.stage === '流失归档' ? '流失归档与观察状态' : '沉睡唤醒状态'}</h3>
-                 ${fidButton('一键重激活回流', 'lcAdvance', 'RotateCcw', 'slim blue', `${fidActionID(c.id)} data-target="需求澄明"`)}
+                 <h3>${icon('RotateCcw')}${esc(lcStageName(c.stage))} · ${lcIsCategory(c.stage, 'lost') ? '归档与观察状态' : '唤醒状态'}</h3>
+                 ${fidButton('一键重激活回流', 'lcAdvance', 'RotateCcw', 'slim blue', `${fidActionID(c.id)} data-target="${esc(lcReactivateTarget(c))}"`)}
                </div>
-               <p style="font-size:12px;color:var(--fid-ink)">${c.stage === '流失归档' ? `归档原因：${esc(c.lostReason || '未记录')} — ${esc(c.lostDetail || '可随时重新激活')}` : '当前处于沉睡培育池，可发送关怀消息或等待客户复联后激活。'}</p>
+               <p style="font-size:12px;color:var(--fid-ink)">${lcIsCategory(c.stage, 'lost') ? `归档原因：${esc(c.lostReason || '未记录')} — ${esc(c.lostDetail || '可随时重新激活')}` : '当前处于沉睡培育池，可发送关怀消息或等待客户复联后激活。'}</p>
              </div>`;
 
       const duplicateNotice = (c.contactRefs?.length || 0) > 1
@@ -1147,7 +1193,8 @@
             ${fidButton('打开会话', 'openConversation', 'MessageCircle', 'blue slim', fidActionID(c.id))}
           </div>
         </div>
-        <div class="lc-stepper" role="group" aria-label="生命周期阶段进度">${stepper}</div>
+        <div class="lc-stepper-head"><span>${icon('GitBranch')}所属流程：<strong>${esc(pipeline.name)}</strong></span><small>选择其他流程的阶段即可转入该流程</small></div>
+        <div class="lc-stepper" role="group" aria-label="生命周期阶段进度" style="--lc-cols:${pipelineStages.length}">${stepper}</div>
       </div>
       <div class="lc-dossier-kpis">
         <div class="lc-mini-kpi"><span>当前防漏状态</span><strong style="font-size:12px">${esc(h.primary.label)}</strong></div>
@@ -1200,7 +1247,7 @@
     const openQuotes = quotes.filter(q => q.status === '待确认');
     const inTransit = orders.filter(o => o.fulfillmentStatus !== '已签收');
     const totalLtv = orders.reduce((s, o) => s + (Number(o.amount) || 0), 0);
-    const retentionPool = myCustomers().filter(c => ['复购培育', '沉睡唤醒', '流失归档'].includes(c.stage));
+    const retentionPool = myCustomers().filter(c => lcHasRole(c, 'nurture') || lcIsRecovery(c.stage));
     const q = lcState.dealsQuery.trim().toLowerCase();
 
     let tableCard = '';
@@ -1255,7 +1302,7 @@
         const ordCount = lcCustomerOrders(c.id).length;
         const repDays = lcDaysUntil(c.nextRepurchaseAt);
         const h = lcHealth(c);
-        const windowDesc = c.stage === '流失归档'
+        const windowDesc = lcIsCategory(c.stage, 'lost')
           ? `流失原因：${c.lostReason || '未填'}${c.reactivateWatchAt ? ' · 观察日 ' + fidDate(c.reactivateWatchAt).slice(0, 10) : ''}`
           : c.nextRepurchaseAt
             ? `${fidDate(c.nextRepurchaseAt).slice(0, 10)}（${repDays < 0 ? '超期 ' + Math.abs(repDays) + ' 天' : repDays === 0 ? '今日到期' : '剩 ' + repDays + ' 天'}）`
@@ -1267,10 +1314,10 @@
           <td style="text-align:left">${esc(windowDesc)}</td>
           <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span></td>
           <td><div class="fid-icon-actions">
-            ${c.stage === '复购培育'
+            ${lcHasRole(c, 'nurture')
               ? fidButton('复购触达', 'lcChatDraft', 'Repeat', 'slim blue', `${fidActionID(c.id)} data-draft-kind="repurchase"`)
-              : fidButton('重激活回流', 'lcAdvance', 'RotateCcw', h.inboundReactivate ? 'slim blue' : 'slim tint', `${fidActionID(c.id)} data-target="需求澄明"`)}
-            ${LC_RECOVERY_STAGES.has(c.stage) ? fidButton('模拟客户复联', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id)) : fidButton('排期跟进', 'followup', 'CalendarPlus', 'slim', fidActionID(c.id))}
+              : fidButton('重激活回流', 'lcAdvance', 'RotateCcw', h.inboundReactivate ? 'slim blue' : 'slim tint', `${fidActionID(c.id)} data-target="${esc(lcReactivateTarget(c))}"`)}
+            ${lcIsRecovery(c.stage) ? fidButton('模拟客户复联', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id)) : fidButton('排期跟进', 'followup', 'CalendarPlus', 'slim', fidActionID(c.id))}
           </div></td>
         </tr>`;
       }).join('');
@@ -1282,7 +1329,7 @@
         <header class="lc-hero">
           <div class="lc-hero-title">
             <h1 id="deals-page-title">${icon('Receipt')}报价转化、订单履约与复购中心</h1>
-            <p>打通「发出报价 → 拍板成单 → 物流签收 → 复购窗口提醒 → 沉睡唤醒/流失重激活」的交易价值后半程闭环。</p>
+            <p>打通「发出报价 → 拍板成单 → 物流签收 → 复购窗口提醒 → 沉睡唤醒/流失重激活」的交易价值后半程闭环；各流程的落点阶段在「流程配置」中设定。</p>
           </div>
           <div class="lc-hero-actions">
             ${fidButton('新建报价单', 'lcQuoteOpen', 'FileSpreadsheet', 'tint')}
@@ -1294,7 +1341,7 @@
           <div class="lc-kpi-card"><span>${icon('FileSpreadsheet')}在途待确认报价</span><strong>${lcMoney(openQuotes.reduce((s, x) => s + Number(x.amount || 0), 0))}</strong><small>${openQuotes.length} 笔报价正在跟进推进</small></div>
           <div class="lc-kpi-card"><span>${icon('DollarSign')}累计已成交总额 (LTV)</span><strong>${lcMoney(totalLtv)}</strong><small>共 ${orders.length} 笔订单（复购 ${orders.filter(o => o.orderType === '复购').length} 笔）</small></div>
           <div class="lc-kpi-card"><span>${icon('Truck')}履约交付中订单</span><strong>${inTransit.length}</strong><small>签收确认后自动开启老客复购倒计时</small></div>
-          <div class="lc-kpi-card"><span>${icon('Repeat')}复购培育与唤醒池</span><strong>${retentionPool.length}</strong><small>${retentionPool.filter(c => lcHealth(c).repurchaseSoon).length} 位临近复购窗口 · ${retentionPool.filter(c => LC_RECOVERY_STAGES.has(c.stage)).length} 位可唤醒</small></div>
+          <div class="lc-kpi-card"><span>${icon('Repeat')}复购培育与唤醒池</span><strong>${retentionPool.length}</strong><small>${retentionPool.filter(c => lcHealth(c).repurchaseSoon).length} 位临近复购窗口 · ${retentionPool.filter(c => lcIsRecovery(c.stage)).length} 位可唤醒</small></div>
         </div>
 
         <div class="lc-radar-bar">
@@ -1351,7 +1398,7 @@
         </tr>`;
       }).join('');
       return `<section class="fid-page"><div class="lc-wrap">
-        ${fidHead('跟进与防漏中心', '实时扫描处于活跃生命周期（S1–S5）却未安排下一步计划的断档客户，杜绝私域漏跟进。')}
+        ${fidHead('跟进与防漏中心', '实时扫描处于转化或成交类阶段却未安排下一步计划的断档客户，杜绝私域漏跟进。')}
         ${headerTabs}
         <div class="fid-table-card">${fidTable('lc-gaps-table', ['客户', '当前阶段', '接待 WhatsApp 号', '最近沟通上下文', '风险诊断', '补救操作'], gapRows, '太棒了！当前所有活跃阶段客户均已安排下一步跟进计划。', true, 'BadgeCheck')}</div>
       </div></section>`;
@@ -1476,7 +1523,7 @@
         <input class="fid-input" id="fid-customer-end" aria-label="截止时间" placeholder="截止时间" value="${esc(fid.customerEnd)}" data-fid-date>
         <select class="fid-select" id="fid-customer-field" aria-label="客户查询字段">${fidOption([['name', '联系人'], ['phone', '手机号'], ['account', '主账号'], ['note', '备注'], ['source', '来源']], fid.customerField)}</select>
         <input class="fid-input" id="customer-search" aria-label="搜索客户库" placeholder="请输入" value="${esc(ui.customerQuery)}">
-        <select class="fid-select" id="fid-customer-stage-select" aria-label="生命周期阶段">${fidOption([['all', '全部生命周期'], ...LC_STAGES.map(s => [s.id, `${s.code} · ${s.name}`])], ui.customerStage)}</select>
+        <select class="fid-select" id="fid-customer-stage-select" aria-label="生命周期阶段">${option('all', '全部生命周期', ui.customerStage)}${lcPipelines().map(p => `<optgroup label="${esc(p.name)}">${lcStages(p).map(s => option(s.id, `${p.name} · ${s.code} · ${s.name}`, ui.customerStage)).join('')}</optgroup>`).join('')}</select>
         <select class="fid-select" id="fid-customer-health-select" aria-label="防漏状态">${fidOption([['all', '全部跟进状态'], ['overdue', '跟进已逾期'], ['noplan', '跟进断档(无待办)'], ['quote', '报价待确认'], ['repurchase', '复购窗口临近']], lcState.customerHealthFilter)}</select>
         <select class="fid-select" id="fid-customer-country" aria-label="国家">${fidOption([['all', '请选择国家'], ['US', '美国'], ['PR', '波多黎各'], ['OTHER', '其他地区']], fid.customerCountry)}</select>
         <select class="fid-select" id="fid-customer-type" aria-label="客户类型">${fidOption([['all', '请选择客户类型'], '新增线索-实时', '新增线索-补录', '重复线索'], fid.customerType)}</select>
@@ -1527,13 +1574,18 @@
     const repCount = customers.filter(c => lcHealth(c).repurchaseSoon).length;
     const reactivateCount = customers.filter(c => lcHealth(c).inboundReactivate).length;
 
-    const nodes = LC_STAGES.map(st => {
-      const count = customers.filter(c => c.stage === st.id).length;
-      return `<button type="button" class="dash-lc-node" data-action="lcJumpStage" ${fidActionID(st.id)}>
-        <span>${esc(st.code)} · ${esc(st.name)}</span>
-        <strong>${count}</strong>
-        <small>${st.zone === 'funnel' ? '转化推进' : st.zone === 'value' ? '存量价值' : '唤醒回流'}</small>
-      </button>`;
+    const tracks = lcPipelines().map(p => {
+      const stages = lcStages(p);
+      const nodes = stages.map(st => {
+        const count = customers.filter(c => c.stage === st.id).length;
+        return `<button type="button" class="dash-lc-node" data-action="lcJumpStage" ${fidActionID(st.id)}>
+          <span>${esc(st.code)} · ${esc(st.name)}</span>
+          <strong>${count}</strong>
+          <small>${esc(LC_CATEGORIES[st.category]?.label || '')}</small>
+        </button>`;
+      }).join('');
+      const total = customers.filter(c => c.pipelineId === p.id).length;
+      return `<div class="dash-lc-pipeline"><div class="dash-lc-pipeline-name">${icon('GitBranch')}${esc(p.name)}<b>${total}</b></div><div class="dash-lc-track" style="--lc-cols:${stages.length}">${nodes}</div></div>`;
     }).join('');
 
     const lcPanel = `<section class="dash-lc-panel" aria-label="客户全生命周期总览">
@@ -1544,7 +1596,7 @@
           <a class="dash-link" href="#lifecycle" data-nav="lifecycle">进入全周期看板${icon('ChevronRight')}</a>
         </div>
       </div>
-      <div class="dash-lc-track">${nodes}</div>
+      ${tracks}
       <div class="dash-lc-alerts">
         <span style="font-size:12px;color:var(--color-text-muted);font-weight:600">防漏雷达快达：</span>
         <button type="button" class="lc-radar-chip ${overdueCount ? 'is-hot' : ''}" data-action="lcJumpRadar" data-id="overdue">${icon('ClockAlert')}逾期未跟进 <b>${overdueCount}</b></button>
@@ -1573,7 +1625,7 @@
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
             <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : c.language)}</span>
-            <span class="mini-stage" title="生命周期阶段：${esc(c.stage)}">${esc(c.stage)}${h.overdue || h.noPlan || h.inboundReactivate ? ' · !' : ''}</span>
+            <span class="mini-stage" title="生命周期阶段：${esc(lcCustomerPipeline(c).name)} · ${esc(lcStageName(c.stage))}">${esc(lcStageName(c.stage))}${h.overdue || h.noPlan || h.inboundReactivate ? ' · !' : ''}</span>
           </span>
         </span>
       </button>`;
@@ -1592,8 +1644,8 @@
       ${oq > 0 ? `<button type="button" class="lc-pill info" style="border:0" data-action="profile" ${fidActionID(c.id)} data-tab="deals">${icon('FileSpreadsheet')}在途报价 ${lcMoney(oq)}</button>` : ''}
       ${ltv > 0 ? `<button type="button" class="lc-pill ok" style="border:0" data-action="profile" ${fidActionID(c.id)} data-tab="deals">${icon('DollarSign')}累计成交 ${lcMoney(ltv)}</button>` : ''}
       <div class="lc-chat-strip-right">
-        ${LC_RECOVERY_STAGES.has(c.stage)
-          ? fidButton('一键重激活', 'lcAdvance', 'RotateCcw', 'slim blue', `${fidActionID(c.id)} data-target="需求澄明"`)
+        ${lcIsRecovery(c.stage)
+          ? fidButton('一键重激活', 'lcAdvance', 'RotateCcw', 'slim blue', `${fidActionID(c.id)} data-target="${esc(lcReactivateTarget(c))}"`)
           : fidButton('推进阶段', 'lcAdvance', 'ArrowRight', 'slim tint', fidActionID(c.id))}
         ${fidButton('模拟对方回复', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
         ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
@@ -1627,14 +1679,14 @@
     const list = myCustomers();
     const c = id ? customer(id) : selectedCustomer();
     if (!list.length) return toast('请先新增客户。');
-    const meta = c ? lcStageMeta(c.stage) : LC_STAGES[0];
+    const meta = lcStageMeta(c?.stage);
     fidForm(
       '安排客户下一步跟进',
       'lc-followup',
-      `${fidFormRow('目标客户', `<select class="fid-select" style="width:100%" name="customer">${list.map(x => option(x.id, `${x.name}（${x.stage} · ${account(x.account)?.name || ''}）`, c?.id)).join('')}</select>`, '', true)}
-       ${fidFormRow('任务类型', `<select class="fid-select" style="width:100%" name="taskType">${LC_TASK_TYPES.map(k => option(k, k, meta.id === '报价推进' ? '报价催单' : meta.id === '复购培育' ? '复购关怀' : '需求跟进')).join('')}</select>`)}
+      `${fidFormRow('目标客户', `<select class="fid-select" style="width:100%" name="customer">${list.map(x => option(x.id, `${x.name}（${lcStageName(x.stage)} · ${account(x.account)?.name || ''}）`, c?.id)).join('')}</select>`, '', true)}
+       ${fidFormRow('任务类型', `<select class="fid-select" style="width:100%" name="taskType">${LC_TASK_TYPES.map(k => option(k, k, meta.taskType || '需求跟进')).join('')}</select>`)}
        ${fidFormRow('跟进事项', `<input class="fid-input" style="width:100%" name="title" required maxlength="100" value="${esc(meta.defaultTask)}" placeholder="写清本次跟进要达成的具体目标">`, '', true)}
-       ${fidFormRow('提醒时间', `<input class="fid-input" style="width:100%" type="datetime-local" id="lc-due-input" name="due" required value="${inputDate(new Date(Date.now() + meta.defaultHours * 3600000).toISOString())}">
+       ${fidFormRow('提醒时间', `<input class="fid-input" style="width:100%" type="datetime-local" id="lc-due-input" name="due" required value="${inputDate(new Date(Date.now() + (Number(meta.defaultHours) || 24) * 3600000).toISOString())}">
          <div class="lc-quick-dates">
            <button type="button" data-action="lcQuickDue" data-id="2">2小时后</button>
            <button type="button" data-action="lcQuickDue" data-id="24">明天此时</button>
@@ -1664,28 +1716,29 @@
       return;
     }
     const meta = lcStageMeta(c.stage);
+    const nextMeta = lcStageLookup(meta.next) ? lcStageMeta(meta.next) : meta;
     fidForm(
       `完成跟进闭环 · ${c.name}`,
       'lc-complete-task',
       `<input type="hidden" name="taskId" value="${esc(t.id)}">
        <div class="lc-card-block" style="margin-bottom:14px;background:var(--color-surface-alt)">
          <strong style="font-size:13px">已完成事项：${esc(t.title)}</strong>
-         <small style="display:block;margin-top:3px;color:var(--color-text-muted)">当前阶段：${esc(c.stage)} · 完成后请记录结果并衔接下一步动作，防止线索断档。</small>
+         <small style="display:block;margin-top:3px;color:var(--color-text-muted)">当前阶段：${esc(meta.pipelineName)} · ${esc(meta.name)} · 完成后请记录结果并衔接下一步动作，防止线索断档。</small>
        </div>
        ${fidFormRow('跟进结果', `<select class="fid-select" style="width:100%" name="outcome" required>
          ${fidOption(['客户已积极回复推进', '已发送资料/方案待看', '客户暂未回复需顺延追访', '客户提出价格/时效异议', '客户确认意向请求报价', '已确认下单成交', '明确无需求/暂缓归档'], '客户已积极回复推进')}
        </select>`, '', true)}
        ${fidFormRow('结果纪要', `<input class="fid-input" style="width:100%" name="outcomeNote" placeholder="选填：补充客户反馈细节，将自动写入 360° 轨迹">`)}
        ${fidFormRow('阶段联动', `<select class="fid-select" style="width:100%" name="nextStage" id="lc-complete-stage">
-         ${option(c.stage, `保持当前阶段（${c.stage}）`, c.stage)}
-         ${LC_STAGES.filter(s => s.id !== c.stage).map(s => option(s.id, `同步推进至 → ${s.code} · ${s.name}`, '')).join('')}
+         ${option(c.stage, `保持当前阶段（${meta.name}）`, c.stage)}
+         ${lcStages(lcCustomerPipeline(c)).filter(s => s.id !== c.stage).map(s => option(s.id, `同步推进至 → ${s.code} · ${s.name}`, '')).join('')}
        </select>`)}
        <div class="lc-card-block" style="background:var(--color-surface-alt)">
          <label style="display:flex;align-items:center;gap:6px;font-weight:650;font-size:12px;margin-bottom:8px">
            <input type="checkbox" name="scheduleNext" value="1" checked> 立即衔接下一次跟进提醒（防漏闭环推荐）
          </label>
          <div class="lc-qual-grid">
-           <label class="lc-field full"><span>下次跟进事项</span><input class="fid-input" name="nextTitle" value="${esc(lcStageMeta(meta.next).defaultTask)}"></label>
+           <label class="lc-field full"><span>下次跟进事项</span><input class="fid-input" name="nextTitle" value="${esc(nextMeta.defaultTask)}"></label>
            <label class="lc-field"><span>下次提醒时间</span><input class="fid-input" type="datetime-local" id="lc-due-input" name="nextDue" value="${inputDate(new Date(Date.now() + 48 * 3600000).toISOString())}"></label>
            <label class="lc-field"><span>优先级</span><select class="fid-select" name="nextPriority">${fidOption([['normal', '普通'], ['high', '重点优先']], 'normal')}</select></label>
          </div>
@@ -1702,13 +1755,13 @@
     fidForm(
       '新建客户报价单',
       'lc-quote',
-      `${fidFormRow('选择客户', `<select class="fid-select" style="width:100%" name="customerId">${list.map(x => option(x.id, `${x.name}（${x.stage}）`, c.id)).join('')}</select>`, '', true)}
+      `${fidFormRow('选择客户', `<select class="fid-select" style="width:100%" name="customerId">${list.map(x => option(x.id, `${x.name}（${lcStageName(x.stage)}）`, c.id)).join('')}</select>`, '', true)}
        ${fidFormRow('报价金额', `<input class="fid-input" style="width:100%" type="number" min="1" step="1" name="amount" placeholder="USD 金额，如 1850" required>`, '', true)}
        ${fidFormRow('方案摘要', `<input class="fid-input" style="width:100%" name="summary" value="${esc(c.qualification?.demand || '')}" placeholder="如：常规规格组合 + 特快专递含税价" required>`, '', true)}
        ${fidFormRow('有效天数', `<select class="fid-select" style="width:100%" name="validDays">${fidOption([['3', '3 天'], ['5', '5 天'], ['7', '7 天'], ['15', '15 天']], '5')}</select>`)}
        ${fidFormRow('异议备注', `<input class="fid-input" style="width:100%" name="objectionNote" placeholder="选填：记录客户对价格或运费的关注点">`)}
        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-left:92px">
-         <input type="checkbox" name="autoFollow" value="1" checked> 自动推进客户至「报价推进」并生成 24h 催单跟进待办
+         <input type="checkbox" name="autoFollow" value="1" checked> 自动推进至客户所属流程的报价阶段（当前客户：「${esc(lcStageName(lcRoleStage(lcCustomerPipeline(c), 'quoting')) )}」）并生成 24h 催单跟进待办
        </label>`,
       '保存报价单',
       { wide: true }
@@ -1724,7 +1777,7 @@
       fromQuote ? `报价转成交订单 · ${fromQuote.quoteNo}` : '登记客户成交订单',
       'lc-order',
       `<input type="hidden" name="quoteId" value="${esc(fromQuote?.id || '')}">
-       ${fidFormRow('成交客户', `<select class="fid-select" style="width:100%" name="customerId" ${fromQuote ? 'readonly' : ''}>${list.map(x => option(x.id, `${x.name}（${x.stage}）`, c.id)).join('')}</select>`, '', true)}
+       ${fidFormRow('成交客户', `<select class="fid-select" style="width:100%" name="customerId" ${fromQuote ? 'readonly' : ''}>${list.map(x => option(x.id, `${x.name}（${lcStageName(x.stage)}）`, c.id)).join('')}</select>`, '', true)}
        ${fidFormRow('成交金额', `<input class="fid-input" style="width:100%" type="number" min="1" step="1" name="amount" value="${esc(fromQuote?.amount || '')}" placeholder="USD 实收金额" required>`, '', true)}
        ${fidFormRow('订单类型', `<select class="fid-select" style="width:100%" name="orderType">${fidOption(['首单', '复购'], priorOrders > 0 ? '复购' : '首单')}</select>`)}
        ${fidFormRow('履约状态', `<select class="fid-select" style="width:100%" name="fulfillmentStatus">${fidOption(['待发货', '运输中', '已签收'], '待发货')}</select>`)}
@@ -1741,8 +1794,9 @@
     const c = customer(ord.customerId);
     if (!c) return;
     const nextStatus = ord.fulfillmentStatus === '待发货' ? '运输中' : '已签收';
+    const nurture = lcRoleStage(lcCustomerPipeline(c), 'nurture');
     fidForm(
-      nextStatus === '运输中' ? `标记订单发货 · ${ord.orderNo}` : `确认客户签收并转入复购培育 · ${ord.orderNo}`,
+      nextStatus === '运输中' ? `标记订单发货 · ${ord.orderNo}` : nurture ? `确认客户签收并转入「${lcStageName(nurture)}」 · ${ord.orderNo}` : `确认客户签收 · ${ord.orderNo}`,
       'lc-order-step',
       `<input type="hidden" name="orderId" value="${esc(ord.id)}">
        <input type="hidden" name="nextStatus" value="${esc(nextStatus)}">
@@ -1754,7 +1808,7 @@
        ${fidFormRow('物流说明', `<input class="fid-input" style="width:100%" name="carrierNote" value="${esc(ord.carrierNote || '')}" placeholder="${nextStatus === '运输中' ? '输入承运商与追踪单号（如 USPS 9405...）' : '记录签收情况与客户初步反馈'}" required>`, '', true)}
        ${nextStatus === '已签收'
          ? `${fidFormRow('复购周期', `<select class="fid-select" style="width:100%" name="repurchaseCycleDays">${fidOption([['15', '15 天后进入复购窗口'], ['25', '25 天后进入复购窗口'], ['30', '30 天后进入复购窗口'], ['45', '45 天后进入复购窗口']], String(c.repurchaseCycleDays || 30))}</select>`)}
-            <p class="fid-field-help">确认签收后，客户将自动由「成交履约」流转至「复购培育」，并自动生成复购窗口关怀待办。</p>`
+            <p class="fid-field-help">${nurture ? `确认签收后，客户将自动转入「${esc(lcStageName(nurture))}」，并生成复购窗口关怀待办。` : '当前流程未设置「签收复购落点」，签收后客户阶段保持不变，仍会生成复购关怀待办。'}</p>`
          : ''}
        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px">
          <input type="checkbox" name="openChatDraft" value="1" checked> 同步生成对应语种（${esc(c.language)}）WhatsApp 通知草稿并打开聊天窗
@@ -1768,9 +1822,10 @@
     const accounts = myAccounts();
     if (!accounts.length) return toast('请先在号码管理绑定至少一个 WhatsApp 号码。');
     fidForm(
-      '模拟新客户加微进线（体验 S1 进线闭环）',
+      '模拟新客户加微进线',
       'lc-sim-lead',
-      `<p class="fid-field-help" style="margin-bottom:12px">模拟一位潜在客户从广告或转介绍添加你的 WhatsApp 号码并发来首条咨询，自动进入「S1 · 新进线」并立首响破冰待办。</p>
+      `<p class="fid-field-help" style="margin-bottom:12px">模拟一位潜在客户从广告或转介绍添加你的 WhatsApp 号码并发来首条咨询，自动进入所选流程的进线阶段并立首响破冰待办。</p>
+       ${fidFormRow('进入流程', `<select class="fid-select" style="width:100%" name="pipelineId">${lcPipelines().map(p => option(p.id, `${p.name}（进线阶段：${lcStageName(lcIntakeStage(p))}）`, lcBoardPipeline().id)).join('')}</select>`)}
        ${fidFormRow('进线号码', `<select class="fid-select" style="width:100%" name="accountId">${accounts.map(a => option(a.id, `${a.name} (${a.number})`, accounts[0].id)).join('')}</select>`)}
        ${fidFormRow('客户称呼', `<input class="fid-input" style="width:100%" name="name" value=" Jordan Brooks" required>`, '', true)}
        ${fidFormRow('客户语言', `<select class="fid-select" style="width:100%" name="language">${fidOption(['英语', '西班牙语'], '英语')}</select>`)}
@@ -1820,12 +1875,12 @@
     const c = customer(customerId);
     if (!c) return;
     const isEs = c.language === '西班牙语';
-    const inRecovery = LC_RECOVERY_STAGES.has(c.stage);
+    const inRecovery = lcIsRecovery(c.stage);
     const pair = inRecovery
       ? (isEs
           ? ['Hola, retomamos las compras esta semana. ¿Podemos revisar la cotización actualizada?', '你好，我们这周恢复采购计划了，可以重新核对一下最新报价吗？']
           : ['Hi! Our budget is ready now—could we revisit the quote and check current lead time?', '你好！我们的采购预算已经批下来了，可以重新确认一下报价和当前发货时效吗？'])
-      : c.stage === '报价推进'
+      : lcStageMeta(c.stage).capture === 'quote'
         ? (isEs
             ? ['El precio nos parece bien. ¿Aceptan pago hoy para enviarlo mañana?', '价格我们觉得合适。今天付款的话明天能安排发出吗？']
             : ['The quote looks good to us! If we confirm today, how soon can it ship out?', '这份报价我们认可！如果今天确认付款，最快多久能发出？'])
@@ -1846,12 +1901,12 @@
     toast(inRecovery ? `收到 ${c.name} 复联消息！已点亮「复联待重激活」信号，可一键重激活回流。` : `已模拟收到 ${c.name} 的新回复。`);
   }
 
-  // Override addCustomer so newly created customers enter S1 新进线 with initial SLA task
+  // Override addCustomer so newly created customers enter their pipeline's intake stage with an initial SLA task
   function openLifecycleCustomerForm() {
     const accounts = myAccounts();
     if (!accounts.length) return toast('请先添加账号。');
     fidForm(
-      '新增 WhatsApp 客户档案（自动入轨 S1 新进线）',
+      '新增 WhatsApp 客户档案（自动进入流程进线阶段）',
       'lc-new-customer',
       `${fidFormRow('客户称呼', `<input class="fid-input" style="width:100%" name="name" required maxlength="50" placeholder="客户姓名或备注称呼">`, '', true)}
        ${fidFormRow('WhatsApp号', `<input class="fid-input" style="width:100%" name="phone" required placeholder="含国家区号，如 +1 (512) 555-0192">`, '', true)}
@@ -1859,6 +1914,7 @@
        ${fidFormRow('沟通语言', `<select class="fid-select" style="width:100%" name="language">${fidOption(['英语', '西班牙语', '其他'], '英语')}</select>`)}
        ${fidFormRow('国家地区', `<select class="fid-select" style="width:100%" name="country">${fidOption([['US', '美国'], ['PR', '波多黎各'], ['OTHER', '其他地区']], 'US')}</select>`)}
        ${fidFormRow('来源渠道', `<select class="fid-select" style="width:100%" name="source">${fidOption(['Facebook 广告', 'Instagram 广告', '客户转介绍', '网站咨询', '手动添加'], 'Facebook 广告')}</select>`)}
+       ${fidFormRow('所属流程', `<select class="fid-select" style="width:100%" name="pipelineId">${lcPipelines().map(p => option(p.id, p.name, lcBoardPipeline().id)).join('')}</select>`)}
        ${fidFormRow('初步需求', `<input class="fid-input" style="width:100%" name="demand" placeholder="记录客户首句来意或咨询重点">`)}`,
       '创建并纳入全周期管理',
       { wide: true }
@@ -1874,7 +1930,14 @@
     lcRadar: id => { lcState.radar = lcState.radar === id && id !== 'all' ? 'all' : id; render(); },
     lcResetFilters: () => { Object.assign(lcState, { stageFilter: 'all', radar: 'all', account: 'all', query: '' }); render(); },
     lcToggleSop: () => { lcState.sopOpen = !lcState.sopOpen; render(); },
-    lcJumpStage: id => { lcState.stageFilter = id; lcState.radar = 'all'; navigate('lifecycle'); },
+    lcJumpStage: id => {
+      const hit = lcStageLookup(id);
+      if (hit) lcState.pipeline = hit.pipeline.id;
+      lcState.stageFilter = hit ? id : 'all';
+      lcState.radar = 'all';
+      navigate('lifecycle');
+    },
+    lcPipeline: id => { lcState.pipeline = id; lcState.stageFilter = 'all'; render(); },
     lcJumpRadar: id => { lcState.stageFilter = 'all'; lcState.radar = id; navigate('lifecycle'); },
     lcAdvance: (id, btn) => openLifecycleAdvance(id, btn?.dataset?.target || ''),
     lcSimLeadOpen: openSimLeadModal,
@@ -1934,16 +1997,21 @@
     'lc-transition-form': (f, v) => {
       const c = customer(v('customerId'));
       const targetStage = v('targetStage');
-      if (!c || !LC_STAGE_MAP.has(targetStage)) return error('请选择有效的生命周期阶段。');
+      const target = lcStageLookup(targetStage);
+      if (!c || !target) return error('请选择有效的生命周期阶段。');
+      const meta = lcStageMeta(targetStage);
       const prevStage = c.stage;
-      const wasRecovery = LC_RECOVERY_STAGES.has(prevStage);
+      const prevName = lcStageName(prevStage);
+      const prevPipeline = lcCustomerPipeline(c);
+      const wasRecovery = lcIsRecovery(prevStage);
+      const reactivating = wasRecovery && lcIsActive(targetStage);
 
-      if (targetStage === '需求澄明') {
+      if (meta.capture === 'qualify') {
         if (!v('demand')) return error('请填写客户核心咨询需求，以便后续精准跟进。');
         c.intentLevel = v('intentLevel') || c.intentLevel;
         c.qualification.demand = v('demand');
         if (v('volume')) c.qualification.volume = v('volume');
-      } else if (targetStage === '报价推进') {
+      } else if (meta.capture === 'quote') {
         const amt = Number(v('quoteAmount'));
         if (!amt || amt <= 0 || !v('quoteSummary')) return error('请填写有效的报价金额和方案摘要。');
         let openQ = lcCustomerQuotes(c.id).find(q => q.status === '待确认');
@@ -1961,7 +2029,7 @@
           data.quotes.unshift(openQ);
         }
         if (v('objection')) c.qualification.objection = v('objection');
-      } else if (targetStage === '成交履约') {
+      } else if (meta.capture === 'order') {
         const amt = Number(v('orderAmount'));
         if (!amt || amt <= 0) return error('请填写有效的成交金额。');
         const openQ = lcCustomerQuotes(c.id).find(q => q.status === '待确认');
@@ -1978,11 +2046,11 @@
           deliveredAt: fStatus === '已签收' ? new Date().toISOString() : null,
         };
         data.orders.unshift(ord);
-      } else if (targetStage === '复购培育') {
+      } else if (meta.capture === 'repurchase') {
         const days = Number(v('repurchaseCycleDays')) || 30;
         c.repurchaseCycleDays = days;
         c.nextRepurchaseAt = fidDay(days);
-      } else if (targetStage === '流失归档') {
+      } else if (meta.capture === 'lost') {
         if (!v('lostReason') || !v('lostDetail')) return error('请选择流失主因并填写简要说明。');
         c.lostReason = v('lostReason');
         c.lostDetail = v('lostDetail');
@@ -1999,34 +2067,36 @@
       }
 
       c.stage = targetStage;
+      c.pipelineId = target.pipeline.id;
       c.stageEnteredAt = new Date().toISOString();
-      if (wasRecovery && LC_ACTIVE_STAGES.has(targetStage)) {
+      if (reactivating) {
         c.reactivatedCount = (c.reactivatedCount || 0) + 1;
         c.unread = 0;
       }
 
-      if (targetStage !== '流失归档' && f.get('createNextTask') === '1' && v('nextTaskTitle')) {
+      if (meta.capture !== 'lost' && f.get('createNextTask') === '1' && v('nextTaskTitle')) {
         lcCreateTask({
           customerId: c.id,
           title: v('nextTaskTitle'),
           dueIso: v('nextTaskDue') ? new Date(v('nextTaskDue')).toISOString() : fidDay(1),
           priority: v('nextTaskPriority') || 'normal',
-          taskType: targetStage === '报价推进' ? '报价催单' : targetStage === '成交履约' ? '履约回访' : targetStage === '复购培育' ? '复购关怀' : targetStage === '沉睡唤醒' ? '沉睡唤醒' : '需求跟进',
+          taskType: meta.taskType || '需求跟进',
         });
       }
 
-      const noteExtra = v('transitionNote') || v('dormantReason') || (targetStage === '流失归档' ? `${c.lostReason}（${c.lostDetail}）` : '');
+      const noteExtra = v('transitionNote') || v('dormantReason') || (meta.capture === 'lost' ? `${c.lostReason}（${c.lostDetail}）` : '');
+      const crossed = prevPipeline.id !== target.pipeline.id ? `【转入「${target.pipeline.name}」流程】` : '';
       lcLog(
         c.id,
         'stage',
-        `${wasRecovery && LC_ACTIVE_STAGES.has(targetStage) ? '【重激活回流】' : ''}阶段由「${prevStage}」变更为「${targetStage}」${noteExtra ? ' · ' + noteExtra : ''}`,
+        `${reactivating ? '【重激活回流】' : ''}${crossed}阶段由「${prevName}」变更为「${meta.name}」${noteExtra ? ' · ' + noteExtra : ''}`,
         { fromStage: prevStage, toStage: targetStage }
       );
 
       persist();
       close();
       render();
-      toast(`已将 ${c.name} 更新至「${targetStage}」并完成闭环同步。`);
+      toast(`已将 ${c.name} 更新至「${meta.name}」并完成闭环同步。`);
     },
 
     'lc-qual-form': (f, v) => {
@@ -2077,15 +2147,17 @@
       lcLog(c.id, 'followup', `完成跟进「${t.title}」· 结果：${t.outcome}`);
 
       const nextStage = v('nextStage');
-      if (nextStage && LC_STAGE_MAP.has(nextStage) && nextStage !== c.stage) {
-        const prev = c.stage;
+      const nextHit = nextStage && nextStage !== c.stage ? lcStageLookup(nextStage) : null;
+      if (nextHit) {
+        const prev = lcStageName(c.stage);
         c.stage = nextStage;
+        c.pipelineId = nextHit.pipeline.id;
         c.stageEnteredAt = new Date().toISOString();
-        if (nextStage === '流失归档') c.lostReason ||= '明确无需求/暂缓归档';
-        lcLog(c.id, 'stage', `随跟进完成同步推进阶段：「${prev}」→「${nextStage}」`);
+        if (lcIsCategory(nextStage, 'lost')) c.lostReason ||= '明确无需求/暂缓归档';
+        lcLog(c.id, 'stage', `随跟进完成同步推进阶段：「${prev}」→「${nextHit.stage.name}」`, { toStage: nextStage });
       }
 
-      if (c.stage !== '流失归档' && f.get('scheduleNext') === '1' && v('nextTitle') && v('nextDue')) {
+      if (!lcIsCategory(c.stage, 'lost') && f.get('scheduleNext') === '1' && v('nextTitle') && v('nextDue')) {
         const due = new Date(v('nextDue'));
         if (!Number.isNaN(due.getTime())) {
           lcCreateTask({
@@ -2093,7 +2165,7 @@
             title: v('nextTitle'),
             dueIso: due.toISOString(),
             priority: v('nextPriority') || 'normal',
-            taskType: c.stage === '报价推进' ? '报价催单' : c.stage === '复购培育' ? '复购关怀' : '需求跟进',
+            taskType: lcStageMeta(c.stage).taskType || '需求跟进',
           });
         }
       } else {
@@ -2122,11 +2194,14 @@
       };
       data.quotes.unshift(q);
       if (f.get('autoFollow') === '1') {
-        if (['新进线', '需求澄明', '沉睡唤醒', '流失归档'].includes(c.stage)) {
-          const prev = c.stage;
-          c.stage = '报价推进';
+        // Advance to the pipeline's quoting stage only from an earlier open stage or a recovery stage.
+        const quoting = lcRoleStage(lcCustomerPipeline(c), 'quoting');
+        const here = lcStageMeta(c.stage);
+        const earlier = here.category === 'open' && here.index < (lcStageLookup(quoting)?.index ?? -1);
+        if (quoting && c.stage !== quoting && (earlier || lcIsRecovery(c.stage))) {
+          c.stage = quoting;
           c.stageEnteredAt = new Date().toISOString();
-          lcLog(c.id, 'stage', `新建报价单 ${q.quoteNo}，阶段由「${prev}」推进至「报价推进」`);
+          lcLog(c.id, 'stage', `新建报价单 ${q.quoteNo}，阶段由「${here.name}」推进至「${lcStageName(quoting)}」`, { toStage: quoting });
         }
         lcCreateTask({
           customerId: c.id,
@@ -2165,8 +2240,10 @@
       };
       data.orders.unshift(ord);
       const prev = c.stage;
+      const orderPipeline = lcCustomerPipeline(c);
+      const landing = lcRoleStage(orderPipeline, fStatus === '已签收' ? 'nurture' : 'fulfillment');
+      if (landing) c.stage = landing;
       if (fStatus === '已签收') {
-        c.stage = '复购培育';
         c.nextRepurchaseAt = fidDay(cycle);
         lcCreateTask({
           customerId: c.id,
@@ -2176,7 +2253,6 @@
           taskType: '复购关怀',
         });
       } else {
-        c.stage = '成交履约';
         lcCreateTask({
           customerId: c.id,
           title: `跟进订单 ${ord.orderNo} 发货单号与客户签收`,
@@ -2185,12 +2261,14 @@
           taskType: '履约回访',
         });
       }
-      c.stageEnteredAt = new Date().toISOString();
-      lcLog(c.id, 'deal', `登记${ord.orderType}成交 ${ord.orderNo}（${lcMoney(amount)}），阶段由「${prev}」进入「${c.stage}」`);
+      if (c.stage !== prev) c.stageEnteredAt = new Date().toISOString();
+      lcLog(c.id, 'deal', c.stage !== prev
+        ? `登记${ord.orderType}成交 ${ord.orderNo}（${lcMoney(amount)}），阶段由「${lcStageName(prev)}」进入「${lcStageName(c.stage)}」`
+        : `登记${ord.orderType}成交 ${ord.orderNo}（${lcMoney(amount)}），阶段保持「${lcStageName(c.stage)}」`);
       persist();
       close();
       render();
-      toast(`订单 ${ord.orderNo} 已登记，客户已进入「${c.stage}」阶段。`);
+      toast(c.stage !== prev ? `订单 ${ord.orderNo} 已登记，客户已进入「${lcStageName(c.stage)}」阶段。` : `订单 ${ord.orderNo} 已登记。`);
     },
 
     'lc-order-step-form': (f, v) => {
@@ -2207,8 +2285,11 @@
         c.repurchaseCycleDays = cycle;
         c.nextRepurchaseAt = fidDay(cycle);
         const prev = c.stage;
-        c.stage = '复购培育';
-        c.stageEnteredAt = new Date().toISOString();
+        const nurture = lcRoleStage(lcCustomerPipeline(c), 'nurture');
+        if (nurture && nurture !== prev) {
+          c.stage = nurture;
+          c.stageEnteredAt = new Date().toISOString();
+        }
         lcCreateTask({
           customerId: c.id,
           title: `老客复购窗口触达（预计 ${cycle} 天补货周期）`,
@@ -2216,7 +2297,9 @@
           priority: 'normal',
           taskType: '复购关怀',
         });
-        lcLog(c.id, 'deal', `订单 ${ord.orderNo} 确认签收，自动由「${prev}」转入「复购培育」（下次复购窗口 ${fidDate(c.nextRepurchaseAt).slice(0, 10)}）`);
+        lcLog(c.id, 'deal', c.stage !== prev
+          ? `订单 ${ord.orderNo} 确认签收，自动由「${lcStageName(prev)}」转入「${lcStageName(c.stage)}」（下次复购窗口 ${fidDate(c.nextRepurchaseAt).slice(0, 10)}）`
+          : `订单 ${ord.orderNo} 确认签收（下次复购窗口 ${fidDate(c.nextRepurchaseAt).slice(0, 10)}）`);
       } else {
         lcLog(c.id, 'deal', `订单 ${ord.orderNo} 更新为「运输中」· ${ord.carrierNote}`);
       }
@@ -2244,12 +2327,14 @@
         : '你好！刚从广告加了你们的 WhatsApp，可以发一下目录和发货说明吗？';
       const id = nextId('c');
       const nowIso = new Date().toISOString();
+      const leadPipeline = lcPipeline(v('pipelineId'));
+      const intake = lcIntakeStage(leadPipeline);
       const c = {
         id, name, initials: initial(name), color: 'blue', phone,
         country: a.country || 'US', city: a.country === 'PR' ? 'San Juan' : 'Dallas',
         timezone: a.country === 'PR' ? 'America/Puerto_Rico' : 'America/Chicago',
         language: v('language'), owner: a.owner || ui.persona, account: a.id,
-        tags: [], stage: '新进线', stageEnteredAt: nowIso,
+        tags: [], pipelineId: leadPipeline.id, stage: intake, stageEnteredAt: nowIso,
         source: v('source'), campaign: v('campaign'), ad: '模拟进线会话',
         unread: 1, star: false, last: '刚刚', preview: msg, translation: tr,
         followup: null, notes: '', contactRefs: [{ account: a.id, owner: a.owner || ui.persona }],
@@ -2266,13 +2351,14 @@
         priority: 'high',
         taskType: '首响破冰',
       });
-      lcLog(id, 'inbound', `通过「${c.source}」首次加微进线，自动进入「S1 · 新进线」并生成首响待办`);
+      lcLog(id, 'inbound', `通过「${c.source}」首次加微进线，自动进入「${leadPipeline.name} · ${lcStageName(intake)}」并生成首响待办`, { toStage: intake });
       persist();
       close();
+      lcState.pipeline = leadPipeline.id;
       lcState.stageFilter = 'all';
       lcState.radar = 'all';
       navigate('lifecycle');
-      toast(`新客户 ${name} 已加微进线！已自动归入「S1 · 新进线」并建立首响待办。`);
+      toast(`新客户 ${name} 已加微进线！已自动归入「${lcStageName(intake)}」并建立首响待办。`);
     },
 
     'lc-new-customer-form': (f, v) => {
@@ -2280,16 +2366,18 @@
       const digits = fidPhoneDigits(v('phone'));
       if (digits.length < 7) return error('请输入含国家区号的有效号码。');
       const dup = data.customers.find(x => fidPhoneDigits(x.phone) === digits);
-      if (dup) return error(`该号码已存在于客户「${dup.name}」（当前阶段：${dup.stage}），请直接前往其档案跟进避免撞单。`);
+      if (dup) return error(`该号码已存在于客户「${dup.name}」（当前阶段：${lcStageName(dup.stage)}），请直接前往其档案跟进避免撞单。`);
       const a = account(v('account'));
       const nowIso = new Date().toISOString();
       const id = nextId('c');
+      const newPipeline = lcPipeline(v('pipelineId'));
+      const intake = lcIntakeStage(newPipeline);
       const c = {
         id, name: v('name'), initials: initial(v('name')), color: 'jade',
         phone: v('phone'), country: v('country'), city: '待补充',
         timezone: v('country') === 'PR' ? 'America/Puerto_Rico' : 'America/New_York',
         language: v('language'), owner: a?.owner || ui.persona, account: a?.id || myAccounts()[0]?.id,
-        tags: [], stage: '新进线', stageEnteredAt: nowIso,
+        tags: [], pipelineId: newPipeline.id, stage: intake, stageEnteredAt: nowIso,
         source: v('source'), campaign: '', ad: '',
         unread: 0, star: false, last: '刚刚', preview: v('demand') || '新建客户档案', translation: '',
         followup: null, notes: v('demand'), contactRefs: [{ account: a?.id, owner: a?.owner || ui.persona }],
@@ -2305,7 +2393,7 @@
         priority: 'normal',
         taskType: '首响破冰',
       });
-      lcLog(id, 'stage', '手动建档纳入「S1 · 新进线」并自动创建首次跟进待办');
+      lcLog(id, 'stage', `手动建档纳入「${newPipeline.name} · ${lcStageName(intake)}」并自动创建首次跟进待办`, { toStage: intake });
       persist();
       close();
       render();
@@ -2313,14 +2401,14 @@
     },
   });
 
-  // Keep any newly bound OpenWA sample chats or external additions normalized into S1 新进线
+  // Keep customers added elsewhere (OpenWA sample chats, legacy saves) on a valid pipeline stage
   function lcSyncRuntimeCustomers() {
+    if (!Array.isArray(data.pipelines) || !data.pipelines.length) data.pipelines = lcPresetPipelines();
+    if (ui.customerStage !== 'all' && !lcStageLookup(ui.customerStage)) ui.customerStage = 'all';
     for (const c of data.customers) {
-      const normalized = lcNormalizeStage(c.stage);
-      if (c.stage !== normalized) {
-        c.stage = normalized;
-        c.stageEnteredAt ||= new Date().toISOString();
-      }
+      const before = c.stage;
+      lcNormalizeCustomer(c);
+      if (c.stage !== before) c.stageEnteredAt ||= new Date().toISOString();
       c.qualification ||= {
         demand: c.notes || c.preview || '',
         volume: '待确认',
@@ -2328,7 +2416,7 @@
         objection: '',
         commWindow: (c.language || '英语') + '沟通',
       };
-      if (c.stage === '新进线' && !data.tasks.some(t => t.customer === c.id) && !(data.activities[c.id] || []).length) {
+      if (lcHasRole(c, 'intake') && !data.tasks.some(t => t.customer === c.id) && !(data.activities[c.id] || []).length) {
         lcCreateTask({
           customerId: c.id,
           title: `首响破冰回复 ${c.name} 并确认咨询需求`,
@@ -2336,7 +2424,7 @@
           priority: 'high',
           taskType: '首响破冰',
         });
-        lcLog(c.id, 'inbound', 'OpenWA 扫码进线会话自动归入「S1 · 新进线」并建立首响待办');
+        lcLog(c.id, 'inbound', `OpenWA 扫码进线会话自动归入「${lcStageName(c.stage)}」并建立首响待办`);
       }
     }
   }

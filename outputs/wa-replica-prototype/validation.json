@@ -1,21 +1,44 @@
 {
-  "version": "0.6-scrm-lifecycle",
+  "version": "0.7-scrm-pipelines",
   "status": "passed",
-  "checkedAt": "2026-11-17T09:00:24.593Z",
-  "projectRoot": "wa-scrm",
-  "historicalBaselineVerified": 6,
+  "checkedAt": "2026-11-17T12:48:48.308Z",
+  "projectRoot": "WA-SCRM",
+  "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
     "whatsapp-scrm-lifecycle.html",
     "whatsapp-replica-ui-fidelity.html"
   ],
-  "lifecycleStages": [
-    "新进线",
-    "需求澄明",
-    "报价推进",
-    "成交履约",
-    "复购培育",
-    "沉睡唤醒",
-    "流失归档"
+  "lifecyclePipelines": [
+    {
+      "id": "retail",
+      "name": "零售客户",
+      "default": true,
+      "stages": [
+        "新进线",
+        "需求澄明",
+        "报价推进",
+        "成交履约",
+        "复购培育",
+        "沉睡唤醒",
+        "流失归档"
+      ]
+    },
+    {
+      "id": "b2b",
+      "name": "大B经销商",
+      "default": false,
+      "stages": [
+        "批发询盘",
+        "资质核验",
+        "样品试单",
+        "批量报价谈判",
+        "签约供货",
+        "周期补货",
+        "暂停合作",
+        "合作终止"
+      ]
+    }
   ],
+  "stageNameHardcoding": "none",
   "externalNetworkCalls": false
 }

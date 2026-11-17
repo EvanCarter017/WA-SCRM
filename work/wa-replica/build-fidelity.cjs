@@ -40,7 +40,7 @@ swap('if(previous){module.decision=previous.decision;module.notes=previous.notes
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
     }`);
-swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',lifecycle:'全周期看板',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进与待办',deals:'成交与复购','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',scope:'功能范围'};
+swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',lifecycle:'全周期看板',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进与待办',deals:'成交与复购','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',pipelines:'流程配置',scope:'功能范围'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';`);
 swap("view:views[location.hash.slice(1)]?location.hash.slice(1):'inbox'", "view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView");
 swap('  const ui={', "  const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');\n  const ui={");
@@ -57,8 +57,8 @@ swap('当前聊手只能使用公共标签，请切换主管视角维护。', '�
 js = js.replaceAll("ui.view==='team'&&!manager()", "['team','members'].includes(ui.view)&&!manager()").replaceAll("id!=='team'||manager()", "!['team','members'].includes(id)||manager()");
 swap('  function render() {\n', '  function render() {\n    if(!renderSignInState())return;\n');
 swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,lifecycle:renderLifecycle,inbox:renderInbox');
-swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,deals:renderDeals,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,scope:renderScope");
-swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'覆盖加微进线、需求澄明、报价推进、成交履约、复购培育及沉睡/流失重激活的 7 阶段防漏闭环看板。','P-DEALS':'在途报价转单、订单发货签收联动复购周期及老客唤醒台账。'");
+swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,deals:renderDeals,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,pipelines:renderPipelines,scope:renderScope");
+swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'按可配置流程展示客户全生命周期的防漏闭环看板；预设「零售客户」7 阶段与「大B经销商」8 阶段两条流程。','P-PIPELINES':'阶段名称、数量、顺序、类型、进入时采集内容与自动流转落点均可配置，支持多条流程并行。','P-DEALS':'在途报价转单、订单发货签收联动复购周期及老客唤醒台账。'");
 swap('聊手管理自己的工作，主管查看团队并处理分配。', '团队成员、账号分配和客户交接由主站管理。');
 const deferredScopeIds = JSON.stringify(['P-COMMERCIAL','P-TEAM','P-AUTO','P-REPLY-MANAGEMENT','P-BROADCAST']);
 swap("m.id!=='P-COMMERCIAL'||m.id==='P-ATTRIBUTION'", `!${deferredScopeIds}.includes(m.id)||m.id==='P-ATTRIBUTION'`);
@@ -97,13 +97,15 @@ const customerPages = read(__dirname, 'fidelity-customer-pages.js');
 const operationsPages = read(__dirname, 'fidelity-operations.js');
 const openwaPages = read(__dirname, 'fidelity-openwa.js');
 const dashboardPage = read(__dirname, 'fidelity-dashboard.js');
+const pipelineDefinitions = read(__dirname, 'fidelity-pipelines.js');
 const lifecyclePages = read(__dirname, 'fidelity-lifecycle.js');
+const pipelineSettings = read(__dirname, 'fidelity-pipeline-settings.js');
 const subsiteSession = read(__dirname, 'fidelity-subsite.js');
-swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
+swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, pipelineDefinitions, lifecyclePages, pipelineSettings, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
-requirement.version = '0.6-scrm-lifecycle';
+requirement.version = '0.7-scrm-pipelines';
 requirement.updatedOn = '2026-11-17';
 const connection = 'OpenWA 桥接';
 Object.assign(requirement.connectionDecision, {
@@ -117,20 +119,23 @@ requirement.review.items.find(item => item.id === 'CONNECTION').question =
 requirement.review.items.push({
   id: 'LIFECYCLE',
   title: '客户全生命周期闭环',
-  question: '7 阶段划分（新进线→需求澄明→报价推进→成交履约→复购培育⇄沉睡唤醒/流失归档）、阶段推进门禁、防断档跟进与复购提醒是否契合实际业务？',
+  question: '生命周期已改为可配置流程：预设「零售客户」与「大B经销商」两条。请评审各流程的阶段划分、进入阶段时的采集内容、自动流转落点、防断档跟进与复购提醒是否契合实际业务，并在「流程配置」中直接调整。',
   status: '待评审',
   notes: '',
 });
-requirement.modelOutline.entities.push('Quote', 'Order', 'LifecycleTransition');
+requirement.modelOutline.entities.push('Pipeline', 'PipelineStage', 'Quote', 'Order', 'LifecycleTransition');
 requirement.modelOutline.relationships.push(
   '每个标签包含一个名称并归属一个自建分组。客户可同时使用同组或不同组的多个标签。',
-  '客户主生命周期采用 7 阶段状态机，与自定义标签解耦；沉睡与流失客户来信支持保留历史档案重激活回流。',
+  '每位客户归属一条流程（Pipeline）并处于其中一个阶段（PipelineStage）。阶段以稳定 ID 存储，名称、顺序与数量可配置；与自定义标签解耦。',
+  '系统行为由阶段类型（转化推进 / 成交与存量 / 沉睡唤醒 / 流失归档）、进入时采集内容和流程的自动流转落点决定，不依赖阶段名称。沉睡与流失客户来信支持保留历史档案重激活回流。',
   '报价单可一键转成交订单，订单确认签收后自动开启复购周期窗口并衔接关怀待办。'
 );
 Object.assign(requirement.prototypeAssumptions.find(a => a.id === 'A001'), {
   text: '子站固定为已登录聊手的工作范围。顶栏提供退出登录。原型使用固定的演示身份与本地退出流程。',
   decision: '已确认',
 });
+const stagePresets = requirement.prototypeAssumptions.find(a => a.id === 'A006');
+if (stagePresets) stagePresets.text = '客户阶段以流程预设提供（零售客户、大B经销商），可在「流程配置」中增删改阶段、调整顺序与自动流转，或新建流程。语言、来源、备注和跟进时间先提供通用预设，后续可修改。';
 const proposal = requirement.prototypeAssumptions.find(a => a.id === 'A005');
 proposal.text = '桌面在原工作台框架上补齐 WhatsApp 客户全生命周期看板、360° 档案、防漏跟进与报价订单复购闭环。窄屏保留自适应切换。';
 const teamModule = requirement.modules.find(module => module.id === 'P-TEAM');
@@ -163,13 +168,18 @@ requirement.modules.splice(autoIndex,0,{
 requirement.modules.unshift(
   {
     id:'P-DASHBOARD', name:'首页经营与全周期概览', decision:'首轮原型', basis:'用户要求首页仪表盘与生命周期总览',
-    originalIds:['HOME'], screens:['dashboard'], features:['未读与跟进概况','7阶段全周期漏斗','防漏雷达直达','号码状态与重连','客户来源分布'],
+    originalIds:['HOME'], screens:['dashboard'], features:['未读与跟进概况','各流程全周期漏斗','防漏雷达直达','号码状态与重连','客户来源分布'],
     notes:'汇总当前聊手名下客户全周期分布、在途报价、累计成交 LTV 与防漏信号。',
   },
   {
     id:'P-LIFECYCLE', name:'客户全生命周期看板', decision:'首轮原型', basis:'用户明确补充 WhatsApp 客户全生命流程闭环',
-    originalIds:['CLUE','CUST'], screens:['lifecycle'], features:['7阶段闭环看板/明细双视图','防漏健康度雷达','智能阶段推进门禁','360°客户全生命档案','沉睡与流失复联重激活'],
-    notes:'覆盖从加微进线破冰到复购培育与流失回流的完整闭环。',
+    originalIds:['CLUE','CUST'], screens:['lifecycle'], features:['按流程切换的闭环看板/明细双视图','防漏健康度雷达','智能阶段推进门禁','360°客户全生命档案','沉睡与流失复联重激活','客户跨流程转移'],
+    notes:'覆盖从加微进线破冰到复购培育与流失回流的完整闭环；阶段来自流程配置。',
+  },
+  {
+    id:'P-PIPELINES', name:'生命周期流程配置', decision:'首轮原型', basis:'SCRM 需适配不同客户类型与业务变化，阶段不应写死',
+    originalIds:[], screens:['pipelines'], features:['多条流程并行','阶段增删改与排序','阶段类型与进入时采集','自动流转落点','流失原因按流程维护','删除阶段/流程时迁移客户'],
+    notes:'正式版由主管在主站维护；原型开放编辑供评审。',
   },
   {
     id:'P-DEALS', name:'成交履约与复购中心', decision:'首轮原型', basis:'全生命周期交易与存量复购闭环必需',

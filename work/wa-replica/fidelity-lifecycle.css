@@ -117,7 +117,7 @@
 }
 .lc-funnel-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--lc-cols, 5), minmax(0, 1fr));
   gap: 8px;
 }
 .lc-step-card {
@@ -214,7 +214,7 @@
 }
 .lc-recovery-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--lc-cols, 2), minmax(0, 1fr));
   gap: 6px;
 }
 .lc-recovery-pill {
@@ -371,10 +371,10 @@
   font-weight: 600;
 }
 
-/* 7-Stage Kanban Board */
+/* Kanban board: one column per configured stage */
 .lc-board {
   display: grid;
-  grid-template-columns: repeat(7, minmax(238px, 1fr));
+  grid-template-columns: repeat(var(--lc-cols, 7), minmax(238px, 1fr));
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 8px;
@@ -767,7 +767,7 @@
 }
 .lc-stepper {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--lc-cols, 7), minmax(0, 1fr));
   gap: 4px;
   margin-top: 12px;
 }
@@ -1107,7 +1107,7 @@
 }
 .dash-lc-track {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--lc-cols, 7), minmax(0, 1fr));
   gap: 8px;
 }
 .dash-lc-node {
@@ -1235,6 +1235,241 @@
   color: var(--color-accent);
 }
 
+/* Configurable pipelines (v0.7) */
+.lc-loop-banner.no-recovery {
+  grid-template-columns: minmax(0, 1fr);
+}
+.lc-pipeline-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.lc-pipeline-tabs {
+  flex-wrap: wrap;
+}
+.lc-elsewhere {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.lc-elsewhere .icon {
+  width: 14px;
+  height: 14px;
+}
+.lc-cross-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--fid-royal);
+}
+.lc-stepper-btn small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-stepper-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--fid-ink);
+}
+.lc-stepper-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lc-stepper-head .icon {
+  width: 13px;
+  height: 13px;
+}
+.lc-stepper-head small {
+  color: var(--color-text-muted);
+}
+.lc-stepper-head + .lc-stepper {
+  margin-top: 6px;
+}
+.dash-lc-pipeline + .dash-lc-pipeline {
+  margin-top: 12px;
+}
+.dash-lc-pipeline-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fid-ink);
+}
+.dash-lc-pipeline-name .icon {
+  width: 13px;
+  height: 13px;
+}
+.dash-lc-pipeline-name b {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 11px;
+}
+.dash-lc-node span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.lc-cfg-head h3 .lc-pill {
+  margin-left: 6px;
+}
+.lc-cfg-chain {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fid-ink);
+}
+.lc-cfg-issues {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fid-amber);
+}
+.lc-cfg-issues li,
+.lc-cfg-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lc-cfg-issues .icon,
+.lc-cfg-ok .icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.lc-cfg-ok {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--fid-mint);
+}
+.lc-cfg-head .lc-block-head {
+  flex-wrap: wrap;
+}
+.lc-cfg-head .lc-block-head h3 {
+  white-space: nowrap;
+}
+.lc-cfg-head .lc-deal-actions {
+  flex-wrap: wrap;
+}
+.lc-cfg-head .info-row {
+  align-items: flex-start;
+  gap: 16px;
+}
+.lc-cfg-head .info-row span:first-child {
+  flex: none;
+}
+.lc-cfg-head .info-row span:last-child {
+  text-align: right;
+}
+.lc-cfg-table {
+  min-width: 1080px;
+}
+.lc-cfg-table col:nth-child(1) {
+  width: 104px;
+}
+.lc-cfg-table col:nth-child(2) {
+  width: 170px;
+}
+.lc-cfg-table col:nth-child(3),
+.lc-cfg-table col:nth-child(5),
+.lc-cfg-table col:nth-child(6) {
+  width: 108px;
+}
+.lc-cfg-table col:nth-child(8) {
+  width: 70px;
+}
+.lc-cfg-table col:nth-child(9) {
+  width: 160px;
+}
+.lc-cfg-table .fid-icon-actions {
+  flex-wrap: nowrap;
+  justify-content: center;
+}
+.lc-cfg-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.lc-cfg-order span {
+  min-width: 24px;
+  font-weight: 700;
+  text-align: center;
+}
+.lc-cfg-order .icon-button {
+  width: 26px;
+  height: 26px;
+}
+.lc-cfg-order .icon-button:disabled {
+  opacity: 0.3;
+}
+.lc-cfg-roles {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+.lc-cfg-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+.lc-cfg-role small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.lc-cfg-role .fid-select {
+  width: 100%;
+}
+.lc-cfg-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lc-cfg-inline .fid-input[type="number"] {
+  width: 90px;
+}
+.lc-cfg-textarea {
+  width: 100%;
+  height: auto;
+  min-height: 104px;
+  padding: 8px 10px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.lc-cfg-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+}
 @media (max-width: 1180px) {
   .lc-loop-banner {
     grid-template-columns: minmax(0, 1fr);
@@ -1264,6 +1499,9 @@
   .lc-board {
     grid-template-columns: minmax(0, 1fr);
     overflow-x: visible;
+  }
+  .lc-recovery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .lc-col {
     max-height: none;
