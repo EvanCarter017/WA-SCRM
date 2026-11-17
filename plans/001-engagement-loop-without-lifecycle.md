@@ -168,7 +168,7 @@ Run from the repository root. `node` v18 or newer works (`node --version`).
 | Restore icon pool (run before **every** build) | `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js` | exit 0 |
 | Build | `node work/wa-replica/build-fidelity.cjs` | exit 0; prints JSON with `"version": "0.8-scrm-engagement"` (after Step 13) |
 | Validate | `node work/wa-replica/validate-scrm-lifecycle.cjs` | exit 0; prints JSON with `"status": "passed"` |
-| Browser smoke | `bash "$SMOKE"` (script from Step 1) | last line `SMOKE PASS` |
+| Browser smoke | `bash /tmp/wa-scrm-plan-001/smoke.sh` (script from Step 1; run from inside the repo) | last line `SMOKE PASS` |
 | Scope check | `git status --porcelain` | only in-scope paths |
 
 There is no test suite, linter or typechecker in this repo. The build fails on a JavaScript **syntax** error but not on a reference to an undefined function — the validator's identifier guard (Step 14) and the browser smoke test are what catch those. Run all three after every step from Step 3 onward.
@@ -208,10 +208,10 @@ There is no test suite, linter or typechecker in this repo. The build fails on a
 
 ### Step 1: Create the browser smoke script (outside the repo) and record the baseline
 
-Create a temp directory **outside the repository** and save this script there. It renders every page of the standalone bundle in headless Chrome (installed at `/usr/bin/google-chrome`), fails on any JavaScript error, and checks rendered text.
+Save this script at the fixed path `/tmp/wa-scrm-plan-001/smoke.sh` (**outside the repository**; shell variables do not survive between your tool calls, so always use this literal path, and always run it from inside the repository). It renders every page of the standalone bundle in headless Chrome (installed at `/usr/bin/google-chrome`), fails on any JavaScript error, and checks rendered text.
 
 ```bash
-export SMOKE_DIR=$(mktemp -d) && export SMOKE="$SMOKE_DIR/smoke.sh" && cat > "$SMOKE" <<'EOF'
+mkdir -p /tmp/wa-scrm-plan-001 && cat > /tmp/wa-scrm-plan-001/smoke.sh <<'EOF'
 #!/usr/bin/env bash
 # Renders each view of the standalone bundle in headless Chrome and checks it.
 set -u
@@ -240,19 +240,20 @@ need dashboard '客户待回复'
 need customers '跟进状态 / 下次跟进'
 need scope '客户全生命周期看板'
 need scope '成交履约与复购中心'
-need scope '客户跟进闭环'
+need scope '报价、订单与复购台账暂缓'
+need scope '每位客户要么有下一步跟进'
 need lifecycle '跟进闭环概览'
 need deals '跟进闭环概览'
 need pipelines '跟进闭环概览'
 echo "artifacts: $OUT"
 [ "$FAIL" = 0 ] && echo "SMOKE PASS" || { echo "SMOKE FAIL"; exit 1; }
 EOF
-chmod +x "$SMOKE" && echo "$SMOKE"
+chmod +x /tmp/wa-scrm-plan-001/smoke.sh && ls -l /tmp/wa-scrm-plan-001/smoke.sh
 ```
 
 Notes: the three removed routes (`#lifecycle`, `#deals`, `#pipelines`) must fall back to the dashboard, which is why the script expects the dashboard panel on them. The `scope` view is exempt from the forbidden-term check because it legitimately lists the deferred modules by name.
 
-**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && bash "$SMOKE"; git status --porcelain` → every `view=` line shows `js_errors=0`; the run ends with `SMOKE FAIL` (expected now — the lifecycle UI still exists); `git status --porcelain` prints **nothing** (the build is reproducible at the planned commit). If `js_errors` is non-zero or `git status` shows changes at this point, STOP.
+**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && bash /tmp/wa-scrm-plan-001/smoke.sh; git status --porcelain` → every `view=` line shows `js_errors=0`; the run ends with `SMOKE FAIL` (expected now — the lifecycle UI still exists); `git status --porcelain` prints **nothing** (the build is reproducible at the planned commit). If `js_errors` is non-zero or `git status` shows changes at this point, STOP.
 
 ### Step 2: Replace the stage helpers with engagement helpers in `fidelity-lifecycle.js`
 
@@ -973,7 +974,12 @@ Also confirm the only remaining reads of legacy stage data are inside `lcMigrate
 1. The `views` replacement (line 43): remove `lifecycle:'全周期看板',`, `deals:'成交与复购',` and `pipelines:'流程配置',` from the second argument. Change `followups:'跟进与待办'` to `followups:'跟进闭环'`.
 2. Line 59: `'const pages={dashboard:renderDashboard,lifecycle:renderLifecycle,inbox:renderInbox'` → `'const pages={dashboard:renderDashboard,inbox:renderInbox'`.
 3. Line 60: remove `deals:renderDeals,` and `pipelines:renderPipelines,` from the second argument.
-4. Line 61 (scope descriptions): replace the `'P-LIFECYCLE':'…','P-PIPELINES':'…','P-DEALS':'…'` part of the second argument with `'P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'`.
+4. Line 61 (scope descriptions): replace the `'P-LIFECYCLE':'…','P-PIPELINES':'…','P-DEALS':'…'` part of the second argument with `'P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。'`. Then add these two new lines directly below line 61 (both first arguments exist verbatim in the frozen baseline — copy them exactly):
+
+```js
+swap("'P-FOLLOW':'把跟进安排成待办，完成后回写客户记录。'", "'P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'");
+swap("'P-CUSTOMERS':'客户档案、来源、阶段、标签及跨账号接触记录。'", "'P-CUSTOMERS':'客户档案、来源、跟进状态、标签及跨账号接触记录。'");
+```
 5. Line 63: `deferredScopeIds` becomes `JSON.stringify(['P-COMMERCIAL','P-TEAM','P-AUTO','P-REPLY-MANAGEMENT','P-BROADCAST','P-LIFECYCLE','P-PIPELINES','P-DEALS'])`.
 6. Line 66: in the second argument remove `||nav.dataset.nav==="deals"`.
 7. Lines 67 and 68: remove `||id==='lifecycle'` from both second arguments.
@@ -1017,11 +1023,21 @@ customersModule.features = customersModule.features.map(feature => feature === '
 requirement.modules.find(module => module.id === 'P-TAGS').notes = '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。';
 ```
 
-**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` → exit 0 and the printed JSON contains `"version": "0.8-scrm-engagement"`. Then `bash "$SMOKE"` → last line `SMOKE PASS`. If the smoke reports `js_errors` > 0, open the `.log` file in the printed artifacts directory, find the `Uncaught …` line, fix the cause in `fidelity-lifecycle.js`, and rebuild (restore `icons.js` first).
+**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` → exit 0 and the printed JSON contains `"version": "0.8-scrm-engagement"`. Then `bash /tmp/wa-scrm-plan-001/smoke.sh` → last line `SMOKE PASS`. If the smoke reports `js_errors` > 0, open the `.log` file in the printed artifacts directory, find the `Uncaught …` line, fix the cause in `fidelity-lifecycle.js`, and rebuild (restore `icons.js` first).
 
 ### Step 14: Validator (`work/wa-replica/validate-scrm-lifecycle.cjs`)
 
-1. In section "2." replace the version assertion and the module assertions with:
+1. In section "2." delete these five lines:
+
+```js
+assert.equal(req.version, '0.7-scrm-pipelines');
+assert(req.modules.some(m => m.id === 'P-LIFECYCLE' && m.screens.includes('lifecycle')));
+assert(req.modules.some(m => m.id === 'P-PIPELINES' && m.screens.includes('pipelines')));
+assert(req.modules.some(m => m.id === 'P-DEALS' && m.screens.includes('deals')));
+assert(req.review.items.some(i => i.id === 'LIFECYCLE'));
+```
+
+and put this in their place:
 
 ```js
 assert.equal(req.version, '0.8-scrm-engagement');
@@ -1076,7 +1092,7 @@ for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEng
 
 Note: `appJs` is already defined earlier in the validator (`const appJs = read(path.join(out, 'app.js'));`); the new section 4 must come after that line (it does, if you insert it where the old sections 4–5 were). The base app code inside `app.js` does not contain any of the removed identifiers; if the `app.js` assertion fires for a name, the cause is in a module file, not the base.
 
-**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && node work/wa-replica/validate-scrm-lifecycle.cjs` → exit 0, JSON with `"status": "passed"`, `"version": "0.8-scrm-engagement"`. Then `bash "$SMOKE"` → `SMOKE PASS`.
+**Verify**: `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && node work/wa-replica/validate-scrm-lifecycle.cjs` → exit 0, JSON with `"status": "passed"`, `"version": "0.8-scrm-engagement"`. Then `bash /tmp/wa-scrm-plan-001/smoke.sh` → `SMOKE PASS`.
 
 ### Step 15: Launcher and documentation
 
@@ -1090,7 +1106,9 @@ sed -i 's/#lifecycle/#followups/g; s/客户全生命周期原型预览服务/客
 
 15b. `README.md` (keep the existing structure and style; edit only what is listed):
 
-- Title line and intro paragraph: replace `客户全生命周期工作台` / `客户全生命周期管理（SCRM）` wording with `客户跟进闭环工作台` / `客户跟进闭环管理（SCRM）`; replace `无断点客户全生命流程闭环` with `无断点客户跟进闭环`. Keep the screenshot line as is.
+- Title line and intro paragraph: replace `客户全生命周期工作台` / `客户全生命周期管理（SCRM）` wording with `客户跟进闭环工作台` / `客户跟进闭环管理（SCRM）`; replace `无断点客户全生命流程闭环` with `无断点客户跟进闭环`.
+- Delete line 5, the screenshot line `![WA Desk SCRM 全周期看板概览](outputs/wa-scrm-lifecycle-overview.png)` (it shows the removed board). Do not delete the image file itself.
+- In section 4 (`安全与数据边界`), change `聊天对话、二维码、报价单与订单均为` to `聊天对话与二维码均为`.
 - In section 1, the Windows shortcut sentence: `#lifecycle` → `#followups`.
 - Replace the whole of section 2 (from its `## 2.` heading down to, but not including, `## 3.`) with:
 
@@ -1131,7 +1149,7 @@ flowchart LR
 
 - In section 3's directory tree: delete the lines for `fidelity-pipelines.js` and `fidelity-pipeline-settings.js`; the `fidelity-lifecycle.js / .css` line's comment becomes `# 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）`; the `PRODUCT.md` and `DESIGN.md` comment lines become `# 产品定位、跟进闭环业务边界与范围说明` and `# 桌面/窄屏布局规范与跟进闭环交互架构`; `validate-scrm-lifecycle.cjs` comment stays.
 
-**Verify**: `grep -cE "生命周期|全周期|漏斗|7 阶段" README.md` → the only matches are inside section 2's "已暂缓" sentence, the `#scope` table row, and file names containing `lifecycle` (expect a count of 3 or fewer; read each remaining match and confirm it describes a deferred feature or a file name).
+**Verify**: `grep -cE "生命周期|全周期|漏斗|7 阶段|报价单" README.md` → `2` (the two remaining lines are section 2's first sentence about what was deferred, and the `#scope` table row).
 
 15c. `PRODUCT.md`:
 
@@ -1217,7 +1235,7 @@ Also, anywhere else in `DESIGN.md` that mentions `全生命周期` in running te
 git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js
 node work/wa-replica/build-fidelity.cjs
 node work/wa-replica/validate-scrm-lifecycle.cjs
-bash "$SMOKE"
+bash /tmp/wa-scrm-plan-001/smoke.sh
 git status --porcelain
 ```
 
@@ -1228,7 +1246,7 @@ git status --porcelain
 This repo has no automated behavioural tests; its verification pattern is the static validator plus browser checks. Follow that pattern:
 
 - **Validator** (`work/wa-replica/validate-scrm-lifecycle.cjs`) — extended in Step 14 with: deferred-module records, removed-identifier guard on the module source and on the built `app.js`, removed-wording guard on the UI sources, and presence of the engagement-loop handlers. Model new assertions on the existing ones in that file (plain `node:assert/strict`).
-- **Browser smoke** (`$SMOKE`, Step 1) — every view renders without JavaScript errors; removed wording is absent from rendered UI; the follow-up centre, dashboard panel, customer list header and scope page contain the expected text; removed routes fall back to the dashboard.
+- **Browser smoke** (`/tmp/wa-scrm-plan-001/smoke.sh`, Step 1) — every view renders without JavaScript errors; removed wording is absent from rendered UI; the follow-up centre, dashboard panel, customer list header and scope page contain the expected text; removed routes fall back to the dashboard.
 - **Interactive flows** (dialogs: complete-and-close-the-loop, end follow-up, resume follow-up, tag filter, simulated lead/re-contact) cannot be exercised by the smoke script. The **reviewer** runs a scripted browser session against your build for these. You are not expected to add a browser test framework — doing so is out of scope.
 
 ## Done criteria
@@ -1237,7 +1255,7 @@ Machine-checkable. ALL must hold:
 
 - [ ] `git checkout 53b0bff -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"`
 - [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
-- [ ] `bash "$SMOKE"` ends with `SMOKE PASS`
+- [ ] `bash /tmp/wa-scrm-plan-001/smoke.sh` ends with `SMOKE PASS`
 - [ ] `ls work/wa-replica/fidelity-pipelines.js work/wa-replica/fidelity-pipeline-settings.js 2>&1 | grep -c "No such file"` → `2`
 - [ ] The Step 12e identifier grep prints nothing
 - [ ] `grep -nE "\.stage\b|data\.pipelines|pipelineId" work/wa-replica/fidelity-lifecycle.js` shows only lines inside `lcMigrateEngagement`
