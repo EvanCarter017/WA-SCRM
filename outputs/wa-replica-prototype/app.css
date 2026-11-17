@@ -872,8 +872,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-archive-meta dt { color:var(--color-text-muted); white-space:nowrap; }
 .fid-archive-meta dd { margin:0; overflow-wrap:anywhere; }
 .fid-archive-meta small { display:block; color:var(--color-text-muted); }
-.fid-archive-review { display:flex; flex-direction:column; gap:var(--fid-px-8); padding:var(--fid-px-10) 0; border-top:var(--fid-px-1) solid var(--fid-frame); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
-.fid-archive-note { width:100%; height:auto; min-height:var(--fid-px-84); padding:var(--fid-px-8) var(--fid-px-10); line-height:1.5; resize:vertical; }
 .fid-archive-actions { display:flex; flex-wrap:wrap; gap:var(--fid-px-6); }
 .fid-ai .fid-heading { margin-bottom:var(--fid-px-12); }
 .fid-ai h2 { margin:var(--fid-px-18) 0 var(--fid-px-8); font-size:var(--fid-px-15); font-weight:700; line-height:var(--fid-px-22); }

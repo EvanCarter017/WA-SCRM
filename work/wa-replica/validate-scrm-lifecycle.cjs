@@ -94,11 +94,15 @@ const customersRecord = req.modules.find(m => m.id === 'P-CUSTOMERS');
 assert(customersRecord.features.some(f => f.startsWith('客户等级')) && customersRecord.features.some(f => f.startsWith('客户状态')), 'P-CUSTOMERS must record tier and status');
 assert(req.review.items.some(i => i.id === 'CUSTOMER_GRADING'));
 
-// 9. Chat history is a review archive of conversation snapshots moved in from the WhatsApp chat
+// 9. Chat history is an archive of conversation snapshots moved in from the WhatsApp chat; it has no rating and no pass/fail classification
 const recordsSource = read(path.join(__dirname, 'fidelity-customer-pages.js'));
-for (const required of ['data.chatArchives ??= []', 'function archiveConversation(c, reason)', "fidForms['fid-archive-add-form']", "fidForms['fid-archive-review-form']", 'fidArchiveRemoveConfirm:', "['pass', '合格'", "['improve', '需改进'"]) {
+for (const required of ['data.chatArchives ??= []', 'function archiveConversation(c, reason)', "fidForms['fid-archive-add-form']", 'fidArchiveRemoveConfirm:']) {
   assert(recordsSource.includes(required), `fidelity-customer-pages.js is missing ${required}`);
 }
+for (const rating of ['fid-archive-review', 'fid-record-filter-form', 'ARCHIVE_RESULTS', 'archiveResult', '.review', '质检', '合格', '需改进']) {
+  assert(!recordsSource.includes(rating), `fidelity-customer-pages.js still contains the chat-history rating (${rating})`);
+}
+assert(!appJs.includes('质检结论') && !appJs.includes('fid-archive-review'), 'app.js still contains the chat-history rating form');
 for (const removed of ['recordsAccounts', 'selectRecordAccount', 'selectRecordContact', 'fidRecordAccount', 'fidRecordContact']) {
   assert(!recordsSource.includes(removed), `fidelity-customer-pages.js still contains the old conversation browser (${removed})`);
 }
@@ -136,8 +140,7 @@ const summary = {
   invitationCodes: 'removed',
   customerTiers: ['S', 'A', 'B', 'C', 'D'],
   customerStatuses: ['converted', 'abandoned', 'organic'],
-  chatHistory: 'review archive of moved-in snapshots',
-  reviewResults: ['pending', 'pass', 'improve'],
+  chatHistory: 'archive of moved-in snapshots, no rating',
   aiCapabilities: ['translate.inbound', 'translate.outbound'],
   aiProvider: 'local demo (prepared sample results)',
   externalNetworkCalls: false,

@@ -35,7 +35,7 @@ swap("const KEY='wa-desk-replica-ui-v01';", "const KEY='wa-desk-scrm-lifecycle-v
 swap('[1,2,3,4].includes(saved?.version)', '[6].includes(saved?.version)');
 swap('{version:4,data,requirements:req,persona:ui.persona,', '{version:6,data,requirements:req,');
 swap('if(previous){module.decision=previous.decision;module.notes=previous.notes}', `if(previous){
-      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。'};
+      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。','P-CHAT-REVIEW':'快照与实时会话相互独立；正式版由主管在主站质检，原型开放操作以便评审。'};
       const revisedScope=Object.hasOwn(previousDefaultNotes,module.id)&&previous.basis!==module.basis;
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
@@ -58,7 +58,7 @@ js = js.replaceAll("ui.view==='team'&&!manager()", "['team','members'].includes(
 swap('  function render() {\n', '  function render() {\n    if(!renderSignInState())return;\n');
 swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,inbox:renderInbox');
 swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope");
-swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。'");
+swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与审核。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。'");
 swap("'P-FOLLOW':'把跟进安排成待办，完成后回写客户记录。'", "'P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'");
 swap("'P-CUSTOMERS':'客户档案、来源、阶段、标签及跨账号接触记录。'", "'P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。'");
 swap('聊手管理自己的工作，主管查看团队并处理分配。', '团队成员、账号分配和客户交接由主站管理。');
@@ -133,8 +133,8 @@ requirement.review.items.push({
 });
 requirement.review.items.push({
   id: 'CHAT_REVIEW',
-  title: '聊天记录质检归档',
-  question: '聊天记录只保存从 WhatsApp 会话移入的快照，移入时必须填写原因；质检结论为待质检 / 合格 / 需改进并可附评语。请评审：由谁移入、由谁质检、是否需要评分或更多结论选项。',
+  title: '聊天记录归档',
+  question: '聊天记录只保存从 WhatsApp 会话移入的快照，移入时必须填写原因；不设评分，也不做结论分类。请评审：由谁移入、谁可以查看。',
   status: '待评审',
   notes: '',
 });
@@ -216,12 +216,12 @@ customersModule.features = customersModule.features.map(feature => feature === '
 customersModule.features.push('客户等级（S/A/B/C/D）', '客户状态（已成交/弃单/自然线索）', '按等级与状态筛选', '导出含等级与状态');
 requirement.modules.find(module => module.id === 'P-TAGS').notes = '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。';
 requirement.modules.push({
-  id:'P-CHAT-REVIEW', name:'聊天记录质检归档', decision:'首轮原型', basis:'用户要求聊天记录用于绩效复盘与质检（2026-11-17）',
-  originalIds:[], screens:['chat-records'], features:['从 WhatsApp 会话移入快照','移入原因','质检结论与评语','按质检状态筛选','快照内搜索与译文开关','移出聊天记录'],
-  notes:'快照与实时会话相互独立；正式版由主管在主站质检，原型开放操作以便评审。',
+  id:'P-CHAT-REVIEW', name:'聊天记录归档', decision:'首轮原型', basis:'用户要求把会话移入聊天记录用于绩效复盘与审核，不设评分（2026-11-17）',
+  originalIds:[], screens:['chat-records'], features:['从 WhatsApp 会话移入快照','移入原因','快照内搜索与译文开关','移出聊天记录'],
+  notes:'快照与实时会话相互独立；不设评分，也不做结论分类。',
 });
 requirement.modelOutline.entities.push('ChatArchive');
-requirement.modelOutline.relationships.push('聊天记录是质检归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因；质检结论为待质检 / 合格 / 需改进，并可附评语。快照与实时会话相互独立，移入不改变实时会话。');
+requirement.modelOutline.relationships.push('聊天记录是归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因，用于绩效复盘与审核；不设评分，也不做结论分类。快照与实时会话相互独立，移入不改变实时会话。');
 requirement.modules.push({
   id:'P-AI', name:'AI 能力接入', decision:'首轮原型', basis:'用户要求为后续接入 AI 接口预留接入点（2026-11-17）',
   originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','本地演示提供方'],

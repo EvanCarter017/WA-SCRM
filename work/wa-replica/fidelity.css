@@ -431,8 +431,6 @@
 .fid-archive-meta dt { color:var(--color-text-muted); white-space:nowrap; }
 .fid-archive-meta dd { margin:0; overflow-wrap:anywhere; }
 .fid-archive-meta small { display:block; color:var(--color-text-muted); }
-.fid-archive-review { display:flex; flex-direction:column; gap:8px; padding:10px 0; border-top:1px solid var(--fid-frame); border-bottom:1px solid var(--fid-frame); }
-.fid-archive-note { width:100%; height:auto; min-height:84px; padding:8px 10px; line-height:1.5; resize:vertical; }
 .fid-archive-actions { display:flex; flex-wrap:wrap; gap:6px; }
 .fid-ai .fid-heading { margin-bottom:12px; }
 .fid-ai h2 { margin:18px 0 8px; font-size:15px; font-weight:700; line-height:22px; }

@@ -6,7 +6,7 @@
   let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
   let req=clone(window.WA_REQUIREMENTS);
   if(saved?.requirements){for(const module of req.modules){const previous=saved.requirements.modules?.find(x=>x.id===module.id);if(previous){
-      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。'};
+      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。','P-CHAT-REVIEW':'快照与实时会话相互独立；正式版由主管在主站质检，原型开放操作以便评审。'};
       const revisedScope=Object.hasOwn(previousDefaultNotes,module.id)&&previous.basis!==module.basis;
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
@@ -157,7 +157,7 @@
   }
   function renderTeam(){if(!manager())return '<div class="view-empty"><div><h2>团队管理在主站</h2><p>子站显示当前聊手的工作范围。</p></div></div>';return '<section class="section-page">'+pageHeader('TEAM & ACCESS','团队与权限','先明确谁管理账号、谁负责客户，再决定团队数据如何共享。','<button class="button primary" data-action="addMember">'+icon('UserRoundPlus')+'新增成员</button>')+'<div class="role-count"><strong>'+data.members.length+'</strong> 位演示成员 <span style="margin:0 12px;color:#cad8bf">/</span> '+data.accounts.length+' 个账号 · '+data.customers.length+' 位客户</div><div class="page-panel"><div class="panel-header"><div><h2>团队成员</h2><p>人数、角色和账号分配均可继续扩展</p></div><span class="tag slate">权限方案待确认</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>团队</th><th>角色</th><th>负责账号</th><th>客户</th><th>待跟进</th><th>操作</th></tr></thead><tbody>'+data.members.map(m=>'<tr><td><div class="customer-cell">'+avatar(m,'small')+'<strong>'+esc(m.name)+'</strong></div></td><td>'+esc(m.team)+'</td><td><span class="tag '+(m.role==='manager'?'purple':'jade')+'">'+(m.role==='manager'?'主管':'聊手')+'</span></td><td>'+data.accounts.filter(a=>a.owner===m.id).length+'</td><td>'+data.customers.filter(c=>c.owner===m.id).length+'</td><td>'+data.tasks.filter(t=>t.owner===m.id&&!t.done).length+'</td><td><button class="link" data-action="memberAccounts" data-id="'+m.id+'">分配账号</button></td></tr>').join('')+'</tbody></table></div></div><div class="permission-grid"><section class="permission-card"><h3>'+icon('UserRound')+'聊手 <span class="tag jade">我的工作空间</span></h3><ul><li>使用获分配的 WhatsApp 账号</li><li>查看、标记并跟进自己负责的客户</li><li>使用公共标签，维护自己的个人标签</li><li>主管可见范围与转交规则需你确认</li></ul></section><section class="permission-card"><h3>'+icon('ShieldCheck')+'主管 <span class="tag purple">团队工作空间</span></h3><ul><li>查看团队账号、客户与待办</li><li>维护公共标签，分配账号和转交客户</li><li>成员与角色可在后续扩展</li><li>此页是权限方案评审，不代表已实现真实鉴权</li></ul></section></div><p class="team-section-note">“客户属于聊手还是团队”“账号转移后历史归谁”“离职交接如何处理”仍待确认。当前只是可操作的默认方案。</p></section>'}
   const scopeDescriptions={
-    'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
+    'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与审核。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
   function scopeCard(m) {
     const choices=['首轮原型','保留','魔改','待定','本轮不展示'];
     return '<article class="scope-card"><h3>'+esc(m.name)+'<span class="tag '+(m.decision==='待定'?'gold':m.decision==='本轮不展示'?'slate':'jade')+'">'+esc(m.decision)+'</span></h3><p>'+esc(scopeDescriptions[m.id]||m.explanation||m.notes)+(m.id==='P-WALLET'?'<br>原站解析时标注客户端检测仍在开发。':'')+'</p><div class="scope-form"><select data-scope-decision="'+m.id+'" aria-label="'+esc(m.name)+'范围选择">'+choices.map(x=>option(x,x,m.decision)).join('')+'</select></div><textarea class="scope-notes" data-scope-notes="'+m.id+'" aria-label="'+esc(m.name)+'修改意见" placeholder="写下需要保留、去掉或魔改的细节…">'+esc(m.notes)+'</textarea><div class="scope-source">原清单关联：'+esc(m.originalIds.join('、')||'新增业务需求')+'</div></article>';
@@ -914,20 +914,17 @@
     if(ui.view==='customers')fidSyncCustomerSelection();
   };
 
-  // Chat history is a review archive: conversations are moved here from the WhatsApp chat as
-  // frozen snapshots, for performance review and auditing. Tag statistics share this file.
+  // Chat history is an archive: conversations are moved here from the WhatsApp chat as frozen snapshots,
+  // for performance review and auditing. It has no rating and no pass/fail classification.
+  // Tag statistics share this file.
   const recordView = { translate: true };
   let statsTagId = '';
 
-  // [value, label, pill tone] of a review result; '' means not reviewed yet.
-  const ARCHIVE_RESULTS = [['', '待质检', 'neutral'], ['pass', '合格', 'ok'], ['improve', '需改进', 'warn']];
-  const archiveResult = record => ARCHIVE_RESULTS.find(([id]) => id === (record.review?.result || '')) || ARCHIVE_RESULTS[0];
   const chatArchives = () => (data.chatArchives ??= []);
   const myArchives = () => chatArchives().filter(record => manager() || record.ownerId === ui.persona);
-  const visibleArchives = () => myArchives().filter(record => recordView.result === 'all' || (record.review?.result || 'none') === recordView.result);
 
   function resetRecordFilters() {
-    Object.assign(recordView, { result: 'all', recordId: '', listQuery: '', messageQuery: '', limit: 200, step: 'archives' });
+    Object.assign(recordView, { recordId: '', listQuery: '', messageQuery: '', limit: 200, step: 'archives' });
   }
 
   function resetCustomerPages() {
@@ -945,7 +942,6 @@
       ownerId: c.owner, ownerName: member(c.owner)?.name || '',
       movedBy: me()?.name || '', movedAt: new Date().toISOString(), reason,
       messages: conversationMessages(c).map(message => ({ ...message })),
-      review: { result: '', note: '', by: '', at: null },
     };
     chatArchives().unshift(record);
     return record;
@@ -958,10 +954,7 @@
     if (chatArchives().length) return;
     const olivia = customer('c3');
     const mateo = customer('c2');
-    if (olivia) Object.assign(archiveConversation(olivia, '老客户回访话术示例，供新人参考'), {
-      movedAt: fidDay(-3),
-      review: { result: 'pass', note: '回访及时，确认了补货节奏，表达清晰。', by: '周宁', at: fidDay(-2) },
-    });
+    if (olivia) Object.assign(archiveConversation(olivia, '老客户回访话术示例，供新人参考'), { movedAt: fidDay(-3) });
     if (mateo) Object.assign(archiveConversation(mateo, '波多黎各交付咨询，申请复盘首响时效'), { movedAt: fidDay(-1) });
   }
 
@@ -1005,15 +998,14 @@
     return older + messagesHTML(record, { list: list.slice(-recordView.limit), showTranslation: recordView.translate, emptyHint: '这个快照没有消息。' });
   }
 
-  // Right-hand panel: snapshot facts, the review form, and the translation switch.
+  // Right-hand panel: snapshot facts, actions, and the translation switch.
   function archiveAside(record) {
     const translate = `<h2>翻译设置</h2>
       <label class="fid-record-toggle" for="fid-record-translation">聊天翻译 <input type="checkbox" id="fid-record-translation" role="switch" ${recordView.translate?'checked':''}></label>`;
-    if (!record) return `<aside class="fid-record-translate fid-archive-aside" aria-label="质检与设置">${translate}</aside>`;
+    if (!record) return `<aside class="fid-record-translate fid-archive-aside" aria-label="快照信息与设置">${translate}</aside>`;
     const live = myCustomers().find(c => c.id === record.customerId);
     const newer = live ? conversationMessages(live).length - record.messages.length : 0;
-    const review = record.review || {};
-    return `<aside class="fid-record-translate fid-archive-aside" aria-label="质检与设置">
+    return `<aside class="fid-record-translate fid-archive-aside" aria-label="快照信息与设置">
       <h2>快照信息</h2>
       <dl class="fid-archive-meta">
         <dt>客户</dt><dd>${esc(record.customerName)}<small>${esc(record.customerPhone || '')}</small></dd>
@@ -1022,14 +1014,6 @@
         <dt>移入原因</dt><dd>${esc(record.reason)}</dd>
         <dt>快照消息</dt><dd>${record.messages.length} 条${newer > 0 ? `<small>实时会话之后新增 ${newer} 条，未计入快照</small>` : ''}</dd>
       </dl>
-      <form id="fid-archive-review-form" class="fid-archive-review">
-        <input type="hidden" name="recordId" value="${esc(record.id)}">
-        <h2>质检结论</h2>
-        <select class="fid-select" name="result" aria-label="质检结论">${ARCHIVE_RESULTS.map(([id, label]) => option(id, label, review.result || '')).join('')}</select>
-        <textarea class="fid-input fid-archive-note" name="note" rows="4" aria-label="质检评语" placeholder="质检评语：做得好的地方、需要改进的地方">${esc(review.note || '')}</textarea>
-        <button type="submit" class="fid-btn blue">${icon('ShieldCheck')}保存质检结论</button>
-        <p class="fid-field-help">${review.at ? `上次质检：${esc(review.by || '—')} · ${esc(fidDate(review.at))}。` : '尚未质检。'}正式版由主管在主站质检；原型开放操作以便评审。</p>
-      </form>
       <div class="fid-archive-actions">
         ${live ? fidButton('打开实时会话', 'openConversation', 'MessageCircle', 'slim', fidActionID(live.id)) : ''}
         ${fidButton('移出聊天记录', 'fidArchiveRemove', 'Trash2', 'slim', fidActionID(record.id))}
@@ -1039,26 +1023,23 @@
   }
 
   function renderChatRecords() {
-    const records = visibleArchives();
+    const records = myArchives();
     const selected = records.find(record => record.id === recordView.recordId);
     if (!selected) Object.assign(recordView, { recordId: '', step: 'archives' });
     const rows = records.map(record => recordListItem(record.customerName,
-      `${record.ownerName || '—'} · ${fidDate(record.movedAt).slice(0, 10)} · ${archiveResult(record)[1]}`,
-      [record.customerName, record.customerPhone, record.ownerName, record.reason, archiveResult(record)[1]].join(' '),
+      `${record.ownerName || '—'} · ${fidDate(record.movedAt).slice(0, 10)}`,
+      [record.customerName, record.customerPhone, record.ownerName, record.reason].join(' '),
       'fidArchiveSelect', record.id, record === selected)).join('');
-    const pending = myArchives().filter(record => !record.review?.result).length;
     return `<section class="fid-page fid-history-page">
-      ${fidHead('聊天记录','从 WhatsApp 会话移入的快照，用于绩效复盘与质检。实时会话不受影响。')}
-      <form id="fid-record-filter-form" class="fid-filter-row fid-record-filters">
-        <select class="fid-select" name="result" aria-label="质检状态">${fidOption([['all','全部质检状态'],['none','待质检'],['pass','合格'],['improve','需改进']], recordView.result)}</select>
-        <button type="submit" class="fid-btn gradient">${icon('Search')}筛选</button>${fidButton('重置','fidRecordsReset','RotateCw')}
-        <span class="fid-small-note">共 ${myArchives().length} 条归档 · 待质检 ${pending} 条</span>
+      ${fidHead('聊天记录','从 WhatsApp 会话移入的快照，用于绩效复盘与审核。实时会话不受影响。')}
+      <div class="fid-filter-row fid-record-filters">
         ${fidButton('从 WhatsApp 会话移入','fidArchivePick','Plus','blue')}
-      </form>
+        <span class="fid-small-note">共 ${records.length} 条归档</span>
+      </div>
       <div class="fid-history-grid fid-archive-grid" data-record-step="${recordView.step}">
-        ${recordList('归档会话','archive','客户/聊手/原因搜索',recordView.listQuery,rows,myArchives().length?'暂无匹配的归档会话':'还没有归档会话')}
+        ${recordList('归档会话','archive','客户/聊手/原因搜索',recordView.listQuery,rows,records.length?'暂无匹配的归档会话':'还没有归档会话')}
         <section class="fid-record-column fid-record-thread" aria-label="会话快照">
-          <div class="fid-record-heading"><h2>${esc(selected ? selected.customerName + ' · 快照' : '未选择归档会话')}</h2>${selected ? `<span class="lc-pill ${archiveResult(selected)[2]}">${esc(archiveResult(selected)[1])}</span>` : ''}</div>
+          <div class="fid-record-heading"><h2>${esc(selected ? selected.customerName + ' · 快照' : '未选择归档会话')}</h2></div>
           ${fidButton('返回归档列表','fidRecordBack','ArrowLeft','fid-record-back',fidActionID('archives'))}
           <div class="fid-record-search"><input type="search" id="fid-record-message-search" class="fid-input" aria-label="搜索快照消息" placeholder="搜索消息" value="${esc(recordView.messageQuery)}" ${selected?'':'disabled'}></div>
           <div class="messages fid-record-messages" id="fid-record-messages" tabindex="0">${recordMessages(selected)}</div>
@@ -1069,20 +1050,15 @@
   }
 
   function selectArchive(id) {
-    if (!visibleArchives().some(record => record.id === id)) return;
+    if (!myArchives().some(record => record.id === id)) return;
     Object.assign(recordView, { recordId: id, messageQuery: '', limit: 200, step: 'messages' });
-    render();
-  }
-
-  function applyRecordFilters(values, value) {
-    recordView.result = ['none', 'pass', 'improve'].includes(value('result')) ? value('result') : 'all';
     render();
   }
 
   function refreshRecordMessages() {
     const container = $('#fid-record-messages');
     if (!container) return;
-    container.innerHTML = recordMessages(visibleArchives().find(record => record.id === recordView.recordId));
+    container.innerHTML = recordMessages(myArchives().find(record => record.id === recordView.recordId));
     paintIcons(container);
   }
 
@@ -1099,7 +1075,7 @@
       fixed ? `移入聊天记录 · ${fixed.name}` : '从 WhatsApp 会话移入',
       'fid-archive-add',
       `${target}
-       <p class="fid-field-help" style="margin:0 0 12px">${fixed ? `将该会话当前的 ${count(fixed)} 条消息` : '将所选会话当前的全部消息'}作为快照移入「聊天记录」，用于绩效复盘与质检。实时会话不受影响，可继续沟通。</p>
+       <p class="fid-field-help" style="margin:0 0 12px">${fixed ? `将该会话当前的 ${count(fixed)} 条消息` : '将所选会话当前的全部消息'}作为快照移入「聊天记录」，用于绩效复盘与审核。实时会话不受影响，可继续沟通。</p>
        ${fidFormRow('移入原因', `<input class="fid-input" style="width:100%" name="reason" required maxlength="80" placeholder="如：首单成交过程复盘 / 客户投诉处理">`, '', true)}`,
       '确认移入',
       { wide: true }
@@ -1164,11 +1140,9 @@
     },
     fidRecordBack: () => { Object.assign(recordView, { recordId: '', step: 'archives' }); render(); },
     fidRecordsOlder: () => { recordView.limit += 200; refreshRecordMessages(); },
-    fidRecordsReset: () => { resetRecordFilters(); render(); },
     fidRecordsRefresh: () => { render(); toast('聊天记录已刷新。'); },
     fidStatsTag: id => { statsTagId = id; render(); },
   });
-  fidForms['fid-record-filter-form'] = applyRecordFilters;
 
   fidForms['fid-archive-add-form'] = (f, v) => {
     const c = myCustomers().find(item => item.id === v('customerId'));
@@ -1176,28 +1150,16 @@
     if (!v('reason')) return error('请填写移入原因。');
     const size = conversationMessages(c).length;
     if (!size) return error('该会话还没有消息，无法移入。');
-    if (chatArchives().some(record => record.customerId === c.id && !record.review?.result && record.messages.length === size)) {
-      return error('该会话的当前内容已在聊天记录中等待质检。');
+    if (chatArchives().some(record => record.customerId === c.id && record.messages.length === size)) {
+      return error('该会话的当前内容已在聊天记录中。');
     }
     const record = archiveConversation(c, v('reason'));
-    lcLog(c.id, 'profile', `会话快照已移入聊天记录供质检：${record.reason}`);
-    Object.assign(recordView, { result: 'all', recordId: record.id, listQuery: '', messageQuery: '', limit: 200, step: 'messages' });
+    lcLog(c.id, 'profile', `会话快照已移入聊天记录：${record.reason}`);
+    Object.assign(recordView, { recordId: record.id, listQuery: '', messageQuery: '', limit: 200, step: 'messages' });
     persist();
     close();
     render();
     toast(`已将与 ${c.name} 的会话移入聊天记录（${size} 条消息）。`);
-  };
-
-  fidForms['fid-archive-review-form'] = (f, v) => {
-    const record = myArchives().find(item => item.id === v('recordId'));
-    if (!record) return;
-    const result = ['pass', 'improve'].includes(v('result')) ? v('result') : '';
-    if (result === 'improve' && !v('note')) return toast('结论为「需改进」时请填写质检评语。');
-    const touched = Boolean(result || v('note'));
-    record.review = { result, note: v('note'), by: touched ? (me()?.name || '') : '', at: touched ? new Date().toISOString() : null };
-    persist();
-    render();
-    toast(result ? `质检结论已保存：${archiveResult(record)[1]}。` : '已保存，当前为待质检。');
   };
 
   document.addEventListener('input', event => {
