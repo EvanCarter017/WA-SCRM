@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><meta name="color-scheme" content="light">
+  <title>WA Desk SCRM · WhatsApp 客户全生命周期工作台原型</title>
+  <link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="components.css"><link rel="stylesheet" href="app.css">
+</head>
+<body class="fidelity">
+  <a class="skip-link" href="#view">跳到工作区</a>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar" aria-label="功能导航">
+      <a class="brand" href="#dashboard" data-nav="dashboard" aria-label="WA Desk 首页"><span class="brand-symbol" data-icon="MessagesSquare"></span><span class="brand-name" translate="no"><strong>WA Desk SCRM</strong><small>WhatsApp 客户管理系统</small></span></a>
+      <nav id="nav" aria-label="主导航"></nav>
+      <div class="sidebar-bottom"><button class="collapse-button" type="button" data-action="toggleSidebar" aria-label="折叠菜单"><span data-icon="PanelLeftClose"></span><span class="nav-label">收起</span></button></div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="header-left"><button class="icon-button" type="button" data-action="toggleSidebar" aria-label="切换导航"><span data-icon="Menu"></span></button><span class="fid-edition"><b>内部版</b><span>当前工作台： <strong>WhatsApp</strong></span></span></div>
+        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="icon-button fid-header-lang" data-action="translation" aria-label="翻译设置"><span data-icon="Languages"></span></button><button class="icon-button fid-header-review" data-action="review" aria-label="评审原型"><span data-icon="MessageSquareText"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
+      </header>
+      <nav class="workspace-tabs" id="workspace-tabs" aria-label="已打开的页面"></nav>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title" hidden>
+    <div class="fid-sign-in-panel">
+      <div class="fid-sign-in-brand" translate="no"><span class="brand-symbol" data-icon="MessagesSquare"></span><strong>WA Desk SCRM</strong></div>
+      <h1 id="subsite-login-title" tabindex="-1">已退出登录</h1>
+      <button class="fid-btn gradient" data-action="subsiteEnterDemo" type="button">进入演示工作台<span data-icon="ChevronRight"></span></button>
+    </div>
+  </main>
+  <button class="fid-float-review" data-action="review" aria-label="打开原型评审"><span data-icon="MessageSquare"></span><span>原型评审</span><i id="review-count" hidden></i><span data-icon="ChevronRight"></span></button>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
+  <dialog id="element-review-dialog" aria-labelledby="element-review-title">
+    <form id="element-review-entry" novalidate>
+      <div class="modal-head">
+        <h2 id="element-review-title">界面备注</h2>
+        <button class="icon-button" type="button" data-element-review-dismiss aria-label="关闭界面备注"><span data-icon="X"></span></button>
+      </div>
+      <div class="modal-body">
+        <p id="element-review-context"></p>
+        <label class="field" for="element-review-note">希望怎么改</label>
+        <textarea id="element-review-note" name="review-note" rows="5" placeholder="写下你希望如何调整这个控件…" required></textarea>
+        <p id="element-review-error" role="alert" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <small id="element-review-destination"></small>
+        <button type="button" class="button" data-element-review-download hidden>下载 .md</button>
+        <button type="button" class="button" data-element-review-dismiss>取消</button>
+        <button type="submit" class="button primary">提交备注</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="icons.js"></script><script src="requirements-data.js"></script><script src="demo-data.js"></script><script src="element-review.js"></script><script src="app.js"></script>
+</body>
+</html>

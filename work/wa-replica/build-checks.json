@@ -1,0 +1,13 @@
+{
+  "status": "static-checks-passed",
+  "prototypeOnly": true,
+  "requirementsPreserved": true,
+  "oldVersionsPreserved": true,
+  "originalInventoryPreserved": true,
+  "originalActionCount": 45,
+  "currentActionCount": 62,
+  "iconCount": 53,
+  "bytes": 228234,
+  "runtimeExternalRequests": false,
+  "sourceReferencesOnlyInRecon": true
+}

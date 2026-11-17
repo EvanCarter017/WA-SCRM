@@ -1,0 +1,568 @@
+{
+  "date": "2026-11-08",
+  "status": "业务功能蓝图；未开始实现",
+  "business": {
+    "domain": "用户说明主要做多肽；具体SKU不作为当前功能设计输入",
+    "acquisition": "Facebook",
+    "conversation": "WhatsApp",
+    "initialMarkets": [
+      "US",
+      "PR"
+    ],
+    "initialLanguages": [
+      "en",
+      "es"
+    ],
+    "scale": "人员、账号、渠道与团队数量为可配置资源，不设置业务硬编码上限",
+    "needs": [
+      "漏跟进",
+      "重复线索",
+      "翻译",
+      "团队管理",
+      "订单对接",
+      "广告归因"
+    ]
+  },
+  "boundaries": [
+    "只做功能、流程与独立产品规划；不修改出海猫线上服务",
+    "商品目录是可选外部资源；不要求具体SKU，不作产品准入或用途判断",
+    "市场、语言、渠道权限和平台规则均为独立配置；上线集成另行核验",
+    "既有功能未完整执行验证；入口可见不代表实现效果已证明",
+    "建议新增表示需要验证或独立实现，并不等同于原产品确定缺失",
+    "原代码、品牌、素材和私有接口不纳入新产品实现"
+  ],
+  "original": [
+    {
+      "id": "F01",
+      "screenId": "S01",
+      "name": "首页",
+      "route": "admin.html",
+      "purpose": "汇总账户资源与线索统计",
+      "decision": "改造",
+      "priority": "P0",
+      "customization": "改成经营看板：新线索、首响、待跟进、成交、净回款、复购和渠道表现",
+      "reason": "没有任务归属与转化口径的统计不够指导日常工作",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F02",
+      "screenId": "S02",
+      "name": "邀请码列表",
+      "route": "invite-codes.html",
+      "purpose": "配置客户端准入、平台权限、端口、分组及去重范围",
+      "decision": "改造",
+      "priority": "P1",
+      "customization": "改为成员邀请与接入授权；普通客户端邀请码作为可选接入方式",
+      "reason": "人员、账号、授权和配额分开建模，未来人数变化不改核心结构",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F03",
+      "screenId": "S03",
+      "name": "账号列表",
+      "route": "accounts.html",
+      "purpose": "查看社交账号、在线与异常状态、备注等",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "统一渠道账号中心：号码归属、状态、可用能力、限额、失败告警与维护责任人",
+      "reason": "多账号扩展必须有统一资源目录和状态管理",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F04",
+      "screenId": "S04",
+      "name": "线索列表",
+      "route": "clue-list.html",
+      "purpose": "按邀请码聚合账号及线索统计，提供工单相关入口",
+      "decision": "改造",
+      "priority": "P0",
+      "customization": "改成销售线索池：来源、负责人、阶段、优先级、最后互动及下一步动作",
+      "reason": "需要持续推进线索，而不只看新增和重复数量",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F05",
+      "screenId": "S05",
+      "name": "底库管理",
+      "route": "base-powder.html",
+      "purpose": "导入历史联系人，并按邀请码去重范围检查新线索重复",
+      "decision": "整合",
+      "priority": "P0",
+      "customization": "合并进客户身份与历史库；精确匹配、疑似重复人工确认、合并留痕和可撤销",
+      "reason": "重复客户不能重复计算获客，也不能丢掉不同来源和购买历史",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F06",
+      "screenId": "S06",
+      "name": "分流链接",
+      "route": "shunt-url.html",
+      "purpose": "将入口流量分配到不同账号，记录点击与访客",
+      "decision": "按场景启用",
+      "priority": "P1",
+      "customization": "将外部号码分流与内部坐席分配分开；支持语言、营业时间、容量和优先级规则",
+      "reason": "直接进入同一WhatsApp号码时，通常更需要内部坐席分配",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F07",
+      "screenId": "S07",
+      "name": "开口回传",
+      "route": "openchat-settings.html",
+      "purpose": "把首条消息等信号与广告后台关联",
+      "decision": "改造",
+      "priority": "P0",
+      "customization": "扩展成转化事件中心：开口、有效线索、报价、成交等内部事件；平台回传单独授权配置",
+      "reason": "开口数只是漏斗的一步，不能代替成交和净收入",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F08",
+      "screenId": "S08",
+      "name": "号池共享",
+      "route": "pool-share.html",
+      "purpose": "向配套系统共享已登录客服号及在线状态",
+      "decision": "按场景启用",
+      "priority": "P2",
+      "customization": "作为外部号池连接器保留接口；接入范围、凭据及读取权限可撤销",
+      "reason": "当前未证明需要依赖出海猫号池；也不应把供应商绑定写进核心",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F09",
+      "screenId": "S09",
+      "name": "代理IP管理",
+      "route": "proxy-ip.html",
+      "purpose": "管理社交账号使用的代理资源，具体规则未实测",
+      "decision": "按接入方式启用",
+      "priority": "P2",
+      "customization": "桌面会话需要时使用连接资源插件；官方API通道单独配置连接器",
+      "reason": "不同接入路径的资源需求不同，不应让全部用户都配置代理",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F10",
+      "screenId": "S10",
+      "name": "WhatsApp API",
+      "route": "wa-api.html",
+      "purpose": "接入Meta业务号码，提供号码管理、聊天与模板入口",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "建设官方渠道连接器、统一消息流、投递状态、失败重试及模板管理",
+      "reason": "这是当前WhatsApp业务的主要接入选项，实际授权和可用性独立核验",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F11",
+      "screenId": "S11",
+      "name": "客户列表",
+      "route": "customer-list.html",
+      "purpose": "筛选客户、标签、备注、跟进和导出",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "形成客户360档案：多渠道身份、负责人、互动时间线、语言、来源与外部订单摘要",
+      "reason": "客户跨账号和团队流转时仍应有连续档案",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F12",
+      "screenId": "S12",
+      "name": "聊天记录",
+      "route": "customer-chat.html",
+      "purpose": "集中查询聊天记录；保存范围与权限需核验",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "统一收件箱和可检索历史；按角色查看、数据保留周期及交接上下文",
+      "reason": "避免记录散落在个人设备、换人后无法接续",
+      "evidence": "官网说明/页面待核验"
+    },
+    {
+      "id": "F13",
+      "screenId": "S13",
+      "name": "标签管理",
+      "route": "customer-tags.html",
+      "purpose": "维护客户分类标签",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "标签字典可配置；来源、偏好、运营分群与销售阶段分别建模",
+      "reason": "标签不应同时承担所有流程状态，避免报表口径混乱",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F14",
+      "screenId": "S14",
+      "name": "标签统计",
+      "route": "customer-tag-stats.html",
+      "purpose": "按标签统计客户分布",
+      "decision": "改造",
+      "priority": "P1",
+      "customization": "增加分群转化、成交价值、复购、流失和渠道质量分析",
+      "reason": "标签数量需要关联经营结果才有决策价值",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F15",
+      "screenId": "S15",
+      "name": "跟进记录",
+      "route": "clue-record.html",
+      "purpose": "记录对客户的后续沟通与处理",
+      "decision": "重点扩展",
+      "priority": "P0",
+      "customization": "跟进任务、下一步日期、负责人、营业时间SLA、提醒、超时升级和交接",
+      "reason": "用户明确需要处理漏跟进；这些任务能力在原站尚未完整核验",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F16",
+      "screenId": "S16",
+      "name": "敏感词监控",
+      "route": "control-sensitive.html",
+      "purpose": "按规则监控聊天中的指定词语或风险内容",
+      "decision": "配置化保留",
+      "priority": "P1",
+      "customization": "业务话术与数据泄露提醒、规则版本、人工复核与纠错",
+      "reason": "规则随团队和渠道变化，不把某行业词库写死",
+      "evidence": "官网说明/规则待核验"
+    },
+    {
+      "id": "F17",
+      "screenId": "S17",
+      "name": "钱包监控",
+      "route": "control-wallet.html",
+      "purpose": "官网描述钱包地址监控；具体覆盖对象未核验",
+      "decision": "按场景启用",
+      "priority": "P2",
+      "customization": "如有真实需求，做收款信息变更或异常提示；与订单支付状态分开",
+      "reason": "不假定你的业务使用加密钱包，也不把此模块当成订单系统",
+      "evidence": "官网说明/规则待核验"
+    },
+    {
+      "id": "F18",
+      "screenId": "S18",
+      "name": "敏感行为监控",
+      "route": "control-behavior.html",
+      "purpose": "监控特定业务操作，具体事件与处置待核验",
+      "decision": "配置化保留",
+      "priority": "P1",
+      "customization": "关注批量导出、权限调整、客户转移和删除等工作区操作，并保留审计",
+      "reason": "围绕业务数据和权限变化定义，不依赖模糊的监控概念",
+      "evidence": "官网说明/规则待核验"
+    },
+    {
+      "id": "F19",
+      "screenId": "S19",
+      "name": "素材管理",
+      "route": "ops-material.html",
+      "purpose": "集中维护可复用资料与素材",
+      "decision": "保留并扩展",
+      "priority": "P1",
+      "customization": "资料库按语言、适用场景和版本管理，关联批准状态与访问权限",
+      "reason": "同一份资料更新后应能替换旧版本",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F20",
+      "screenId": "S20",
+      "name": "快捷回复",
+      "route": "ops-reply.html",
+      "purpose": "按平台与分组维护公共回复，员工使用",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "英语/西语优先、变量填充、引用来源、版本管理与发送前确认",
+      "reason": "提高响应一致性，并为其他语言留同一套扩展结构",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F21",
+      "screenId": "S21",
+      "name": "关键词回复",
+      "route": "ops-keyword.html",
+      "purpose": "按关键词触发自动回复",
+      "decision": "配置化保留",
+      "priority": "P1",
+      "customization": "升级为触发条件、客户状态、时间和人工接管可配置的自动化规则",
+      "reason": "避免重复触发、错误场景回复和与人工客服抢答",
+      "evidence": "官网说明/页面待核验"
+    },
+    {
+      "id": "F22",
+      "screenId": "S22",
+      "name": "欢迎语回复",
+      "route": "ops-welcome.html",
+      "purpose": "新会话或指定时机发送欢迎内容",
+      "decision": "配置化保留",
+      "priority": "P0",
+      "customization": "按入口、语言、营业时间和是否老客户选择首条服务内容",
+      "reason": "初次响应应服务于分配和确认需求，具体内容由业务维护",
+      "evidence": "官网说明/页面待核验"
+    },
+    {
+      "id": "F23",
+      "screenId": "S23",
+      "name": "群发任务",
+      "route": "ops-mass.html",
+      "purpose": "批量或定时发送内容，具体渠道规则待核验",
+      "decision": "按权限启用",
+      "priority": "P1",
+      "customization": "客户同意记录、分群、发送模板、频率、停止条件和退订统一控制",
+      "reason": "作为客户运营能力，不默认向所有历史联系人发送",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F24",
+      "screenId": "S24",
+      "name": "购买套餐",
+      "route": "buy-plan.html",
+      "purpose": "购买供应商销售的产品套餐",
+      "decision": "自用主菜单移出",
+      "priority": "P2",
+      "customization": "未来若对外提供SaaS，再启用独立订阅计费模块",
+      "reason": "这是供应商商业模式的一部分，不是你的客户接待主流程",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F25",
+      "screenId": "S25",
+      "name": "个人资料",
+      "route": "account-center.html",
+      "purpose": "维护账号资料与安全设置",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "个人设置与组织设置分开，支持认证安全、会话、语言和通知偏好",
+      "reason": "安全与偏好是平台基础能力",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F26",
+      "screenId": "S26",
+      "name": "充值",
+      "route": "ac-recharge.html",
+      "purpose": "给供应商账户充值",
+      "decision": "自用主菜单移出",
+      "priority": "P2",
+      "customization": "替换为资源预算和成本上限；未来订阅收费独立启用",
+      "reason": "自用系统无需模拟给自己充值",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F27",
+      "screenId": "S27",
+      "name": "充值记录",
+      "route": "ac-recharge-log.html",
+      "purpose": "查看供应商充值流水",
+      "decision": "整合或移出",
+      "priority": "P2",
+      "customization": "有需要时关联供应商账单与成本记录",
+      "reason": "与客户付款记录属于不同业务对象",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F28",
+      "screenId": "S28",
+      "name": "钱包日志",
+      "route": "ac-wallet-log.html",
+      "purpose": "查看平台余额相关变动",
+      "decision": "整合或移出",
+      "priority": "P2",
+      "customization": "转为费用账本、操作人和资源用量的追溯",
+      "reason": "不要把平台余额日志混成客户交易台账",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F29",
+      "screenId": "S29",
+      "name": "字符日志",
+      "route": "char-log.html",
+      "purpose": "查看翻译字符等资源使用情况",
+      "decision": "保留并改造",
+      "priority": "P1",
+      "customization": "按组织、账号、人员、渠道和服务商统计翻译/AI成本与质量反馈",
+      "reason": "费用单价与资源额度均配置化，未来模型变化不重写业务",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F30",
+      "screenId": "S30",
+      "name": "购买记录",
+      "route": "ac-buy-log.html",
+      "purpose": "查看供应商套餐购买历史",
+      "decision": "自用主菜单移出",
+      "priority": "P2",
+      "customization": "未来SaaS计费模块处理；客户订单另设模型",
+      "reason": "供应商订阅购买不是你的客户成交订单",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F31",
+      "screenId": "S31",
+      "name": "推广返利",
+      "route": "promotion.html",
+      "purpose": "推广供应商服务并查看返利",
+      "decision": "自用主菜单移出",
+      "priority": "P2",
+      "customization": "将来确有渠道合作业务时，另启用推荐来源与结算模块",
+      "reason": "保留扩展位置，不为尚未确认的业务增加日常操作",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F32",
+      "screenId": "S32",
+      "name": "组织架构",
+      "route": "org-structure.html",
+      "purpose": "建立组织、权限组等管理结构",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "组织、团队、角色和资源范围分离；支持多团队及业务隔离",
+      "reason": "团队数量和层级不固化在代码中",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F33",
+      "screenId": "S33",
+      "name": "账号管理",
+      "route": "org-account.html",
+      "purpose": "创建和管理子账号，绑定权限组与邀请码",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "成员身份、角色、团队、可用渠道与客户数据范围独立授权",
+      "reason": "扩展人员不需要改表结构或增加硬编码角色",
+      "evidence": "已查看"
+    },
+    {
+      "id": "F34",
+      "screenId": "S34",
+      "name": "操作日志",
+      "route": "org-logs.html",
+      "purpose": "记录后台业务操作",
+      "decision": "保留并扩展",
+      "priority": "P0",
+      "customization": "客户合并、转移、状态变更、自动化、导出和权限修改均可追踪",
+      "reason": "为纠错、协作与经营数据可信度提供依据",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F35",
+      "screenId": "S35",
+      "name": "登录日志",
+      "route": "login-log.html",
+      "purpose": "查看登录与会话记录",
+      "decision": "保留",
+      "priority": "P0",
+      "customization": "账号会话管理、异常提醒和注销会话",
+      "reason": "基础安全功能，保留必要数据并设置保留周期",
+      "evidence": "入口待核验"
+    },
+    {
+      "id": "F36",
+      "screenId": "S36",
+      "name": "关于产品",
+      "route": "about-product.html",
+      "purpose": "产品信息与帮助入口",
+      "decision": "替换",
+      "priority": "P2",
+      "customization": "使用说明、岗位操作指南、版本变化和反馈入口",
+      "reason": "用你自己的产品信息和培训内容",
+      "evidence": "入口待核验"
+    }
+  ],
+  "proposed": [
+    {
+      "id": "N01",
+      "name": "统一收件箱与分配",
+      "priority": "P0",
+      "behavior": "按渠道账号、会话状态、负责人、语言和优先级形成工作队列；能接管、转交、暂挂与解决",
+      "reason": "避免每个号码一个孤岛；原站客户端是否具备完整队列仍待核验"
+    },
+    {
+      "id": "N02",
+      "name": "销售漏斗与流失原因",
+      "priority": "P0",
+      "behavior": "阶段、必填字段、进入/离开条件、负责人和流失原因可配置；记录每次变更",
+      "reason": "不能只用标签或首次开口代表销售进度"
+    },
+    {
+      "id": "N03",
+      "name": "跟进任务与SLA",
+      "priority": "P0",
+      "behavior": "未回复、未分配、无人跟进、报价逾期触发任务和升级；按客户时区和营业时间执行",
+      "reason": "用户确认漏跟进需要处理；原站任务闭环尚未核验"
+    },
+    {
+      "id": "N04",
+      "name": "客户身份、去重与合并",
+      "priority": "P0",
+      "behavior": "规范化联系方式，保存跨渠道身份；确定性匹配与疑似匹配分开；合并可追踪、可纠正",
+      "reason": "重复联系人、重复获客和老客户新咨询需要不同处理"
+    },
+    {
+      "id": "N05",
+      "name": "广告来源与内部归因",
+      "priority": "P0",
+      "behavior": "保存平台实际提供的来源线索及自有入口记录，关联会话、线索和订单；标记未知来源与匹配置信度",
+      "reason": "不能承诺每条WhatsApp消息都拿到完整Facebook广告字段"
+    },
+    {
+      "id": "N06",
+      "name": "报价、订单与履约对接",
+      "priority": "P0",
+      "behavior": "以实际订单系统为事实源，接入外部订单号、报价版本、支付、发货、退款及售后摘要",
+      "reason": "将客户沟通与真实业务结果关联；具体交易和渠道适用性上线前独立核验"
+    },
+    {
+      "id": "N07",
+      "name": "成交与复购运营",
+      "priority": "P0",
+      "behavior": "基于真实订单状态区分新客、已成交、复购、沉睡和流失；设置可配置的提醒和停止条件",
+      "reason": "复购节奏按实际业务维护，不写死固定天数"
+    },
+    {
+      "id": "N08",
+      "name": "语言与知识资料",
+      "priority": "P0",
+      "behavior": "英语/西语作为首批语言；原文和译文并存，保留语言偏好、术语字典和人工修订",
+      "reason": "语言依据客户选择与实际会话，不仅凭地区猜测"
+    },
+    {
+      "id": "N09",
+      "name": "自动化规则中心",
+      "priority": "P1",
+      "behavior": "触发、条件、动作、频率、例外、人工优先及版本均可配置；有预览与回滚",
+      "reason": "欢迎语、关键词和跟进可共用规则框架，但保留各自权限"
+    },
+    {
+      "id": "N10",
+      "name": "转化事件与回传适配",
+      "priority": "P0",
+      "behavior": "内部统一事件独立于广告平台；回传采用获准字段、去重键、状态和重试记录",
+      "reason": "内部归因先自洽，外部回传按授权、资料敏感性和平台规则启用"
+    },
+    {
+      "id": "N11",
+      "name": "经营与服务看板",
+      "priority": "P0",
+      "behavior": "按来源、渠道、团队、账号查看首响、跟进、转化、净回款、退款、复购和获客成本",
+      "reason": "各指标定义分母、时间窗与去重口径，未知来源单列"
+    },
+    {
+      "id": "N12",
+      "name": "连接器与扩展框架",
+      "priority": "P0",
+      "behavior": "连接、鉴权、消息接收/发送、媒体、模板、投递状态、重试与能力声明采用统一接口",
+      "reason": "WhatsApp先启用，其他渠道和桌面接入各自扩展，不承诺所有平台能力相同"
+    },
+    {
+      "id": "N13",
+      "name": "数据权限与客户偏好",
+      "priority": "P0",
+      "behavior": "记录沟通授权、退订、数据可见范围、导出授权及保留周期；业务操作均留痕",
+      "reason": "运营所需数据与对外发送的数据分别控制"
+    },
+    {
+      "id": "N14",
+      "name": "可靠性与成本管理",
+      "priority": "P0",
+      "behavior": "消息去重、失败重试、死信、告警、备份、用量、预算与限额分离配置",
+      "reason": "可扩展不等于无限资源；仍受服务商权限/限额和系统容量约束"
+    }
+  ]
+}

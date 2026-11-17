@@ -1,0 +1,112 @@
+[
+  {
+    "fg": "text",
+    "bg": "bg",
+    "size": "normal",
+    "ratio": 11.87,
+    "aa": true,
+    "aaa": true,
+    "fg_hex": "#263342",
+    "bg_hex": "#f4f6fa"
+  },
+  {
+    "fg": "text",
+    "bg": "surface",
+    "size": "normal",
+    "ratio": 12.85,
+    "aa": true,
+    "aaa": true,
+    "fg_hex": "#263342",
+    "bg_hex": "#ffffff"
+  },
+  {
+    "fg": "text-muted",
+    "bg": "surface",
+    "size": "normal",
+    "ratio": 5.37,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#5e6c7c",
+    "bg_hex": "#ffffff"
+  },
+  {
+    "fg": "text-muted",
+    "bg": "surface-alt",
+    "size": "normal",
+    "ratio": 5.01,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#5e6c7c",
+    "bg_hex": "#f6f7fa"
+  },
+  {
+    "fg": "on-accent",
+    "bg": "accent",
+    "size": "normal",
+    "ratio": 6.75,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#ffffff",
+    "bg_hex": "#375f80"
+  },
+  {
+    "fg": "accent",
+    "bg": "surface",
+    "size": "normal",
+    "ratio": 6.75,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#375f80",
+    "bg_hex": "#ffffff"
+  },
+  {
+    "fg": "accent",
+    "bg": "accent-soft",
+    "size": "normal",
+    "ratio": 5.92,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#375f80",
+    "bg_hex": "#eaf1f7"
+  },
+  {
+    "fg": "danger",
+    "bg": "surface",
+    "size": "normal",
+    "ratio": 6.38,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#aa3636",
+    "bg_hex": "#ffffff"
+  },
+  {
+    "fg": "success",
+    "bg": "success-soft",
+    "size": "normal",
+    "ratio": 5.7,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#256a4b",
+    "bg_hex": "#e8f3ec"
+  },
+  {
+    "fg": "warning",
+    "bg": "warning-soft",
+    "size": "normal",
+    "ratio": 6.02,
+    "aa": true,
+    "aaa": false,
+    "fg_hex": "#7c570d",
+    "bg_hex": "#fff5e3"
+  },
+  {
+    "fg": "border-input",
+    "bg": "surface",
+    "size": "ui",
+    "ratio": 3.13,
+    "aa": true,
+    "aaa": true,
+    "fg_hex": "#87939f",
+    "bg_hex": "#ffffff"
+  }
+]

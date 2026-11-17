@@ -1,0 +1,43 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+node_modules/
+
+# Local browser profiles, authenticated captures & raw recon dumps (never commit)
+*.har
+work/rea-browser-profile/
+work/full-modules/
+work/site-source/
+work/chm123/
+work/skill-discovery-*/
+work/ui-workflow-skill/
+work/collect-*.cjs
+work/inspect-source.cjs
+work/update-report-auth.cjs
+work/verify-cleanup.cjs
+work/write-report.cjs
+work/site-inventory.json
+work/report-preview.png
+
+# Exclude third-party recon/evidence dumps & reference vendor screenshots
+outputs/admingcat-*
+outputs/chm123-*
+outputs/*.zip
+replica/screens/
+replica/fidelity/reference/
+
+# Exclude temporary QA scratch directories & legacy draft iterations
+work/wa-prototype/
+work/wa-prototype-v02/
+work/wa-prototype-v03/
+work/wa-replica/*-qa/
+work/wa-replica/*-qa-*/
+outputs/wa-workbench-prototype*/
+outputs/whatsapp-workbench-*
+outputs/whatsapp-replica-ui-prototype*
+outputs/ui-design-workflow*
+outputs/design-skills-installed.json
+.impeccable/
+.ui-design-workflow/

@@ -1,0 +1,487 @@
+{
+  "schemaVersion": 2,
+  "project": "WhatsApp 内部客户工作台",
+  "version": "0.3",
+  "updatedOn": "2026-11-11",
+  "phase": "interactive-prototype-review",
+  "language": "zh-CN",
+  "sourceInventory": "../chm123-complete-modules.json",
+  "sourceInventoryPreserved": true,
+  "approvalGate": "用户敲定布局、功能和关键规则后，再安排技术方案与正式开发。",
+  "confirmedRequirements": [
+    {
+      "id": "R001",
+      "text": "聚焦 WhatsApp 聚合与客户管理。",
+      "origin": "user-current"
+    },
+    {
+      "id": "R002",
+      "text": "多名聊手方便地管理各自负责的 WhatsApp 账号、标签与客户体系。",
+      "origin": "user-current"
+    },
+    {
+      "id": "R003",
+      "text": "内部自用，不商业化。",
+      "origin": "user-current"
+    },
+    {
+      "id": "R004",
+      "text": "先用原型确认布局与功能，再安排正式执行。",
+      "origin": "user-previous"
+    },
+    {
+      "id": "R005",
+      "text": "人数、账号数量及未来扩展不写死。演示记录数量不代表系统容量。",
+      "origin": "user-previous"
+    },
+    {
+      "id": "R006",
+      "text": "原始模块清单中的保留、删除、魔改由用户决定；未表态模块继续待定。",
+      "origin": "user-previous"
+    }
+  ],
+  "knownBusinessContext": {
+    "acquisition": "Facebook 广告转 WhatsApp 私域",
+    "initialRegions": [
+      "美国",
+      "波多黎各"
+    ],
+    "productFields": "客户模型使用通用字段，不要求填写具体产品，也不预设SKU。",
+    "previouslyMentionedNeeds": [
+      "防漏跟进",
+      "重复客户处理",
+      "翻译",
+      "员工管理",
+      "订单对接",
+      "广告归因"
+    ],
+    "priorityBoundary": "以上既有需求不等于全部已批准本轮实施。订单、真实归因回传及其他接入待用户确认。"
+  },
+  "prototypeAssumptions": [
+    {
+      "id": "A001",
+      "text": "暂以聊手、主管两种评审视角展示。角色、团队与权限模型仍可扩展。",
+      "decision": "待确认"
+    },
+    {
+      "id": "A002",
+      "text": "聊手默认只看到自己的客户和获分配账号；主管查看团队并可转交客户。",
+      "decision": "待确认"
+    },
+    {
+      "id": "A003",
+      "text": "客户与 WhatsApp 账号分开建模；同一客户可有多个账号接触记录。",
+      "decision": "待确认"
+    },
+    {
+      "id": "A004",
+      "text": "公共标签由主管维护、聊手可使用；个人标签由各聊手维护。",
+      "decision": "待确认"
+    },
+    {
+      "id": "A005",
+      "text": "桌面使用导航、会话列表、聊天与客户档案分栏；中小屏客户档案收进抽屉，手机在会话列表与聊天之间切换。",
+      "decision": "待确认"
+    },
+    {
+      "id": "A006",
+      "text": "客户阶段、语言、来源、备注和跟进时间先提供通用预设，后续可修改。",
+      "decision": "待确认"
+    }
+  ],
+  "connectionDecision": {
+    "status": "待确认",
+    "options": [
+      "WhatsApp Web 会话接入",
+      "WhatsApp 官方 Business Platform API",
+      "两条接入路线并存"
+    ],
+    "prototypeBoundary": "本轮仅评审工作流，不接入账号、不生成可登录二维码、不获取令牌、不调用消息或广告接口。"
+  },
+  "modelOutline": {
+    "entities": [
+      "Member",
+      "Team",
+      "Role",
+      "WhatsAppAccount",
+      "Customer",
+      "AccountContact",
+      "Conversation",
+      "Message",
+      "TagGroup",
+      "Tag",
+      "Followup",
+      "QuickReply",
+      "ReviewNote"
+    ],
+    "relationships": [
+      "Member 与 WhatsAppAccount 的分配关系独立于登录凭据。",
+      "Customer 对应多个 AccountContact；跨账号去重与归属规则需确认。",
+      "Tag 支持公共与个人作用域；分配给客户不改变标签定义所有权。",
+      "Followup 关联客户、负责人与会话账号。",
+      "主管转交客户后的历史访问、私有标签和账号归属行为待进一步确认。"
+    ],
+    "capacity": "所有集合均动态管理，无代码层坐席数、账号数或标签总数上限。"
+  },
+  "modules": [
+    {
+      "id": "P-INBOX",
+      "name": "聚合会话",
+      "decision": "首轮原型",
+      "basis": "核心工作流提案",
+      "originalIds": [
+        "D04",
+        "D05",
+        "WAAPI"
+      ],
+      "screens": [
+        "inbox"
+      ],
+      "features": [
+        "按账号切换会话",
+        "未读/待回复筛选",
+        "搜索会话",
+        "本地演示发送",
+        "客户侧栏",
+        "接收译文展示",
+        "快捷话术填入"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P-ACCOUNTS",
+      "name": "WhatsApp 账号",
+      "decision": "首轮原型",
+      "basis": "用户明确",
+      "originalIds": [
+        "ACC",
+        "D04",
+        "D15"
+      ],
+      "screens": [
+        "accounts"
+      ],
+      "features": [
+        "账号状态",
+        "备注",
+        "负责人",
+        "新增演示账号",
+        "模拟恢复连接",
+        "按账号进入会话"
+      ],
+      "notes": "接入方式与代理环境另行敲定。"
+    },
+    {
+      "id": "P-CUSTOMERS",
+      "name": "客户库与档案",
+      "decision": "首轮原型",
+      "basis": "用户明确",
+      "originalIds": [
+        "CUST",
+        "CUSTDETAIL",
+        "D11",
+        "D12"
+      ],
+      "screens": [
+        "customers"
+      ],
+      "features": [
+        "搜索与筛选",
+        "客户阶段",
+        "标签",
+        "来源",
+        "归属账号与聊手",
+        "客户备注",
+        "批量标签",
+        "重复客户提示",
+        "主管转交"
+      ],
+      "notes": "跨账号是否合并、跨聊手是否共享需确认。"
+    },
+    {
+      "id": "P-TAGS",
+      "name": "标签体系",
+      "decision": "首轮原型",
+      "basis": "用户明确；作用域是提案",
+      "originalIds": [
+        "TAGS",
+        "TAGSTATS",
+        "D11"
+      ],
+      "screens": [
+        "tags"
+      ],
+      "features": [
+        "公共标签",
+        "个人标签",
+        "分组",
+        "新建/编辑",
+        "颜色",
+        "按标签定位客户"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P-FOLLOW",
+      "name": "跟进待办",
+      "decision": "首轮原型",
+      "basis": "用户此前要求防漏跟进",
+      "originalIds": [
+        "FOLLOW",
+        "D11",
+        "D14"
+      ],
+      "screens": [
+        "followups"
+      ],
+      "features": [
+        "逾期/今日/以后",
+        "创建提醒",
+        "完成待办",
+        "跟进记录",
+        "回到客户会话"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "P-TEAM",
+      "name": "团队与权限",
+      "decision": "首轮原型",
+      "basis": "多聊手协作；权限边界是提案",
+      "originalIds": [
+        "ORG",
+        "STAFF",
+        "ORGAUDIT"
+      ],
+      "screens": [
+        "team"
+      ],
+      "features": [
+        "聊手/主管视角切换",
+        "团队成员",
+        "账号分配",
+        "客户转交",
+        "权限边界展示",
+        "新增演示成员"
+      ],
+      "notes": "角色切换仅用于原型评审，不是生产鉴权。"
+    },
+    {
+      "id": "P-ASSIST",
+      "name": "翻译与快捷回复",
+      "decision": "首轮原型",
+      "basis": "此前需求；本轮做辅助交互",
+      "originalIds": [
+        "D06",
+        "D08",
+        "ops-reply"
+      ],
+      "screens": [
+        "inbox"
+      ],
+      "features": [
+        "接收译文",
+        "示例话术",
+        "发送前语言提示"
+      ],
+      "notes": "翻译是演示文案，没有调用真实模型或翻译服务。"
+    },
+    {
+      "id": "P-WALLET",
+      "name": "钱包地址监控",
+      "decision": "待定",
+      "basis": "用户表示尚不理解，未批准删除或保留",
+      "originalIds": [
+        "control-wallet"
+      ],
+      "screens": [],
+      "features": [
+        "地址监控",
+        "可信钱包白名单",
+        "记录/拦截/通知策略"
+      ],
+      "explanation": "用于识别聊天内容中的加密货币钱包地址，例如防止发出非公司收款地址；并非公司钱包余额、订单或收款账本。",
+      "sourceBoundary": "2026-11-08解析时，出海猫页面明确提示客户端检测正在开发，配置仅先保存。",
+      "notes": ""
+    },
+    {
+      "id": "P-GUARD",
+      "name": "敏感词与敏感行为",
+      "decision": "待定",
+      "basis": "待用户评审原清单",
+      "originalIds": [
+        "control-sensitive",
+        "control-behavior",
+        "D17"
+      ],
+      "screens": [],
+      "features": [
+        "敏感内容策略",
+        "删除/编辑行为审计"
+      ],
+      "notes": "规则和告警范围未确认。"
+    },
+    {
+      "id": "P-AUTO",
+      "name": "自动回复与群发",
+      "decision": "待定",
+      "basis": "未明确本轮范围",
+      "originalIds": [
+        "ops-keyword",
+        "ops-welcome",
+        "ops-mass",
+        "D09",
+        "D10"
+      ],
+      "screens": [],
+      "features": [
+        "关键词回复",
+        "欢迎语",
+        "群发"
+      ],
+      "notes": "不因原产品存在而自动纳入。"
+    },
+    {
+      "id": "P-ATTRIBUTION",
+      "name": "广告来源与归因",
+      "decision": "待定",
+      "basis": "Facebook转WhatsApp的既有业务背景",
+      "originalIds": [
+        "SHUNT",
+        "openchat-settings",
+        "pool-share"
+      ],
+      "screens": [
+        "inbox",
+        "customers"
+      ],
+      "features": [
+        "原型中展示示例来源",
+        "真实广告关联/回传流程待确认"
+      ],
+      "notes": "示例广告名称不代表已连接Meta。"
+    },
+    {
+      "id": "P-ORDERS",
+      "name": "订单与业务系统对接",
+      "decision": "待定",
+      "basis": "此前提及需要，具体工作流尚未敲定",
+      "originalIds": [],
+      "screens": [],
+      "features": [],
+      "notes": "不预设ERP、支付方式或产品结构。"
+    },
+    {
+      "id": "P-NETWORK",
+      "name": "代理、网络和会话环境",
+      "decision": "待定",
+      "basis": "取决于接入路线",
+      "originalIds": [
+        "PROXY",
+        "D15",
+        "D16"
+      ],
+      "screens": [],
+      "features": [],
+      "notes": "接入路线确定后再明确需要哪些配置。"
+    },
+    {
+      "id": "P-LEGACY",
+      "name": "工单、底库、分流与号池",
+      "decision": "待定",
+      "basis": "用户尚未完成清单取舍",
+      "originalIds": [
+        "CLUE",
+        "BASE",
+        "TICKETVIEW",
+        "WORKSHARE",
+        "SHUNT",
+        "pool-share"
+      ],
+      "screens": [],
+      "features": [],
+      "notes": "与内部客户去重、路由分配分开确认。"
+    },
+    {
+      "id": "P-COMMERCIAL",
+      "name": "SaaS商业化界面",
+      "decision": "本轮不展示",
+      "basis": "用户明确内部自用、不商业化",
+      "originalIds": [
+        "PLAN",
+        "RECHARGE",
+        "RECHARGELOG",
+        "WALLETLOG",
+        "CHARLOG",
+        "BUYLOG",
+        "PROMO"
+      ],
+      "screens": [],
+      "features": [],
+      "notes": "套餐、充值、推广返利、字符售卖和端口授权不进入原型导航。真实运营成本与用量可以后续单独考虑。"
+    }
+  ],
+  "review": {
+    "items": [
+      {
+        "id": "LAYOUT",
+        "title": "工作台布局",
+        "question": "会话、聊天、客户档案的宽度与位置是否顺手？",
+        "status": "待评审",
+        "notes": ""
+      },
+      {
+        "id": "OWNERSHIP",
+        "title": "客户归属",
+        "question": "客户属于聊手、账号还是团队？重复进线和转交时如何处理？",
+        "status": "待评审",
+        "notes": ""
+      },
+      {
+        "id": "TAGS",
+        "title": "标签体系",
+        "question": "公共标签和个人标签是否都需要？谁能创建和修改？",
+        "status": "待评审",
+        "notes": ""
+      },
+      {
+        "id": "CONNECTION",
+        "title": "账号接入",
+        "question": "WhatsApp Web、官方API或两者并存？先评审界面，路线未锁定。",
+        "status": "待评审",
+        "notes": ""
+      },
+      {
+        "id": "SCOPE",
+        "title": "待定模块",
+        "question": "钱包监控、自动化、订单、广告归因等逐项确定保留/魔改/不需要。",
+        "status": "待评审",
+        "notes": ""
+      }
+    ]
+  },
+  "implementationBoundary": {
+    "realAccounts": false,
+    "externalMessages": false,
+    "externalNetworkCalls": false,
+    "productionAuth": false,
+    "serverDatabase": false,
+    "deployment": false,
+    "persistence": "演示数据与评审备注仅保存在当前浏览器本地；可导出需求与评审JSON。",
+    "nextPhase": "用户确认原型布局、功能和关键规则后，再规划真实接入与开发。"
+  },
+  "sourceRequirements": "../whatsapp-scrm-requirements-v0.2.json",
+  "uxRevision": {
+    "mode": "Operate",
+    "scope": "重做布局、视觉与交互，功能与业务判断沿用现有需求",
+    "changes": [
+      "账号常驻列表与会话形成明确上下文",
+      "收窄全局导航，将宽度留给聊天",
+      "客户资料分成资料/记录/备注并固定下一步跟进",
+      "账号管理改为可扩展的表格",
+      "统一各页面的表格、表单、抽屉和反馈",
+      "保留本机草稿、标签撤销与需求评审"
+    ],
+    "productionDevelopment": false
+  }
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><meta name="color-scheme" content="light">
+  <title>WA Desk · WhatsApp 客户管理 · UI 复刻原型</title>
+  <link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="components.css"><link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <a class="skip-link" href="#view">跳到工作区</a>
+  <div class="app-shell" id="app-shell">
+    <aside class="sidebar" aria-label="功能导航">
+      <a class="brand" href="#inbox" data-nav="inbox" aria-label="WA Desk 会话工作台"><span class="brand-symbol" data-icon="MessagesSquare"></span><span class="brand-name" translate="no"><strong>WA Desk</strong><small>WhatsApp 客户管理</small></span></a>
+      <nav id="nav" aria-label="主导航"></nav>
+      <div class="sidebar-bottom"><a class="scope-link" href="#scope" data-nav="scope" aria-label="本轮功能范围"><span data-icon="SlidersHorizontal"></span><span class="nav-label">功能范围</span><span id="pending-count" class="nav-count"></span></a><button class="collapse-button" type="button" data-action="toggleSidebar" aria-label="折叠菜单"><span data-icon="PanelLeftClose"></span><span class="nav-label">收起导航</span></button></div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar"><div class="header-left"><button class="icon-button" type="button" data-action="toggleSidebar" aria-label="切换导航"><span data-icon="Menu"></span></button><span class="workspace-chip">内部工作空间</span><span class="header-caption">WhatsApp 聚合客户管理</span></div><div class="top-actions"><span class="prototype-badge">演示原型</span><a class="icon-button" href="#followups" data-nav="followups" aria-label="查看跟进待办" title="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></a><span class="header-separator"></span><div class="view-as"><span id="header-avatar"></span><select id="persona" aria-label="切换评审视角"></select><span data-icon="ChevronDown"></span></div><button class="button review-trigger" type="button" data-action="review" aria-label="评审原型"><span data-icon="MessageSquareText"></span><span>评审</span><i id="review-count" hidden></i></button></div></header>
+      <nav class="workspace-tabs" id="workspace-tabs" aria-label="已打开的页面"></nav>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
+  <script src="icons.js"></script><script src="requirements-data.js"></script><script src="demo-data.js"></script><script src="app.js"></script>
+</body></html>

@@ -1,0 +1,256 @@
+{
+  "prototype": "0.4-replica-ui",
+  "method": "CUA browser UI interactions on local mock prototype",
+  "checks": 59,
+  "passed": 59,
+  "failed": 0,
+  "results": [
+    {
+      "name": "导航与内容尺寸匹配参考",
+      "pass": true
+    },
+    {
+      "name": "侧栏可收起",
+      "pass": true
+    },
+    {
+      "name": "关闭页签保留菜单入口",
+      "pass": true
+    },
+    {
+      "name": "重新打开模块恢复页签",
+      "pass": true
+    },
+    {
+      "name": "账号筛选保持对应会话",
+      "pass": true
+    },
+    {
+      "name": "离线账号禁用发送",
+      "pass": true
+    },
+    {
+      "name": "取消重连不改变状态",
+      "pass": true
+    },
+    {
+      "name": "重连保留草稿并恢复发送",
+      "pass": true
+    },
+    {
+      "name": "西语快捷回复显示译文预览",
+      "pass": true
+    },
+    {
+      "name": "修改后按原文生成本地消息",
+      "pass": true
+    },
+    {
+      "name": "发送后空白内容禁用发送",
+      "pass": true
+    },
+    {
+      "name": "附件草稿不跨客户携带",
+      "pass": true
+    },
+    {
+      "name": "刷新后恢复当前客户附件草稿",
+      "pass": true
+    },
+    {
+      "name": "工具栏打开客户资料抽屉",
+      "pass": true
+    },
+    {
+      "name": "备注保存回客户记录",
+      "pass": true
+    },
+    {
+      "name": "资料抽屉移除标签可撤销",
+      "pass": true,
+      "detail": "B01已修复并复测：模态内撤销按钮位置稳定，保持可操作，标签恢复且抽屉保持打开"
+    },
+    {
+      "name": "撤销提示位于可交互模态层",
+      "pass": true
+    },
+    {
+      "name": "撤销后保留抽屉并恢复标签",
+      "pass": true,
+      "detail": "B01已修复并复测：模态内撤销按钮位置稳定，保持可操作，标签恢复且抽屉保持打开"
+    },
+    {
+      "name": "模态层撤销提示位于抽屉边界内并可点击",
+      "pass": true,
+      "detail": "B01已修复并复测：模态内撤销按钮位置稳定，保持可操作，标签恢复且抽屉保持打开"
+    },
+    {
+      "name": "B01修复后撤销功能通过",
+      "pass": true,
+      "detail": "实际点击撤销，待报价标签恢复，dialog保持打开"
+    },
+    {
+      "name": "必填错误可定位与聚焦",
+      "pass": true
+    },
+    {
+      "name": "取消关闭且不提交",
+      "pass": true
+    },
+    {
+      "name": "新建跟进进入表格",
+      "pass": true
+    },
+    {
+      "name": "完成跟进可在已完成列表重开",
+      "pass": true
+    },
+    {
+      "name": "客户条件筛选",
+      "pass": true
+    },
+    {
+      "name": "客户批量标签保留原标签",
+      "pass": true
+    },
+    {
+      "name": "客户无匹配状态与总数同步",
+      "pass": true
+    },
+    {
+      "name": "账号新增进入可扩展表格",
+      "pass": true
+    },
+    {
+      "name": "账号查询条件生效",
+      "pass": true
+    },
+    {
+      "name": "账号编辑保存",
+      "pass": true
+    },
+    {
+      "name": "空账号会话有明确下一步",
+      "pass": true
+    },
+    {
+      "name": "公共标签维护权限提示",
+      "pass": true
+    },
+    {
+      "name": "左分组右列表联动与新建标签",
+      "pass": true
+    },
+    {
+      "name": "标签编辑保存",
+      "pass": true
+    },
+    {
+      "name": "标签查询空态",
+      "pass": true
+    },
+    {
+      "name": "个人标签按成员隔离",
+      "pass": true
+    },
+    {
+      "name": "聊手隐藏团队管理入口",
+      "pass": true
+    },
+    {
+      "name": "成员列表支持扩展",
+      "pass": true
+    },
+    {
+      "name": "账号可以分配给新增成员",
+      "pass": true
+    },
+    {
+      "name": "客户交接更新负责人",
+      "pass": true
+    },
+    {
+      "name": "原聊手不再显示已转交客户",
+      "pass": true
+    },
+    {
+      "name": "客户交接不隐式移动账号",
+      "pass": true
+    },
+    {
+      "name": "待定模块仍保留范围判断",
+      "pass": true
+    },
+    {
+      "name": "恢复演示数据清除QA实体",
+      "pass": true
+    },
+    {
+      "name": "手机显示会话列表并隐藏桌面侧栏",
+      "pass": true,
+      "detail": "先切换到会话页后复测"
+    },
+    {
+      "name": "手机导航菜单可打开",
+      "pass": true
+    },
+    {
+      "name": "手机分组菜单可收放",
+      "pass": true
+    },
+    {
+      "name": "手机聊天发送区可达",
+      "pass": true
+    },
+    {
+      "name": "手机保留会话工具菜单",
+      "pass": true
+    },
+    {
+      "name": "手机工具可进入备注",
+      "pass": true
+    },
+    {
+      "name": "Escape关闭资料抽屉",
+      "pass": true
+    },
+    {
+      "name": "320px聊天和发送控件不溢出",
+      "pass": true
+    },
+    {
+      "name": "768px会话工具栏裁切修复",
+      "pass": true
+    },
+    {
+      "name": "键盘斜杠聚焦搜索",
+      "pass": true
+    },
+    {
+      "name": "跳过导航聚焦主工作区",
+      "pass": true
+    },
+    {
+      "name": "页面可达：WhatsApp账号",
+      "pass": true
+    },
+    {
+      "name": "页面可达：客户列表",
+      "pass": true
+    },
+    {
+      "name": "页面可达：标签管理",
+      "pass": true
+    },
+    {
+      "name": "页面可达：跟进管理",
+      "pass": true
+    }
+  ],
+  "consoleWarningsOrErrors": [],
+  "limitations": [
+    "No real WhatsApp API or backend tests",
+    "Role isolation is a browser prototype simulation",
+    "Source empty tables populated with original fictional demo data"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": "0.6-scrm-lifecycle",
+  "status": "passed",
+  "checkedAt": "2026-11-17T09:00:24.593Z",
+  "projectRoot": "wa-scrm",
+  "historicalBaselineVerified": 6,
+  "standaloneBundlesVerified": [
+    "whatsapp-scrm-lifecycle.html",
+    "whatsapp-replica-ui-fidelity.html"
+  ],
+  "lifecycleStages": [
+    "新进线",
+    "需求澄明",
+    "报价推进",
+    "成交履约",
+    "复购培育",
+    "沉睡唤醒",
+    "流失归档"
+  ],
+  "externalNetworkCalls": false
+}
