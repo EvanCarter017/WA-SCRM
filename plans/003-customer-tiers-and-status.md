@@ -287,7 +287,7 @@ chmod +x /tmp/wa-scrm-plan-003/smoke.sh && ls -l /tmp/wa-scrm-plan-003/smoke.sh
 
 For `c10`–`c12` put the properties on the same line as `clientType: '…', intentLevel: '…',`. For `c1`–`c6` put them on the same line as `intentLevel: '…',`.
 
-**Verify**: module syntax check → `SYNTAX_OK`; `grep -c "tier: '" work/wa-replica/fidelity-lifecycle.js` → `11`; `grep -c "customerStatus: '" work/wa-replica/fidelity-lifecycle.js` → `5`.
+**Verify**: module syntax check → `SYNTAX_OK`; `grep -cE "\btier: '[SABCD]'" work/wa-replica/fidelity-lifecycle.js` → `11`; `grep -cE "customerStatus: '(converted|abandoned|organic)'" work/wa-replica/fidelity-lifecycle.js` → `5`.
 
 ### Step 3: Save changes made with the drop-downs (the `change` listener)
 
@@ -336,7 +336,7 @@ Change the comment above the listener to `// Field toggles of the completion dia
         <div class="lc-dossier-grade">${lcGradeControls(c)}</div>
 ```
 
-**Verify**: module syntax check → `SYNTAX_OK`; `grep -c "lcGradeControls(c)" work/wa-replica/fidelity-lifecycle.js` → `2` (the definition line uses `lcGradeControls(c) {`, which this grep does not count).
+**Verify**: module syntax check → `SYNTAX_OK`; `grep -c 'lcGradeControls(c)}' work/wa-replica/fidelity-lifecycle.js` → `2` (the two call sites; the definition line `function lcGradeControls(c) {` does not match because of the space before the brace).
 
 ### Step 5: The comprehensive customer list
 
@@ -654,7 +654,7 @@ Machine-checkable. ALL must hold:
 - [ ] `git checkout dfe5efe -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"`
 - [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
 - [ ] `bash /tmp/wa-scrm-plan-003/smoke.sh` ends with `SMOKE PASS`
-- [ ] `grep -c "tier: '" work/wa-replica/fidelity-lifecycle.js` → `11` and `grep -c "customerStatus: '" work/wa-replica/fidelity-lifecycle.js` → `5`
+- [ ] `grep -cE "\btier: '[SABCD]'" work/wa-replica/fidelity-lifecycle.js` → `11` and `grep -cE "customerStatus: '(converted|abandoned|organic)'" work/wa-replica/fidelity-lifecycle.js` → `5`
 - [ ] `git diff dfe5efe -- outputs/wa-replica-prototype/icons.js | wc -l` → `0` (no icon was added or dropped)
 - [ ] `cmp outputs/whatsapp-scrm-lifecycle.html outputs/whatsapp-replica-ui-fidelity.html` → identical (no output)
 - [ ] `git diff --stat dfe5efe -- work/wa-replica/fidelity-base work/wa-replica/fidelity-ui.js work/wa-replica/fidelity-customer-pages.js work/wa-replica/fidelity-dashboard.js work/wa-replica/fidelity-openwa.js work/wa-replica/fidelity-operations.js work/wa-replica/fidelity-subsite.js work/wa-replica/fidelity.css work/wa-replica/fidelity-index.html outputs/review-prompts` → empty

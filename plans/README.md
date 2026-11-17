@@ -10,8 +10,21 @@ honor its STOP conditions, and update your row when done.
 |------|-------|----------|--------|------------|--------|
 | 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | DONE — approved 2026-11-17 after two revision rounds (both caused by plan gaps, see the plan's Amendments) and merged to `main` on the owner's instruction |
 | 002  | The prototype no longer shows or uses invitation codes anywhere | P1 | S | 001 | DONE — approved 2026-11-17 on the first run, no revisions, and merged to `main` on the owner's instruction. Reviewer checks: build, validator and smoke test re-run; scope clean; full diff read; 18 interactive browser tests. The manager-only staff-accounts page cannot be opened in this agent-view build and was verified by the validator guard and code review only |
+| 003  | Customers carry a manual tier (S/A/B/C/D) and status, editable in the chat screen, and the customer list shows and filters by them | P1 | M | 002 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
+
+## Owner request of 2026-11-17 (four improvements) and how it is split
+
+The owner asked for: (1) hooks for future AI API integration, with no sales messaging; (2) a more detailed customer list with a D/C/B/A/S tier set by hand in the chat screen; (3) customer-list filtering by status (converted / abandoned order / organic lead), also set by hand in the chat screen; (4) the chat-history page reworked into a place where conversations from the WhatsApp chat are moved for performance review and auditing.
+
+These are planned and executed one after another, each merged before the next is written, because they touch the same module:
+
+- **003** — points 2 and 3 (customer tier and status).
+- **004** — point 4 (chat history as a review and audit archive). To be written after 003 merges.
+- **005** — point 1 (AI capability hooks). Written last so it can hook every place translation is used, including the reworked chat history.
+
+The owner does not review plans and has given a standing instruction to merge every change that passes review. Open design points are decided by the advisor and recorded in each plan under "Decisions already made".
 
 ## Review record for 001
 
