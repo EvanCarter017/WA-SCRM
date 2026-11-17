@@ -194,6 +194,9 @@ Run from the repository root (inside your worktree). `node` v18 or newer works.
 | Validate | `node work/wa-replica/validate-scrm-lifecycle.cjs` | exit 0; prints JSON with `"status": "passed"` |
 | Browser smoke | `bash /tmp/wa-scrm-plan-005/smoke.sh` (script from Step 1; run from inside the repo) | last line `SMOKE PASS` |
 | Syntax of a module file | `node -e "new (require('vm').Script)('(()=>{'+require('fs').readFileSync(process.argv[1],'utf8')+'})')" work/wa-replica/fidelity-ai.js && echo SYNTAX_OK` | `SYNTAX_OK` |
+| Icon set unchanged | `node -e "const cp=require('child_process'),fs=require('fs');const keys=s=>{const w={};new Function('window',s)(w);return Object.keys(w.WA_ICONS).sort().join()};console.log(keys(cp.execSync('git show 97634e5:outputs/wa-replica-prototype/icons.js').toString())===keys(fs.readFileSync('outputs/wa-replica-prototype/icons.js','utf8'))?'ICON_SET_UNCHANGED':'ICON_SET_CHANGED')"` | `ICON_SET_UNCHANGED` |
+
+Note on `icons.js`: the build lists icons in the order they are first used. This plan uses `Sparkles` earlier than before (in the sidebar), so the **order** inside `icons.js` changes and the file shows up as modified — that is expected. What must not change is the **set** of icons; the "Icon set unchanged" command checks that.
 
 There is no test suite, linter or typechecker. The build fails on a syntax error but not on a call to an undefined function; the smoke test catches those for code that runs on page load.
 
@@ -263,7 +266,6 @@ need dashboard 'data-nav="ai"'
 gone ai '套餐'
 gone ai '付费'
 gone ai '升级'
-need inbox '中文译文'
 need chat-records '归档会话'
 need scope 'AI 能力接入'
 echo "artifacts: $OUT"
@@ -665,7 +667,7 @@ git status --porcelain
 This repo's verification pattern is the static validator plus browser checks; follow it.
 
 - **Validator** — the new section 10 and the two extended file lists (Step 8).
-- **Browser smoke** (`/tmp/wa-scrm-plan-005/smoke.sh`) — every view renders without JavaScript errors; the new page shows both capabilities, their switches and the usage table; the sidebar has the new entry; the inbox still shows stored translations; the page carries no sales wording.
+- **Browser smoke** (`/tmp/wa-scrm-plan-005/smoke.sh`) — every view renders without JavaScript errors; the new page shows both capabilities, their switches and the usage table; the sidebar has the new entry; the page carries no sales wording. (A freshly loaded inbox shows the conversation list, not an open conversation, so translations inside a conversation are checked by the reviewer, not by the smoke script.)
 - **Verified by the reviewer in a scripted browser session, not by you**: a simulated reply and a simulated new lead get their translation through the integration point and leave a usage record; switching "接收消息翻译" off stops both; a quick reply gets its translation preview through the integration point, is sent translated, and is sent as typed when "发送前翻译" is off; totals and the recent-calls table update; everything survives a reload; narrow-screen layout.
 
 ## Done criteria
@@ -678,7 +680,7 @@ Machine-checkable. ALL must hold:
 - [ ] `grep -c "aiTranslateInbound(" work/wa-replica/fidelity-lifecycle.js` → `2`, and the same for `work/wa-replica/fidelity-openwa.js` → `1`
 - [ ] `git diff 97634e5 --stat -- work/wa-replica/fidelity-lifecycle.js | tail -1` → `1 file changed, 9 insertions(+), 4 deletions(-)`
 - [ ] `git diff 97634e5 --stat -- work/wa-replica/fidelity-openwa.js | tail -1` → `1 file changed, 3 insertions(+), 2 deletions(-)`
-- [ ] `git diff 97634e5 -- outputs/wa-replica-prototype/icons.js | wc -l` → `0` (no icon was added or dropped)
+- [ ] The "Icon set unchanged" command from the commands table prints `ICON_SET_UNCHANGED` (no icon was added or dropped; a changed order is expected)
 - [ ] `grep -c "套餐\|升级\|付费\|购买\|订阅\|充值\|额度\|计费\|价格\|定价\|试用\|会员\|解锁\|专业版\|高级版\|优惠\|限时" work/wa-replica/fidelity-ai.js` → `0`
 - [ ] `cmp outputs/whatsapp-scrm-lifecycle.html outputs/whatsapp-replica-ui-fidelity.html` → identical (no output)
 - [ ] `git diff --stat 97634e5 -- work/wa-replica/fidelity-base work/wa-replica/fidelity-ui.js work/wa-replica/fidelity-customer-pages.js work/wa-replica/fidelity-dashboard.js work/wa-replica/fidelity-operations.js work/wa-replica/fidelity-subsite.js work/wa-replica/fidelity-lifecycle.css work/wa-replica/fidelity-dashboard.css work/wa-replica/fidelity-index.html outputs/review-prompts` → empty
@@ -692,7 +694,7 @@ Stop and report back (do not improvise) if:
 - Step 1's baseline check fails (JavaScript errors at the planned commit, or the build is not reproducible there).
 - Any of the code excerpts in "Current state" does not match the live code (the code has drifted), or you find another place outside the demo seed data that writes a `translated` text onto an incoming message or a draft.
 - A `swap(...)` in the build script throws `Missing prototype source anchor` after your edit — you changed a first argument; revert that edit.
-- The build drops or adds an icon (the icons done-criterion fails).
+- The build drops or adds an icon (the "Icon set unchanged" command prints `ICON_SET_CHANGED`).
 - The smoke test still reports `js_errors` after two fix attempts for the same error.
 - The validator's new wording guard fails on text this plan told you to write. Report it; do not reword on your own.
 - The work appears to require editing an out-of-scope file.
