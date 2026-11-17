@@ -1149,7 +1149,7 @@ flowchart LR
 ---
 ````
 
-- In section 3's directory tree: delete the lines for `fidelity-pipelines.js` and `fidelity-pipeline-settings.js`; the `fidelity-lifecycle.js / .css` line's comment becomes `# 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）`; the `PRODUCT.md` and `DESIGN.md` comment lines become `# 产品定位、跟进闭环业务边界与范围说明` and `# 桌面/窄屏布局规范与跟进闭环交互架构`; `validate-scrm-lifecycle.cjs` comment stays.
+- In section 3's directory tree: delete the lines for `fidelity-pipelines.js` and `fidelity-pipeline-settings.js`; the `fidelity-dashboard.js / .css` line's comment `# 首页经营与全周期概览` becomes `# 首页经营概览与跟进闭环概览`; the `fidelity-lifecycle.js / .css` line's comment becomes `# 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）`; the `PRODUCT.md` and `DESIGN.md` comment lines become `# 产品定位、跟进闭环业务边界与范围说明` and `# 桌面/窄屏布局规范与跟进闭环交互架构`; `validate-scrm-lifecycle.cjs` comment stays.
 
 **Verify**: `grep -cE "生命周期|全周期|漏斗|7 阶段|报价单" README.md` → `2` (the two remaining lines are section 2's first sentence about what was deferred, and the `#scope` table row).
 
@@ -1193,7 +1193,7 @@ flowchart LR
 6. **WhatsApp 在线聊天联动（`#inbox`）**：会话列表在需要关注时显示跟进状态；聊天窗顶部协同条显示跟进状态、下次跟进时间与客户标签，并提供安排跟进（或重新跟进）、设置标签、模拟对方回复与打开档案。
 ```
 
-Also, anywhere else in `DESIGN.md` that mentions `全生命周期` in running text, replace it with `跟进闭环`.
+Also, anywhere else in `DESIGN.md` that mentions `全生命周期` in running text (including the line-1 title), replace it with `跟进闭环`; and on line 6 (the local preview address) change `#lifecycle` to `#followups`.
 
 15e. `outputs/wa-replica-prototype/README.md`: title becomes `# WA Desk SCRM · WhatsApp 客户跟进闭环可交互原型 (v0.8)`; first paragraph: replace `围绕「管理加上我的 WhatsApp 的客户全生命流程」构建的闭环可交互原型` with `围绕「加上我的 WhatsApp 的客户跟进不断档」构建的可交互原型`. In "快速打开方式" replace the `#lifecycle` URL with `#followups` and delete the `成交与复购：…#deals` bullet. Replace the whole section `## 推荐体验的 5 条核心闭环路径` (heading and all its numbered items, to the end of the file) with:
 
@@ -1287,6 +1287,7 @@ The first executor run completed Steps 1–13 correctly and stopped in Step 14 o
 1. **Step 3, item 8a (new)** — three demo strings for `c10` contained `报价单`, which the Step 14 guard rejects. They are reworded; all other fictional conversation content is deliberately left alone.
 2. **Step 2d** — `lcCloseEngagement` now sets `c.unread = 0`. Found in review with a browser test: ending follow-up on a customer who still had unread messages immediately raised 「复联待处理」, which must only mean "wrote again after follow-up ended".
 3. **Step 5b** — the dossier's to-do card button is labelled `完成并闭环`, matching the to-do list.
+4. **Step 15b / 15d** (after the second executor run) — two documentation spots the plan had not listed: the README directory-tree comment for `fidelity-dashboard.js` (found and fixed by the executor), and the stale `#lifecycle` preview address on `DESIGN.md` line 6 (found in review).
 
 ## Maintenance notes
 
