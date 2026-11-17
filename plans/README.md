@@ -9,6 +9,7 @@ honor its STOP conditions, and update your row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | DONE — approved 2026-11-17 after two revision rounds (both caused by plan gaps, see the plan's Amendments) and merged to `main` on the owner's instruction |
+| 002  | The prototype no longer shows or uses invitation codes anywhere | P1 | S | 001 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -21,6 +22,12 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 ## Dependency notes
 
 - 001 has no dependencies. It was written with `plan <description>` (no audit) from the owner's instruction of 2026-11-17: "strip out the funnel and lifecycle stages for now. Instead, focus on closing the loop on customer engagement, using tags as a supporting mechanism; that should be sufficient."
+
+## Decisions recorded for 002
+
+- Written with `plan <description>` from the owner's instruction of 2026-11-17: "Remove all content related to invitation codes."
+- "All content" is taken to mean the working prototype (module sources, styles, built outputs, validator). The historical and reference records that still contain the term — the v0.5 snapshot, the original product's feature inventory and customization blueprint, the original site's measurements, and plan 001 — are left unchanged, following this repository's convention of preserving history. This boundary was stated to the owner when the plan was dispatched.
+- 002 depends on 001 only because it edits the history tab that 001 rewrote.
 
 ## Decisions recorded for 001
 
