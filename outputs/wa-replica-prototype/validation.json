@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-17T16:03:51.627Z",
+  "checkedAt": "2026-11-17T18:15:03.888Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -42,6 +42,6 @@
     "translate.outbound"
   ],
   "aiProvider": "local demo (prepared sample results)",
-  "conversationCardTags": "first 3 visible tags, then +N",
+  "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
   "externalNetworkCalls": false
 }

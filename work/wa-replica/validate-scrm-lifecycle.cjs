@@ -130,6 +130,7 @@ assert(req.review.items.some(i => i.id === 'AI_HOOKS'));
 // 11. Conversation cards in the WhatsApp chat list show the customer's tags
 assert(moduleSource.includes('function lcConversationTags(c)') && moduleSource.includes('${lcConversationTags(c)}'), 'conversation cards must show the customer tags');
 assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('.conversation-tags {'), 'the tag row on conversation cards needs its styles');
+assert(!moduleSource.includes('mini-stage'), 'conversation cards must not show the follow-up status chip');
 assert(req.modules.find(m => m.id === 'P-INBOX').features.includes('会话卡片显示客户标签'));
 
 const summary = {
@@ -148,7 +149,7 @@ const summary = {
   chatHistory: 'archive of moved-in snapshots, no rating',
   aiCapabilities: ['translate.inbound', 'translate.outbound'],
   aiProvider: 'local demo (prepared sample results)',
-  conversationCardTags: 'first 3 visible tags, then +N',
+  conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

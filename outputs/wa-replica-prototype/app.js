@@ -2854,7 +2854,6 @@
   conversationRows = function() {
     return filteredConversations().map(c => {
       const a = account(c.account);
-      const h = lcHealth(c);
       const selected = fid.chatOpen && c.id === ui.customer ? 'selected' : '';
       return `<button type="button" class="conversation ${selected}" aria-label="打开${esc(c.name)}的会话" data-action="openConversation" data-id="${esc(c.id)}">
         ${avatar(c)}
@@ -2863,7 +2862,6 @@
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
             <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : c.language)}</span>
-            ${h.primary.key === 'healthy' ? '' : `<span class="mini-stage" title="跟进状态：${esc(h.primary.label)}">${esc(h.primary.label)}</span>`}
           </span>
           ${lcConversationTags(c)}
         </span>
