@@ -9,7 +9,7 @@ honor its STOP conditions, and update your row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | DONE — approved 2026-11-17 after two revision rounds (both caused by plan gaps, see the plan's Amendments) and merged to `main` on the owner's instruction |
-| 002  | The prototype no longer shows or uses invitation codes anywhere | P1 | S | 001 | TODO |
+| 002  | The prototype no longer shows or uses invitation codes anywhere | P1 | S | 001 | DONE — approved 2026-11-17 on the first run, no revisions; on branch `worktree-agent-a95d744a398edecb0`, awaiting the owner's decision to merge |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
