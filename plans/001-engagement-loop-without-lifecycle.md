@@ -356,6 +356,7 @@ Notes: the three removed routes (`#lifecycle`, `#deals`, `#pipelines`) must fall
       }
     }
     c.followup = null;
+    c.unread = 0; // messages already seen when ending; anything unread afterwards is a real re-contact
     lcLog(c.id, 'followup', `结束跟进 · ${reason}`);
   }
 
@@ -420,6 +421,7 @@ In `lcSeed`:
 ```
 
 8. Delete the whole `// v0.7: move the dealer-style demo customer ...` block (`if (!data.lcPipelinesV07) { ... }`).
+8a. Reword the three demo strings for customer `c10` that contain the removed term `报价单` (the validator in Step 14 rejects that term anywhere in this file): in the `c10` object, `translation: '收到报价单了，我和合伙人核对一下采购数量。'` becomes `translation: '收到报价了，我和合伙人核对一下采购数量。'`; in `data.messages.c10`, the `translated` text of `m1001` `'可以发一份两套发往芝加哥的正式报价单吗？'` becomes `'可以发一份两套发往芝加哥的正式报价吗？'`, and the `translated` text of `m1003` becomes `'收到报价了，我和合伙人核对一下采购数量。'`. Change nothing else in the demo conversations, notes or requirement profiles: customers and agents naturally talk about prices, quotes and orders in chat, and that fictional conversation content (including the English/Spanish messages and their quote/order numbers) stays as it is. Only the product's own UI wording for the removed features is cleaned up.
 9. In the final `for (const c of data.customers) { ... }` loop: replace `lcNormalizeCustomer(c);` with `lcMigrateEngagement(c);`; delete the `c.stageEnteredAt ||= …` line and the `c.repurchaseCycleDays ||= 30;` line; keep the rest. Change the comment above the loop to `// Ensure every customer has an engagement state and safe defaults`.
 
 After `lcSeed();`:
@@ -459,7 +461,7 @@ After `lcSeed();`:
 - Remove these local constants: `quotes`, `orders`, `ltv`, `openQuoteVal`, `currentIdx`, `pipeline`, `pipelineStages`, and the whole `stepper` constant.
 - The `tab` constant becomes `const tab = ['overview', 'timeline', 'notes'].includes(lcState.dossierTab) ? lcState.dossierTab : 'overview';`.
 - `nextCard` (inside `if (tab === 'overview')`) keeps its three-way shape but with these conditions and contents:
-  1. `h.nextTask` → keep the existing card, but (i) the `<small>` line is `计划时间：${esc(dateLabel(h.nextTask.due))}` with no "类型" part, and (ii) add a third button to its action group: `${fidButton('结束跟进', 'lcCloseOpen', 'Archive', 'slim', fidActionID(c.id))}`.
+  1. `h.nextTask` → keep the existing card, but (i) the `<small>` line is `计划时间：${esc(dateLabel(h.nextTask.due))}` with no "类型" part, (ii) add a third button to its action group: `${fidButton('结束跟进', 'lcCloseOpen', 'Archive', 'slim', fidActionID(c.id))}`, and (iii) rename the first button's label from `完成并衔接下一步` to `完成并闭环` (same wording as the to-do list).
   2. `!h.closed` (no next task) → the existing warn block, title `跟进断档预警`, with buttons `立即补排跟进` (action `followup`) and `结束跟进` (action `lcCloseOpen`, icon `Archive`, style `slim`), and the paragraph text `该客户尚未安排下一次跟进，极易造成意向流失。请补排跟进，或明确结束跟进。`.
   3. otherwise (closed) → a plain `lc-card-block` with heading `${icon('Archive')}已结束跟进`, a button `重新跟进` (action `followup`, icon `RotateCcw`, style `slim blue`), and the paragraph `结束原因：${esc(c.closedReason || '未记录')}${c.closedAt ? `（${esc(fidDate(c.closedAt).slice(0, 10))}）` : ''}。客户再次来信时会提示「复联待处理」。`.
 - Delete the whole `else if (tab === 'deals') { ... }` branch.
@@ -1277,6 +1279,14 @@ Stop and report back (do not improvise) if:
 - Removing something appears to require editing an out-of-scope file (especially anything under `fidelity-base/` or `fidelity-ui.js`).
 - You find stage, pipeline, quote or order UI that this plan does not mention and that would remain visible after all steps.
 - You believe a decision in "Decisions already made" is wrong. Report it; do not act on it.
+
+## Amendments (2026-11-17, after the first executor run)
+
+The first executor run completed Steps 1–13 correctly and stopped in Step 14 on a defect in this plan. The plan was amended as follows; the same executor continued from Step 14.
+
+1. **Step 3, item 8a (new)** — three demo strings for `c10` contained `报价单`, which the Step 14 guard rejects. They are reworded; all other fictional conversation content is deliberately left alone.
+2. **Step 2d** — `lcCloseEngagement` now sets `c.unread = 0`. Found in review with a browser test: ending follow-up on a customer who still had unread messages immediately raised 「复联待处理」, which must only mean "wrote again after follow-up ended".
+3. **Step 5b** — the dossier's to-do card button is labelled `完成并闭环`, matching the to-do list.
 
 ## Maintenance notes
 

@@ -8,7 +8,7 @@ honor its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | TODO |
+| 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | IN PROGRESS — executor run 1 finished Steps 1–13 and stopped on a plan defect (demo text contained a guarded term); plan amended, same executor continuing from Step 14 |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
