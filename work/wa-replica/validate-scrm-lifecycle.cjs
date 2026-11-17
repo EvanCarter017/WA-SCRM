@@ -133,6 +133,13 @@ assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('.conversat
 assert(!moduleSource.includes('mini-stage'), 'conversation cards must not show the follow-up status chip');
 assert(req.modules.find(m => m.id === 'P-INBOX').features.includes('会话卡片显示客户标签'));
 
+// 12. The follow-up labels above an open chat open the follow-up centre on this customer's row
+assert.equal((moduleSource.match(/data-action="lcTrackFollow"/g) || []).length, 2, 'both follow-up labels in the chat strip must open the follow-up centre');
+assert(moduleSource.includes('lcTrackFollow: id =>') && moduleSource.includes('lcState.followFocus = {'), 'the follow-up centre must open on the customer row');
+assert(moduleSource.includes("if (ui.view !== 'followups') lcState.followFocus = null;"), 'the highlighted row must be cleared when the follow-up centre is left');
+assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('tr.lc-row-focus td {'), 'the highlighted row needs its style');
+assert(req.modules.find(m => m.id === 'P-INBOX').features.includes('协同条的跟进状态与下次跟进可跳转到跟进闭环并定位该客户'));
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -150,6 +157,7 @@ const summary = {
   aiCapabilities: ['translate.inbound', 'translate.outbound'],
   aiProvider: 'local demo (prepared sample results)',
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
+  chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

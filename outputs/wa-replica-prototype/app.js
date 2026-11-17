@@ -1951,6 +1951,7 @@
     followTab: 'todo',
     signal: 'all',
     followTags: [],
+    followFocus: null,
     customerHealthFilter: 'all',
     customerTier: 'all',
     customerStatus: 'all',
@@ -2193,7 +2194,7 @@
   const lcOrigResetExtras = fidResetExtras;
   fidResetExtras = function() {
     lcOrigResetExtras();
-    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all' });
+    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], followFocus: null, customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all' });
     lcSeed();
   };
 
@@ -2567,6 +2568,9 @@
     const closedList = customers.filter(lcIsClosed);
     const marked = lcState.followTags.map(tag).filter(Boolean);
     const tab = ['todo', 'signals', 'closed', 'history'].includes(lcState.followTab) ? lcState.followTab : 'todo';
+    // The row opened from the chat strip (lcTrackFollow): a to-do, or a customer when there is no to-do.
+    const focus = lcState.followFocus;
+    const focusCustomer = c => focus && !focus.task && focus.customer === c.id ? ' class="lc-row-focus"' : '';
 
     const subtab = (id, label, glyph, count) =>
       `<button type="button" class="lc-subtab" data-action="lcFollowTab" data-id="${id}" aria-pressed="${tab === id}">${icon(glyph)}${label}<b>${count}</b></button>`;
@@ -2595,7 +2599,7 @@
       const counts = Object.fromEntries(lcSignalDefs.map(([id]) => [id, customers.filter(c => lcMatchesSignal(c, id)).length]));
       const rows = customers.filter(c => lcMatchesSignal(c, lcState.signal)).map(c => {
         const h = lcHealth(c);
-        return `<tr>
+        return `<tr${focusCustomer(c)}>
           <td style="text-align:left">${nameCell(c)}</td>
           <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span></td>
           <td style="text-align:left">${tagCell(c)}</td>
@@ -2620,7 +2624,7 @@
     if (tab === 'closed') {
       const rows = closedList.map(c => {
         const h = lcHealth(c);
-        return `<tr>
+        return `<tr${focusCustomer(c)}>
           <td style="text-align:left">${nameCell(c)}</td>
           <td style="text-align:left">${esc(c.closedReason || '未记录原因')}<span class="fid-cell-detail">结束于 ${esc(c.closedAt ? fidDate(c.closedAt).slice(0, 10) : '—')}</span></td>
           <td style="text-align:left">${tagCell(c)}</td>
@@ -2653,11 +2657,16 @@
     const filterKey = ui.taskFilter || 'pending';
     const list = (filterKey === 'done' ? done : filterKey === 'overdue' ? overdue : filterKey === 'today' ? today : pending)
       .slice().sort((a, b) => new Date(a.due) - new Date(b.due));
+    if (focus?.task && !focus.placed) {
+      const at = list.findIndex(t => t.id === focus.task);
+      if (at >= 0) ui.pages.followups = Math.floor(at / (ui.pageSizes.followups || 10));
+      focus.placed = true;
+    }
     const taskRows = paged(list, 'followups').map(t => {
       const c = customer(t.customer);
       if (!c) return '';
       const isOverdue = !t.done && beforeToday(t.due);
-      return `<tr>
+      return `<tr${focus?.task === t.id ? ' class="lc-row-focus"' : ''}>
         <td style="text-align:left"><button type="button" class="fid-link" data-action="profile" ${fidActionID(c.id)}><strong>${esc(c.name)}</strong></button><span class="fid-cell-detail">${esc(account(c.account)?.name || '')} · ${esc(c.language)}</span></td>
         <td style="text-align:left">${tagCell(c)}</td>
         <td style="text-align:left"><span class="task-title ${t.done ? 'completed' : ''}"><strong>${esc(t.title)}</strong></span>${t.outcome ? `<span class="fid-cell-detail">结果：${esc(t.outcome)}</span>` : ''}</td>
@@ -2874,8 +2883,8 @@
     let html = lcPrevChatHTML(c);
     const h = lcHealth(c);
     const strip = `<div class="lc-chat-strip" aria-label="客户跟进协同栏">
-      <span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span>
-      ${h.nextTask ? `<span class="lc-pill info">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</span>` : ''}
+      <button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon(h.primary.icon)}${esc(h.primary.label)}</button>
+      ${h.nextTask ? `<button type="button" class="lc-pill lc-pill-link info" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</button>` : ''}
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
       <div class="lc-chat-strip-right">
@@ -3077,6 +3086,23 @@
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },
     lcSignal: id => { lcState.signal = id; render(); },
     lcJumpSignal: id => { lcState.followTab = 'signals'; lcState.signal = id; ui.pages.followups = 0; navigate('followups'); },
+    // Chat strip → follow-up centre, on this customer's row: the earliest unfinished to-do if the viewer
+    // has one for the customer, otherwise the customer among the signals, or among the ended follow-ups.
+    // The row stays highlighted until the follow-up centre is left (see the render wrapper).
+    lcTrackFollow: id => {
+      const c = customer(id);
+      if (!c || !myCustomers().includes(c)) return;
+      const h = lcHealth(c);
+      const task = !h.closed && h.nextTask && myTasks().includes(h.nextTask) ? h.nextTask : null;
+      if (!lcHasFollowTags(c)) lcState.followTags = [];
+      lcState.followTab = h.closed ? 'closed' : task ? 'todo' : 'signals';
+      if (task) ui.taskFilter = 'pending';
+      else if (!h.closed) lcState.signal = 'all';
+      lcState.followFocus = { customer: c.id, task: task ? task.id : null, placed: false };
+      ui.pages.followups = 0;
+      navigate('followups');
+      $('#view .lc-row-focus')?.scrollIntoView({ block: 'center' });
+    },
     lcCloseOpen: id => openCloseEngagement(id),
     lcFollowTagFilter: () => fidOpenTagPicker('按标签筛选跟进', 'lc-follow-tag-filter', lcState.followTags, { submit: '筛选' }),
     lcFollowTagClear: () => { lcState.followTags = []; ui.pages.followups = 0; render(); },
@@ -3287,6 +3313,7 @@
   const lcWrapRender = render;
   render = function() {
     lcSyncRuntimeCustomers();
+    if (ui.view !== 'followups') lcState.followFocus = null;
     lcWrapRender();
   };
 

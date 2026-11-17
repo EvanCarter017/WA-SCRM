@@ -2754,3 +2754,17 @@ dialog>#toast,dialog>#toast.show{transform:none}
   line-height: var(--fid-px-16);
   color: var(--color-text-muted);
 }
+
+/* Follow-up labels in the chat strip open the follow-up centre on the customer's row (plan 009) */
+.lc-pill-link {
+  border: 0;
+}
+.lc-pill-link:hover {
+  text-decoration: underline;
+}
+.fid-table tbody tr.lc-row-focus td {
+  background: var(--color-accent-soft);
+}
+.fid-table tbody tr.lc-row-focus td:first-child {
+  box-shadow: inset var(--fid-px-3) 0 0 var(--fid-royal);
+}
