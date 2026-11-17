@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-17T14:15:16.623Z",
+  "checkedAt": "2026-11-17T15:07:19.546Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -24,5 +24,17 @@
     "P-DEALS"
   ],
   "invitationCodes": "removed",
+  "customerTiers": [
+    "S",
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "customerStatuses": [
+    "converted",
+    "abandoned",
+    "organic"
+  ],
   "externalNetworkCalls": false
 }

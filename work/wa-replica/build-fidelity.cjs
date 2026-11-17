@@ -60,7 +60,7 @@ swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,i
 swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,scope:renderScope");
 swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。'");
 swap("'P-FOLLOW':'把跟进安排成待办，完成后回写客户记录。'", "'P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'");
-swap("'P-CUSTOMERS':'客户档案、来源、阶段、标签及跨账号接触记录。'", "'P-CUSTOMERS':'客户档案、来源、跟进状态、标签及跨账号接触记录。'");
+swap("'P-CUSTOMERS':'客户档案、来源、阶段、标签及跨账号接触记录。'", "'P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。'");
 swap('聊手管理自己的工作，主管查看团队并处理分配。', '团队成员、账号分配和客户交接由主站管理。');
 const deferredScopeIds = JSON.stringify(['P-COMMERCIAL','P-TEAM','P-AUTO','P-REPLY-MANAGEMENT','P-BROADCAST','P-LIFECYCLE','P-PIPELINES','P-DEALS']);
 swap("m.id!=='P-COMMERCIAL'||m.id==='P-ATTRIBUTION'", `!${deferredScopeIds}.includes(m.id)||m.id==='P-ATTRIBUTION'`);
@@ -123,10 +123,18 @@ requirement.review.items.push({
   status: '待评审',
   notes: '',
 });
+requirement.review.items.push({
+  id: 'CUSTOMER_GRADING',
+  title: '客户等级与客户状态',
+  question: '客户等级（S / A / B / C / D）与客户状态（已成交 / 弃单 / 自然线索）均为手动设置，可在聊天界面调整。请评审各等级的含义、状态选项是否齐全，以及是否需要在更多位置展示。',
+  status: '待评审',
+  notes: '',
+});
 requirement.modelOutline.relationships.push(
   '每个标签包含一个名称并归属一个自建分组。客户可同时使用同组或不同组的多个标签。',
   '客户跟进状态只有「跟进中」与「已结束跟进」两种。跟进中的客户必须有下一条待办，否则提示跟进断档；结束跟进需填写原因并结清待办，客户再次来信时提示复联，可重新跟进并保留全部历史。',
-  '标签是唯一的客户分类手段：完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。'
+  '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。',
+  '客户另有两项手动设置的分类：客户等级（S / A / B / C / D，S 最高，默认未评级）与客户状态（已成交 / 弃单 / 自然线索，默认未标记）。两者可在聊天界面或客户档案中随时调整，系统不自动评级或改状态。'
 );
 Object.assign(requirement.prototypeAssumptions.find(a => a.id === 'A001'), {
   text: '子站固定为已登录聊手的工作范围。顶栏提供退出登录。原型使用固定的演示身份与本地退出流程。',
@@ -190,6 +198,7 @@ Object.assign(follow, {
 });
 const customersModule = requirement.modules.find(module => module.id === 'P-CUSTOMERS');
 customersModule.features = customersModule.features.map(feature => feature === '客户阶段' ? '跟进状态' : feature);
+customersModule.features.push('客户等级（S/A/B/C/D）', '客户状态（已成交/弃单/自然线索）', '按等级与状态筛选', '导出含等级与状态');
 requirement.modules.find(module => module.id === 'P-TAGS').notes = '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。';
 const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
 

@@ -24,11 +24,31 @@
 
   const LC_INTENT_LEVELS = ['高意向', '中意向', '了解中'];
 
+  // Customer tier (set by hand; S is the highest). '' means not rated yet.
+  const LC_TIERS = ['S', 'A', 'B', 'C', 'D'];
+  const LC_TIER_TONES = { S: 'purple', A: 'blue', B: 'jade', C: 'gold', D: 'slate' };
+  // Customer status (set by hand; one value). '' means not marked yet.
+  const LC_CUSTOMER_STATUSES = [['converted', '已成交', 'ok'], ['abandoned', '弃单', 'warn'], ['organic', '自然线索', 'info']];
+  const lcTier = c => LC_TIERS.includes(c?.tier) ? c.tier : '';
+  const lcCustomerStatus = c => LC_CUSTOMER_STATUSES.some(([id]) => id === c?.customerStatus) ? c.customerStatus : '';
+  const lcCustomerStatusLabel = c => LC_CUSTOMER_STATUSES.find(([id]) => id === lcCustomerStatus(c))?.[1] || '未标记';
+  const lcTierBadge = c => lcTier(c)
+    ? `<span class="lc-stage-badge lc-tier ${LC_TIER_TONES[lcTier(c)]}" title="客户等级：${lcTier(c)} 级">${lcTier(c)}</span>`
+    : '<span class="lc-pill neutral">未评级</span>';
+  const lcCustomerStatusPill = c => `<span class="lc-pill ${LC_CUSTOMER_STATUSES.find(([id]) => id === lcCustomerStatus(c))?.[2] || 'neutral'}">${esc(lcCustomerStatusLabel(c))}</span>`;
+  // Two drop-downs that save as soon as they change (see the change listener at the end of this file).
+  function lcGradeControls(c) {
+    return `<label class="lc-inline-select"><span>等级</span><select class="fid-select" data-lc-tier="${esc(c.id)}" aria-label="客户等级">${option('', '未评级', lcTier(c))}${LC_TIERS.map(t => option(t, t + ' 级', lcTier(c))).join('')}</select></label>
+      <label class="lc-inline-select"><span>客户状态</span><select class="fid-select" data-lc-status="${esc(c.id)}" aria-label="客户状态">${option('', '未标记', lcCustomerStatus(c))}${LC_CUSTOMER_STATUSES.map(([id, label]) => option(id, label, lcCustomerStatus(c))).join('')}</select></label>`;
+  }
+
   const lcState = {
     followTab: 'todo',
     signal: 'all',
     followTags: [],
     customerHealthFilter: 'all',
+    customerTier: 'all',
+    customerStatus: 'all',
     dossierTab: 'overview',
     timelineFilter: 'all',
   };
@@ -68,7 +88,7 @@
           followup: null, notes: '已发组合报价 $2,450，客户表示与合伙人商议，当前漏排下一步跟进（断档示例）。',
           contactRefs: [{ account: 'a1', owner: 'lin' }],
           createdAt: fidDay(-6), updatedAt: fidDay(-2),
-          clientType: '新增线索-实时', intentLevel: '高意向',
+          clientType: '新增线索-实时', intentLevel: '高意向', tier: 'A',
           qualification: {
             demand: '双规格组合采购方案，要求分批包装说明',
             volume: '$2,000 - $3,000 / 批',
@@ -88,7 +108,7 @@
           followup: fidDay(1), notes: '首单已收款并发出 USPS Priority，预计明日签收，签收后回访。',
           contactRefs: [{ account: 'a2', owner: 'lin' }],
           createdAt: fidDay(-9), updatedAt: fidDay(-1),
-          clientType: '新增线索-实时', intentLevel: '高意向',
+          clientType: '新增线索-实时', intentLevel: '高意向', tier: 'A', customerStatus: 'converted',
           qualification: {
             demand: '首批标准规格订单履约中，后续有按月补货意向',
             volume: '$1,300 - $1,800 / 月',
@@ -108,7 +128,7 @@
           followup: null, notes: '因季度预算排期暂缓，已结束跟进；预算开放后再联系。',
           contactRefs: [{ account: 'a1', owner: 'lin' }],
           createdAt: fidDay(-22), updatedAt: fidDay(-12),
-          clientType: '新增线索-实时', intentLevel: '中意向',
+          clientType: '新增线索-实时', intentLevel: '中意向', tier: 'C', customerStatus: 'abandoned',
           engagement: 'closed', closedReason: '客户季度预算冻结，下一轮预算开放后再联系', closedAt: fidDay(-12),
           qualification: {
             demand: '季度常规采购询盘，曾索取整箱阶梯报价',
@@ -145,7 +165,7 @@
       // Enrich the base customers c1-c8 with requirement profiles
       const enrichMap = {
         c1: {
-          intentLevel: '高意向',
+          intentLevel: '高意向', tier: 'B',
           qualification: {
             demand: '索取最新产品总目录，对比常规规格与批次交付周期',
             volume: '$1,200 - $2,000 / 首单',
@@ -155,7 +175,7 @@
           },
         },
         c2: {
-          intentLevel: '高意向',
+          intentLevel: '高意向', tier: 'C',
           qualification: {
             demand: '确认波多黎各（San Juan）是否支持稳定直发与时效',
             volume: '待确认具体采购量',
@@ -165,7 +185,7 @@
           },
         },
         c3: {
-          intentLevel: '高意向',
+          intentLevel: '高意向', tier: 'S', customerStatus: 'converted',
           reactivatedCount: 1,
           qualification: {
             demand: '长期稳定老客（已完成 2 单），按月固定补货常规组合',
@@ -176,7 +196,7 @@
           },
         },
         c4: {
-          intentLevel: '高意向',
+          intentLevel: '高意向', tier: 'A',
           qualification: {
             demand: '已发首批标准方案报价 $1,680，正在核实加州签收时效',
             volume: '$1,680（首单报价确认中）',
@@ -186,7 +206,7 @@
           },
         },
         c5: {
-          intentLevel: '中意向',
+          intentLevel: '中意向', tier: 'C', customerStatus: 'organic',
           qualification: {
             demand: '需要全套西语版说明手册与入门规格建议',
             volume: '$600 - $1,000 / 试单',
@@ -196,7 +216,7 @@
           },
         },
         c6: {
-          intentLevel: '中意向',
+          intentLevel: '中意向', tier: 'B', customerStatus: 'converted',
           qualification: {
             demand: '老客转介绍试单客户（首单 $890 已签收 40 天），发新版目录后未回',
             volume: '$800 - $1,500',
@@ -205,8 +225,8 @@
             commWindow: '美东工作时间',
           },
         },
-        c7: { intentLevel: '高意向' },
-        c8: { intentLevel: '高意向' },
+        c7: { intentLevel: '高意向', tier: 'B' },
+        c8: { intentLevel: '高意向', tier: 'C' },
       };
       for (const [cid, patch] of Object.entries(enrichMap)) {
         const target = customer(cid);
@@ -268,7 +288,7 @@
   const lcOrigResetExtras = fidResetExtras;
   fidResetExtras = function() {
     lcOrigResetExtras();
-    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], customerHealthFilter: 'all' });
+    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all' });
     lcSeed();
   };
 
@@ -583,6 +603,7 @@
             ${fidButton('打开会话', 'openConversation', 'MessageCircle', 'blue slim', fidActionID(c.id))}
           </div>
         </div>
+        <div class="lc-dossier-grade">${lcGradeControls(c)}</div>
       </div>
       <div class="lc-dossier-kpis">
         <div class="lc-mini-kpi"><span>当前跟进状态</span><strong style="font-size:12px">${esc(h.primary.label)}</strong></div>
@@ -761,20 +782,24 @@
   };
 
   // ============================================================================
-  // Page: #customers (客户列表 — 跟进状态筛选与标签)
+  // Page: #customers (客户列表 — 等级、客户状态、跟进状态与标签)
   // ============================================================================
   const lcOrigFilteredCustomers = filteredCustomers;
+  // Customers after the search form and the follow-up filter, before the tier / status chips.
+  const lcCustomerPool = () => lcOrigFilteredCustomers().filter(c => {
+    if (lcState.customerHealthFilter === 'all') return true;
+    const h = lcHealth(c);
+    if (lcState.customerHealthFilter === 'reply') return h.awaitingReply;
+    if (lcState.customerHealthFilter === 'overdue') return h.overdue;
+    if (lcState.customerHealthFilter === 'noplan') return h.noPlan;
+    if (lcState.customerHealthFilter === 'recontact') return h.recontact;
+    if (lcState.customerHealthFilter === 'closed') return h.closed;
+    return true;
+  });
   filteredCustomers = function() {
-    return lcOrigFilteredCustomers().filter(c => {
-      if (lcState.customerHealthFilter === 'all') return true;
-      const h = lcHealth(c);
-      if (lcState.customerHealthFilter === 'reply') return h.awaitingReply;
-      if (lcState.customerHealthFilter === 'overdue') return h.overdue;
-      if (lcState.customerHealthFilter === 'noplan') return h.noPlan;
-      if (lcState.customerHealthFilter === 'recontact') return h.recontact;
-      if (lcState.customerHealthFilter === 'closed') return h.closed;
-      return true;
-    });
+    return lcCustomerPool().filter(c =>
+      (lcState.customerTier === 'all' || (lcTier(c) || 'none') === lcState.customerTier) &&
+      (lcState.customerStatus === 'all' || (lcCustomerStatus(c) || 'none') === lcState.customerStatus));
   };
 
   customerRows = function() {
@@ -793,11 +818,13 @@
         <td>${esc(a?.name || '—')}<span class="fid-cell-detail">${esc(member(c.owner)?.name || '未分配')}</span></td>
         <td><button class="fid-link fid-note-link" data-action="profileNote" ${fidActionID(c.id)} title="${esc(c.notes || '')}" aria-label="查看${esc(c.name)}备注"><span class="fid-cell-note">${esc(c.qualification?.demand || c.notes || '—')}</span></button></td>
         <td><button class="fid-link" data-action="profile" ${fidActionID(c.id)} aria-label="查看${esc(c.name)}资料"><strong>${esc(c.name)}</strong></button><span class="fid-cell-detail">${esc(c.source)}</span></td>
+        <td>${lcTierBadge(c)}</td>
+        <td>${lcCustomerStatusPill(c)}</td>
         <td><button type="button" class="fid-link fid-tag-cell" data-action="fidViewCustomerTags" ${fidActionID(c.id)} aria-label="查看${esc(c.name)}的标签，共 ${assigned.length} 个">${tagPreview}${tagDetail}</button></td>
         <td>${esc(c.phone)}<span class="fid-cell-detail">${esc(country(c))} · ${esc(c.language)}</span></td>
         <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span></td>
-        <td>${esc(fidDate(c.createdAt))}</td>
-        <td>${esc(fidDate(c.updatedAt))}</td>
+        <td>${esc(c.last || '—')}${c.unread ? `<span class="fid-cell-detail">${c.unread} 条未读</span>` : ''}</td>
+        <td>${esc(fidDate(c.createdAt))}<span class="fid-cell-detail">更新 ${esc(fidDate(c.updatedAt))}</span></td>
         <td><div class="fid-icon-actions">${fidIcon('打开' + c.name + '会话', 'openConversation', 'MessageCircle', c.id)}${fidIcon('360° 客户档案：' + c.name, 'profile', 'ContactRound', c.id)}${fidIcon('安排跟进：' + c.name, 'followup', 'CalendarPlus', c.id)}</div></td>
       </tr>`;
     }).join('');
@@ -805,6 +832,7 @@
 
   renderCustomers = function() {
     const list = filteredCustomers();
+    const pool = lcCustomerPool();
     const marked = fid.customerTags.map(tag).filter(Boolean);
     const selected = ui.selected.size;
     const filters = `<form class="fid-customer-filter fid-rounded" id="fid-customer-search-form">
@@ -814,17 +842,25 @@
         <input class="fid-input" id="fid-customer-end" aria-label="截止时间" placeholder="截止时间" value="${esc(fid.customerEnd)}" data-fid-date>
         <select class="fid-select" id="fid-customer-field" aria-label="客户查询字段">${fidOption([['name', '联系人'], ['phone', '手机号'], ['account', '主账号'], ['note', '备注'], ['source', '来源']], fid.customerField)}</select>
         <input class="fid-input" id="customer-search" aria-label="搜索客户库" placeholder="请输入" value="${esc(ui.customerQuery)}">
-        <select class="fid-select" id="fid-customer-health-select" aria-label="防漏状态">${fidOption([['all', '全部跟进状态'], ['reply', '客户待回复'], ['overdue', '跟进已逾期'], ['noplan', '跟进断档(无待办)'], ['recontact', '复联待处理'], ['closed', '已结束跟进']], lcState.customerHealthFilter)}</select>
+        <select class="fid-select" id="fid-customer-health-select" aria-label="跟进状态">${fidOption([['all', '全部跟进状态'], ['reply', '客户待回复'], ['overdue', '跟进已逾期'], ['noplan', '跟进断档(无待办)'], ['recontact', '复联待处理'], ['closed', '已结束跟进']], lcState.customerHealthFilter)}</select>
         <select class="fid-select" id="fid-customer-country" aria-label="国家">${fidOption([['all', '请选择国家'], ['US', '美国'], ['PR', '波多黎各'], ['OTHER', '其他地区']], fid.customerCountry)}</select>
         <select class="fid-select" id="fid-customer-type" aria-label="客户类型">${fidOption([['all', '请选择客户类型'], '新增线索-实时', '新增线索-补录', '重复线索'], fid.customerType)}</select>
       </div>
       <div class="fid-actions fid-filter-submit"><button class="fid-btn gradient" type="submit">${icon('Search')}搜索</button>${fidButton('重置', 'fidCustomerReset', 'RotateCw')}</div>
       <div class="fid-actions fid-tag-filter"><span>标签查询</span><span class="fid-small-note" aria-live="polite">${marked.length ? marked.map(t => esc(t.name)).join('、') : '未选'}</span>${fidButton('选择标签', 'fidCustomerChooseTags', 'Tag')}${fidButton('重置标签', 'fidCustomerClearFilter', 'X')}</div>
     </form>`;
-    const toolbar = `<div class="fid-actions fid-list-toolbar">${fidButton('批量打标签', 'batchTags', 'Tag', 'gradient', selected ? '' : 'disabled')}${fidButton('清空标签', 'fidClearCustomerTags', 'Eraser', '', selected ? '' : 'disabled')}${fidButton('跟进闭环', '', 'ClipboardList', 'green', 'data-nav="followups"')}${fidButton('导出列表', 'fidExportCustomers', 'FileDown')}${fidButton('新增客户', 'addCustomer', 'Plus', 'slim')}</div>`;
-    const header = ['<input type="checkbox" id="select-all-customers" aria-label="选择当前结果全部客户">', '序号', '主账号信息', '需求画像 / 备注', '联系人 / 来源', '标签', '手机号 / 地区', '跟进状态 / 下次跟进', '添加时间', '更新时间', '操作 ' + icon('Settings2')];
+    const chip = (action, current, id, label, count) =>
+      `<button type="button" class="lc-radar-chip" data-action="${action}" ${fidActionID(id)} aria-pressed="${current === id}">${esc(label)}<b>${count}</b></button>`;
+    const tierCount = id => pool.filter(c => (lcTier(c) || 'none') === id).length;
+    const statusCount = id => pool.filter(c => (lcCustomerStatus(c) || 'none') === id).length;
+    const facets = `<div class="lc-customer-facets">
+      <div class="lc-radar-chips" role="group" aria-label="按客户等级筛选"><span class="lc-facet-label">客户等级</span>${chip('lcCustomerTier', lcState.customerTier, 'all', '全部', pool.length)}${LC_TIERS.map(t => chip('lcCustomerTier', lcState.customerTier, t, t + ' 级', tierCount(t))).join('')}${chip('lcCustomerTier', lcState.customerTier, 'none', '未评级', tierCount('none'))}</div>
+      <div class="lc-radar-chips" role="group" aria-label="按客户状态筛选"><span class="lc-facet-label">客户状态</span>${chip('lcCustomerStatusFilter', lcState.customerStatus, 'all', '全部', pool.length)}${LC_CUSTOMER_STATUSES.map(([id, label]) => chip('lcCustomerStatusFilter', lcState.customerStatus, id, label, statusCount(id))).join('')}${chip('lcCustomerStatusFilter', lcState.customerStatus, 'none', '未标记', statusCount('none'))}</div>
+    </div>`;
+    const toolbar = `<div class="fid-actions fid-list-toolbar">${fidButton('批量打标签', 'batchTags', 'Tag', 'gradient', selected ? '' : 'disabled')}${fidButton('清空标签', 'fidClearCustomerTags', 'Eraser', '', selected ? '' : 'disabled')}${fidButton('跟进闭环', '', 'ClipboardList', 'green', 'data-nav="followups"')}${fidButton('导出列表', 'fidExportCustomers', 'FileDown')}${fidButton('新增客户', 'addCustomer', 'Plus', 'slim')}<span class="fid-small-note">等级与客户状态在聊天界面或客户档案中调整</span></div>`;
+    const header = ['<input type="checkbox" id="select-all-customers" aria-label="选择当前结果全部客户">', '序号', '主账号信息', '需求画像 / 备注', '联系人 / 来源', '等级', '客户状态', '标签', '手机号 / 地区', '跟进状态 / 下次跟进', '最近互动', '添加 / 更新时间', '操作 ' + icon('Settings2')];
     const table = fidTable('fid-customer-table', header, customerRows(), '暂无匹配客户', true).replace('<tbody>', '<tbody id="customer-rows">');
-    return `<section class="fid-page"><h1 class="sr-only">客户列表</h1>${filters}${toolbar}<div class="fid-batchbar" id="batchbar" hidden><span id="selected-count">${selected}</span></div><div class="fid-table-card">${table}${fidPager(list.length, 'customers', [10, 20, 50])}</div></section>`;
+    return `<section class="fid-page"><h1 class="sr-only">客户列表</h1>${filters}${facets}${toolbar}<div class="fid-batchbar" id="batchbar" hidden><span id="selected-count">${selected}</span></div><div class="fid-table-card">${table}${fidPager(list.length, 'customers', [10, 20, 50])}</div></section>`;
   };
 
   fidForms['fid-customer-search-form'] = () => {
@@ -845,8 +881,22 @@
 
   const lcOrigResetCustomerFilters = fidActions.fidCustomerReset;
   fidActions.fidCustomerReset = () => {
-    lcState.customerHealthFilter = 'all';
+    Object.assign(lcState, { customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all' });
     lcOrigResetCustomerFilters();
+  };
+
+  // The export of the earlier module does not know about tier and status; this one replaces it.
+  fidActions.fidExportCustomers = function() {
+    const safe = v => '"' + (/^[=+\-@\t\r]/.test(String(v ?? '')) ? "'" : '') + String(v ?? '').replaceAll('"', '""') + '"';
+    const rows = [['主账号', '联系人', '手机号', '客户等级', '客户状态', '跟进状态', '最近互动', '客户类型', '国家', '标签'],
+      ...filteredCustomers().map(c => [account(c.account)?.name, c.name, c.phone, lcTier(c) || '未评级', lcCustomerStatusLabel(c), lcHealth(c).primary.label, c.last, c.clientType, country(c), c.tags.map(tag).filter(t => t && myTags().includes(t)).map(t => t.name).join('、')])];
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'whatsapp-演示客户列表.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('已导出当前筛选的演示客户列表。');
   };
 
   // ============================================================================
@@ -891,7 +941,7 @@
       return `<button type="button" class="conversation ${selected}" aria-label="打开${esc(c.name)}的会话" data-action="openConversation" data-id="${esc(c.id)}">
         ${avatar(c)}
         <span class="conversation-main">
-          <span class="conversation-line"><strong>${esc(c.name)}</strong><time>${esc(c.last)}</time></span>
+          <span class="conversation-line"><strong>${esc(c.name)}${lcTier(c) ? ' ' + lcTierBadge(c) : ''}</strong><time>${esc(c.last)}</time></span>
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
             <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : c.language)}</span>
@@ -909,6 +959,7 @@
     const strip = `<div class="lc-chat-strip" aria-label="客户跟进协同栏">
       <span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span>
       ${h.nextTask ? `<span class="lc-pill info">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</span>` : ''}
+      ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
       <div class="lc-chat-strip-right">
         ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
@@ -1109,6 +1160,8 @@
     lcCloseOpen: id => openCloseEngagement(id),
     lcFollowTagFilter: () => fidOpenTagPicker('按标签筛选跟进', 'lc-follow-tag-filter', lcState.followTags, { submit: '筛选' }),
     lcFollowTagClear: () => { lcState.followTags = []; ui.pages.followups = 0; render(); },
+    lcCustomerTier: id => { lcState.customerTier = id; ui.selected.clear(); ui.pages.customers = 0; render(); },
+    lcCustomerStatusFilter: id => { lcState.customerStatus = id; ui.selected.clear(); ui.pages.customers = 0; render(); },
     taskDone: id => openTaskCompleteModal(id),
     followup: id => openFollowup(id),
     newTask: () => openFollowup(),
@@ -1316,7 +1369,7 @@
     lcWrapRender();
   };
 
-  // Dialog field toggles for the completion dialog
+  // Field toggles of the completion dialog, and the tier / status drop-downs
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'lc-complete-next') {
@@ -1325,5 +1378,27 @@
       $('#lc-complete-close-block').hidden = !closing;
       $('#dialog [name="nextTitle"]').required = !closing;
       $('#dialog [name="closeReason"]').required = closing;
+    }
+    if (t.dataset.lcTier || t.dataset.lcStatus) {
+      const c = customer(t.dataset.lcTier || t.dataset.lcStatus);
+      if (!c || !myCustomers().includes(c)) return;
+      if (t.dataset.lcTier) {
+        const next = LC_TIERS.includes(t.value) ? t.value : '';
+        if (next === lcTier(c)) return;
+        const before = lcTier(c) ? lcTier(c) + ' 级' : '未评级';
+        c.tier = next;
+        lcLog(c.id, 'profile', `客户等级：${before} → ${next ? next + ' 级' : '未评级'}`);
+        toast(`已将 ${c.name} 的客户等级设为${next ? ' ' + next + ' 级' : '未评级'}。`);
+      } else {
+        const next = LC_CUSTOMER_STATUSES.some(([id]) => id === t.value) ? t.value : '';
+        if (next === lcCustomerStatus(c)) return;
+        const before = lcCustomerStatusLabel(c);
+        c.customerStatus = next;
+        lcLog(c.id, 'profile', `客户状态：${before} → ${lcCustomerStatusLabel(c)}`);
+        toast(`已将 ${c.name} 的客户状态设为「${lcCustomerStatusLabel(c)}」。`);
+      }
+      persist();
+      render();
+      lcRefreshOpenDossier(c.id);
     }
   });

@@ -85,6 +85,15 @@ for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-f
   assert(!read(path.join(root, 'outputs', bundleName)).includes('邀请码'), `${bundleName} still mentions invitation codes`);
 }
 
+// 8. Customer tier and status are manual fields, editable from the chat screen and shown in the customer list
+for (const required of ["const LC_TIERS = ['S', 'A', 'B', 'C', 'D'];", "['converted', '已成交'", "['abandoned', '弃单'", "['organic', '自然线索'", 'data-lc-tier=', 'data-lc-status=', 'lcCustomerTier:', 'lcCustomerStatusFilter:', 'fidActions.fidExportCustomers =']) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+}
+assert.equal((moduleSource.match(/lcGradeControls\(c\)\}/g) || []).length, 2, 'tier and status controls must appear in the chat strip and in the dossier');
+const customersRecord = req.modules.find(m => m.id === 'P-CUSTOMERS');
+assert(customersRecord.features.some(f => f.startsWith('客户等级')) && customersRecord.features.some(f => f.startsWith('客户状态')), 'P-CUSTOMERS must record tier and status');
+assert(req.review.items.some(i => i.id === 'CUSTOMER_GRADING'));
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -96,6 +105,8 @@ const summary = {
   attentionSignals: ['reply', 'overdue', 'noplan', 'recontact'],
   deferredModules: ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS'],
   invitationCodes: 'removed',
+  customerTiers: ['S', 'A', 'B', 'C', 'D'],
+  customerStatuses: ['converted', 'abandoned', 'organic'],
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

@@ -2662,3 +2662,51 @@ dialog>#toast,dialog>#toast.show{transform:none}
   flex-wrap: nowrap;
   overflow: hidden;
 }
+
+/* Customer tier and status (plan 003) */
+.fid-customer-table {
+  min-width: var(--fid-px-1280);
+}
+.lc-tier {
+  min-width: var(--fid-px-24);
+  justify-content: center;
+  font-weight: 800;
+}
+.conversation-line .lc-tier {
+  min-height: var(--fid-px-16);
+  padding: 0 var(--fid-px-5);
+  font-size: var(--fid-px-10);
+  vertical-align: middle;
+}
+.lc-inline-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fid-px-4);
+  font-size: var(--fid-px-11);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.lc-inline-select .fid-select {
+  width: auto;
+  min-height: var(--fid-px-26);
+  height: var(--fid-px-26);
+  font-size: var(--fid-px-12);
+}
+.lc-dossier-grade {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fid-px-12);
+  margin-top: var(--fid-px-10);
+}
+.lc-customer-facets {
+  display: grid;
+  gap: var(--fid-px-8);
+  margin: 0 0 var(--fid-px-12);
+}
+.lc-facet-label {
+  align-self: center;
+  margin-right: var(--fid-px-4);
+  font-size: var(--fid-px-12);
+  font-weight: 650;
+  color: var(--fid-ink);
+}

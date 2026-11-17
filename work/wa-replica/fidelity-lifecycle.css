@@ -1536,3 +1536,51 @@
   flex-wrap: nowrap;
   overflow: hidden;
 }
+
+/* Customer tier and status (plan 003) */
+.fid-customer-table {
+  min-width: 1280px;
+}
+.lc-tier {
+  min-width: 24px;
+  justify-content: center;
+  font-weight: 800;
+}
+.conversation-line .lc-tier {
+  min-height: 16px;
+  padding: 0 5px;
+  font-size: 10px;
+  vertical-align: middle;
+}
+.lc-inline-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.lc-inline-select .fid-select {
+  width: auto;
+  min-height: 26px;
+  height: 26px;
+  font-size: 12px;
+}
+.lc-dossier-grade {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+.lc-customer-facets {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.lc-facet-label {
+  align-self: center;
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fid-ink);
+}
