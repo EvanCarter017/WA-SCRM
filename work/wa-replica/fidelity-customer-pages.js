@@ -4,7 +4,7 @@
 
   function resetRecordFilters() {
     Object.assign(recordView, {
-      invite: '', inviteQuery: '', inviteNote: '', platform: '',
+      platform: '',
       accountId: '', customerId: '', accountQuery: '', contactQuery: '',
       messageQuery: '', limit: 200, step: 'accounts',
     });
@@ -17,10 +17,7 @@
   resetCustomerPages();
 
   const recordsAccounts = () => myAccounts().filter(a =>
-    (!recordView.invite || fidInvite(a) === recordView.invite) &&
-    fidMatch(fidInvite(a), recordView.inviteQuery) &&
-    fidMatch([a.note, a.annotation].filter(Boolean).join(' '), recordView.inviteNote) &&
-    (!recordView.platform || recordView.platform === 'wa')
+    !recordView.platform || recordView.platform === 'wa'
   );
 
   function recordListItem(label, detail, search, action, id, selected) {
@@ -67,18 +64,14 @@
     const selectedContact = contacts.find(item => item.id === recordView.customerId);
     if (!selectedAccount) Object.assign(recordView, {accountId:'', customerId:'', step:'accounts'});
     else if (!selectedContact) Object.assign(recordView, {customerId:'', step:'contacts'});
-    const inviteOptions = [...new Set(myAccounts().map(fidInvite))];
-    const accountRows = accounts.map(item => recordListItem(item.name, `${fidInvite(item)} · ${item.number}`,
-      [item.name,item.number,fidInvite(item)].join(' '), 'fidRecordAccount', item.id, item === selectedAccount)).join('');
+    const accountRows = accounts.map(item => recordListItem(item.name, item.number,
+      [item.name,item.number].join(' '), 'fidRecordAccount', item.id, item === selectedAccount)).join('');
     const contactRows = contacts.map(item => recordListItem(item.name, item.phone,
       [item.name,item.phone,item.notes].join(' '), 'fidRecordContact', item.id, item === selectedContact)).join('');
 
     return `<section class="fid-page fid-history-page">
       ${fidHead('聊天记录','按社交账号和联系人查看 WhatsApp 演示消息。')}
       <form id="fid-record-filter-form" class="fid-filter-row fid-record-filters">
-        <select class="fid-select" name="invite" aria-label="选择邀请码">${fidOption([['','全部邀请码'],...inviteOptions], recordView.invite)}</select>
-        <input class="fid-input" name="inviteQuery" aria-label="邀请码搜索" placeholder="请输入邀请码" value="${esc(recordView.inviteQuery)}">
-        <input class="fid-input" name="inviteNote" aria-label="邀请码备注搜索" placeholder="请输入邀请码备注" value="${esc(recordView.inviteNote)}">
         <select class="fid-select" name="platform" aria-label="选择平台">${fidOption([['','请选择平台'],['wa','WhatsApp']], recordView.platform)}</select>
         <button type="submit" class="fid-btn gradient">${icon('Search')}搜索</button>${fidButton('重置','fidRecordsReset','RotateCw')}
       </form>
@@ -114,11 +107,7 @@
   }
 
   function applyRecordFilters(values, value) {
-    const invite = value('invite');
-    const inviteQuery = value('inviteQuery');
-    const inviteNote = value('inviteNote');
-    const platform = value('platform');
-    Object.assign(recordView, { invite, inviteQuery, inviteNote, platform });
+    Object.assign(recordView, { platform: value('platform') });
     render();
   }
 

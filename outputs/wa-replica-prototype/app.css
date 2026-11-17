@@ -639,10 +639,10 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-log-line .fid-small-note { margin-left:0; }
 .fid-log-table { min-width:var(--fid-px-800); }
 .fid-log-table th { height:var(--fid-px-48); }
-.fid-log-table col:nth-child(1),.fid-log-table col:nth-child(2),.fid-log-table col:nth-child(4) { width:10.88%; }
-.fid-log-table col:nth-child(3),.fid-log-table col:nth-child(6),.fid-log-table col:nth-child(7) { width:13.46%; }
-.fid-log-table col:nth-child(5) { width:18.62%; }
-.fid-log-table col:nth-child(8) { width:8.36%; }
+.fid-log-table col:nth-child(1),.fid-log-table col:nth-child(3) { width:10.88%; }
+.fid-log-table col:nth-child(2),.fid-log-table col:nth-child(5),.fid-log-table col:nth-child(6) { width:13.46%; }
+.fid-log-table col:nth-child(4) { width:18.62%; }
+.fid-log-table col:nth-child(7) { width:19.24%; }
 .fid-return-tasks { margin-bottom:var(--fid-px-14); }
 
 .fid-wa { padding:var(--fid-px-20) var(--fid-px-24) var(--fid-px-16); }
@@ -730,9 +730,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-role-table col:nth-child(6),.fid-role-table col:nth-child(7) { width:var(--fid-px-150); }
 .fid-member-table col:nth-child(1) { width:var(--fid-px-56); }
 .fid-member-table col:nth-child(4) { width:var(--fid-px-124); }
-.fid-member-table col:nth-child(5) { width:14.7%; }
-.fid-member-table col:nth-child(7) { width:var(--fid-px-80); }
-.fid-member-table col:nth-child(8),.fid-member-table col:nth-child(9),.fid-member-table col:nth-child(10) { width:12%; }
+.fid-member-table col:nth-child(6) { width:var(--fid-px-80); }
+.fid-member-table col:nth-child(7),.fid-member-table col:nth-child(8),.fid-member-table col:nth-child(9) { width:12%; }
 
 .fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(var(--fid-px-540),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); max-width:none; max-height:calc(100dvh - var(--fid-top) - var(--fid-px-28)); margin:auto; border:0; border-radius:var(--fid-px-10); box-shadow:0 var(--fid-px-16) var(--fid-px-40) rgba(0,0,0,.23); animation:none; background:var(--color-surface); color:var(--color-text); }
 .fidelity #dialog.fid-dialog::backdrop { background:rgba(0,0,0,.45); clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-240)); }

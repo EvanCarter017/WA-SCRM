@@ -73,6 +73,18 @@ for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEng
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 
+// 7. Invitation codes were removed from the prototype (2026-11-17): no wording, helper or filter field is left
+const invitationCode = /邀请码|invite/i;
+for (const file of ['fidelity-lifecycle.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html', 'fidelity.css', 'fidelity-dashboard.css', 'fidelity-lifecycle.css']) {
+  read(path.join(__dirname, file)).split('\n').forEach((line, index) => {
+    assert(!invitationCode.test(line), `${file}:${index + 1} still refers to invitation codes`);
+  });
+}
+assert(!invitationCode.test(appJs), 'app.js still refers to invitation codes');
+for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-fidelity.html']) {
+  assert(!read(path.join(root, 'outputs', bundleName)).includes('邀请码'), `${bundleName} still mentions invitation codes`);
+}
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -83,6 +95,7 @@ const summary = {
   engagementStates: ['open', 'closed'],
   attentionSignals: ['reply', 'overdue', 'noplan', 'recontact'],
   deferredModules: ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS'],
+  invitationCodes: 'removed',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');
