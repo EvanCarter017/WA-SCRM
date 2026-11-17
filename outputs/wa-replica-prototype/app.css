@@ -866,6 +866,15 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-record-toggle input { accent-color:var(--fid-violet); }
 .fid-record-back { display:none; }
 .fid-record-older { margin:0 auto var(--fid-px-8); }
+.fid-archive-grid { grid-template-columns:minmax(0,var(--fid-px-280)) minmax(var(--fid-px-240),1fr) minmax(var(--fid-px-240),var(--fid-px-300)); }
+.fid-archive-aside { overflow:auto; }
+.fid-archive-meta { display:grid; grid-template-columns:auto 1fr; gap:var(--fid-px-6) var(--fid-px-10); margin:0; font-size:var(--fid-px-12); }
+.fid-archive-meta dt { color:var(--color-text-muted); white-space:nowrap; }
+.fid-archive-meta dd { margin:0; overflow-wrap:anywhere; }
+.fid-archive-meta small { display:block; color:var(--color-text-muted); }
+.fid-archive-review { display:flex; flex-direction:column; gap:var(--fid-px-8); padding:var(--fid-px-10) 0; border-top:var(--fid-px-1) solid var(--fid-frame); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
+.fid-archive-note { width:100%; height:auto; min-height:var(--fid-px-84); padding:var(--fid-px-8) var(--fid-px-10); line-height:1.5; resize:vertical; }
+.fid-archive-actions { display:flex; flex-wrap:wrap; gap:var(--fid-px-6); }
 
 .fid-stats-cards { display:grid; grid-template-columns:1fr 1fr; gap:var(--fid-px-12); margin-bottom:var(--fid-px-16); }
 .fid-stat-card { display:flex; align-items:center; justify-content:center; gap:var(--fid-px-12); min-height:var(--fid-px-82); padding:var(--fid-px-12); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-6); }
@@ -887,8 +896,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 @media (max-width:760px) {
   .fid-history-grid { display:block; min-height:0; }
   .fid-history-grid .fid-record-column,.fid-history-grid .fid-record-translate { display:none; }
-  .fid-history-grid[data-record-step="accounts"] .fid-record-account,
-  .fid-history-grid[data-record-step="contacts"] .fid-record-contact,
+  .fid-history-grid[data-record-step="archives"] .fid-record-archive,
   .fid-history-grid[data-record-step="messages"] .fid-record-thread,
   .fid-history-grid[data-record-step="messages"] .fid-record-translate { display:flex; }
   .fid-record-back { display:inline-flex; align-self:flex-start; margin:var(--fid-px-8) var(--fid-px-8) 0; }

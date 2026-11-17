@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-17T15:07:19.546Z",
+  "checkedAt": "2026-11-17T15:19:41.260Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -35,6 +35,12 @@
     "converted",
     "abandoned",
     "organic"
+  ],
+  "chatHistory": "review archive of moved-in snapshots",
+  "reviewResults": [
+    "pending",
+    "pass",
+    "improve"
   ],
   "externalNetworkCalls": false
 }

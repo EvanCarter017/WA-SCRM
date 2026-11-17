@@ -964,6 +964,7 @@
       <div class="lc-chat-strip-right">
         ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
         ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
+        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
         ${fidButton('模拟对方回复', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
         ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
       </div>

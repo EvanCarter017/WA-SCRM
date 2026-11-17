@@ -425,6 +425,15 @@
 .fid-record-toggle input { accent-color:var(--fid-violet); }
 .fid-record-back { display:none; }
 .fid-record-older { margin:0 auto 8px; }
+.fid-archive-grid { grid-template-columns:minmax(0,280px) minmax(240px,1fr) minmax(240px,300px); }
+.fid-archive-aside { overflow:auto; }
+.fid-archive-meta { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; margin:0; font-size:12px; }
+.fid-archive-meta dt { color:var(--color-text-muted); white-space:nowrap; }
+.fid-archive-meta dd { margin:0; overflow-wrap:anywhere; }
+.fid-archive-meta small { display:block; color:var(--color-text-muted); }
+.fid-archive-review { display:flex; flex-direction:column; gap:8px; padding:10px 0; border-top:1px solid var(--fid-frame); border-bottom:1px solid var(--fid-frame); }
+.fid-archive-note { width:100%; height:auto; min-height:84px; padding:8px 10px; line-height:1.5; resize:vertical; }
+.fid-archive-actions { display:flex; flex-wrap:wrap; gap:6px; }
 
 .fid-stats-cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
 .fid-stat-card { display:flex; align-items:center; justify-content:center; gap:12px; min-height:82px; padding:12px; border:1px solid var(--fid-frame); border-radius:6px; }
@@ -446,8 +455,7 @@
 @media (max-width:760px) {
   .fid-history-grid { display:block; min-height:0; }
   .fid-history-grid .fid-record-column,.fid-history-grid .fid-record-translate { display:none; }
-  .fid-history-grid[data-record-step="accounts"] .fid-record-account,
-  .fid-history-grid[data-record-step="contacts"] .fid-record-contact,
+  .fid-history-grid[data-record-step="archives"] .fid-record-archive,
   .fid-history-grid[data-record-step="messages"] .fid-record-thread,
   .fid-history-grid[data-record-step="messages"] .fid-record-translate { display:flex; }
   .fid-record-back { display:inline-flex; align-self:flex-start; margin:8px 8px 0; }

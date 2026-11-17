@@ -94,6 +94,18 @@ const customersRecord = req.modules.find(m => m.id === 'P-CUSTOMERS');
 assert(customersRecord.features.some(f => f.startsWith('客户等级')) && customersRecord.features.some(f => f.startsWith('客户状态')), 'P-CUSTOMERS must record tier and status');
 assert(req.review.items.some(i => i.id === 'CUSTOMER_GRADING'));
 
+// 9. Chat history is a review archive of conversation snapshots moved in from the WhatsApp chat
+const recordsSource = read(path.join(__dirname, 'fidelity-customer-pages.js'));
+for (const required of ['data.chatArchives ??= []', 'function archiveConversation(c, reason)', "fidForms['fid-archive-add-form']", "fidForms['fid-archive-review-form']", 'fidArchiveRemoveConfirm:', "['pass', '合格'", "['improve', '需改进'"]) {
+  assert(recordsSource.includes(required), `fidelity-customer-pages.js is missing ${required}`);
+}
+for (const removed of ['recordsAccounts', 'selectRecordAccount', 'selectRecordContact', 'fidRecordAccount', 'fidRecordContact']) {
+  assert(!recordsSource.includes(removed), `fidelity-customer-pages.js still contains the old conversation browser (${removed})`);
+}
+assert(moduleSource.includes("'fidArchiveOpen'"), 'the chat strip must offer moving the conversation into chat history');
+assert(req.modules.some(m => m.id === 'P-CHAT-REVIEW' && m.screens.includes('chat-records')));
+assert(req.review.items.some(i => i.id === 'CHAT_REVIEW'));
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -107,6 +119,8 @@ const summary = {
   invitationCodes: 'removed',
   customerTiers: ['S', 'A', 'B', 'C', 'D'],
   customerStatuses: ['converted', 'abandoned', 'organic'],
+  chatHistory: 'review archive of moved-in snapshots',
+  reviewResults: ['pending', 'pass', 'improve'],
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');
