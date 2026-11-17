@@ -11,7 +11,7 @@
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
     }}for(const item of req.review.items){const previous=saved.requirements.review?.items?.find(x=>x.id===item.id);if(previous){item.status=previous.status;item.notes=previous.notes}}}
-  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',scope:'功能范围'};
+  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
   const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');
   const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:'c1',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
@@ -91,7 +91,7 @@
     if(!renderSignInState())return;
     const active=document.activeElement,action=active?.dataset?.action,actionId=active?.dataset?.id,activeId=active?.id,stage=active?.dataset?.stage,nav=active?.dataset?.nav;
     const old=$('#messages'),position=old?{customer:old.dataset.customer,top:old.scrollTop,bottom:old.scrollHeight-old.clientHeight-old.scrollTop}:null;
-    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,scope:renderScope};
+    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope};
     $('#view').innerHTML=pages[ui.view]();paintIcons();
     if(ui.view==='inbox')requestAnimationFrame(()=>{const el=$('#messages');if(el)el.scrollTop=position&&position.customer===el.dataset.customer&&position.bottom>40?position.top:el.scrollHeight});
     let target=activeId?document.getElementById(activeId):null;
@@ -157,7 +157,7 @@
   }
   function renderTeam(){if(!manager())return '<div class="view-empty"><div><h2>团队管理在主站</h2><p>子站显示当前聊手的工作范围。</p></div></div>';return '<section class="section-page">'+pageHeader('TEAM & ACCESS','团队与权限','先明确谁管理账号、谁负责客户，再决定团队数据如何共享。','<button class="button primary" data-action="addMember">'+icon('UserRoundPlus')+'新增成员</button>')+'<div class="role-count"><strong>'+data.members.length+'</strong> 位演示成员 <span style="margin:0 12px;color:#cad8bf">/</span> '+data.accounts.length+' 个账号 · '+data.customers.length+' 位客户</div><div class="page-panel"><div class="panel-header"><div><h2>团队成员</h2><p>人数、角色和账号分配均可继续扩展</p></div><span class="tag slate">权限方案待确认</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>团队</th><th>角色</th><th>负责账号</th><th>客户</th><th>待跟进</th><th>操作</th></tr></thead><tbody>'+data.members.map(m=>'<tr><td><div class="customer-cell">'+avatar(m,'small')+'<strong>'+esc(m.name)+'</strong></div></td><td>'+esc(m.team)+'</td><td><span class="tag '+(m.role==='manager'?'purple':'jade')+'">'+(m.role==='manager'?'主管':'聊手')+'</span></td><td>'+data.accounts.filter(a=>a.owner===m.id).length+'</td><td>'+data.customers.filter(c=>c.owner===m.id).length+'</td><td>'+data.tasks.filter(t=>t.owner===m.id&&!t.done).length+'</td><td><button class="link" data-action="memberAccounts" data-id="'+m.id+'">分配账号</button></td></tr>').join('')+'</tbody></table></div></div><div class="permission-grid"><section class="permission-card"><h3>'+icon('UserRound')+'聊手 <span class="tag jade">我的工作空间</span></h3><ul><li>使用获分配的 WhatsApp 账号</li><li>查看、标记并跟进自己负责的客户</li><li>使用公共标签，维护自己的个人标签</li><li>主管可见范围与转交规则需你确认</li></ul></section><section class="permission-card"><h3>'+icon('ShieldCheck')+'主管 <span class="tag purple">团队工作空间</span></h3><ul><li>查看团队账号、客户与待办</li><li>维护公共标签，分配账号和转交客户</li><li>成员与角色可在后续扩展</li><li>此页是权限方案评审，不代表已实现真实鉴权</li></ul></section></div><p class="team-section-note">“客户属于聊手还是团队”“账号转移后历史归谁”“离职交接如何处理”仍待确认。当前只是可操作的默认方案。</p></section>'}
   const scopeDescriptions={
-    'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
+    'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
   function scopeCard(m) {
     const choices=['首轮原型','保留','魔改','待定','本轮不展示'];
     return '<article class="scope-card"><h3>'+esc(m.name)+'<span class="tag '+(m.decision==='待定'?'gold':m.decision==='本轮不展示'?'slate':'jade')+'">'+esc(m.decision)+'</span></h3><p>'+esc(scopeDescriptions[m.id]||m.explanation||m.notes)+(m.id==='P-WALLET'?'<br>原站解析时标注客户端检测仍在开发。':'')+'</p><div class="scope-form"><select data-scope-decision="'+m.id+'" aria-label="'+esc(m.name)+'范围选择">'+choices.map(x=>option(x,x,m.decision)).join('')+'</select></div><textarea class="scope-notes" data-scope-notes="'+m.id+'" aria-label="'+esc(m.name)+'修改意见" placeholder="写下需要保留、去掉或魔改的细节…">'+esc(m.notes)+'</textarea><div class="scope-source">原清单关联：'+esc(m.originalIds.join('、')||'新增业务需求')+'</div></article>';
@@ -1606,10 +1606,11 @@
       country:'US', city:'San Francisco', timezone:'America/Los_Angeles', language:'英语',
       owner:a.owner||ui.persona, account:a.id, tags:[], needsFirstReply:true, // the engagement module creates the first-reply to-do on the next render
       source:'Facebook 广告', campaign:'示例广告', ad:'', unread:1, star:false,
-      last:time, preview:text, translation:translated, followup:null, notes:'',
+      last:time, preview:text, translation:'', followup:null, notes:'',
       contactRefs:[{account:a.id, owner:a.owner||ui.persona}], createdAt:fidDay(), updatedAt:fidDay(), clientType:'新增线索-实时',
     });
-    data.messages[id] = [{id:nextId('m'), side:'in', text, translated, time}];
+    data.messages[id] = [{id:nextId('m'), side:'in', text, time}];
+    aiTranslateInbound(data.customers[0], data.messages[id][0], translated);
   }
 
   function openwaFinish(pair) {
@@ -2376,6 +2377,7 @@
     materials: 'Images',
     team: 'Network',
     members: 'UsersRound',
+    ai: 'Sparkles',
     scope: 'SlidersHorizontal',
   }[id] || 'FileText');
 
@@ -2400,6 +2402,7 @@
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
+      renderItem('ai', views.ai) +
       renderItem('scope', views.scope)
     );
   };
@@ -3050,9 +3053,11 @@
           : ['Thanks for the quick response! Could you share the recommended starter option?', '谢谢快速回复！可以推荐一下适合首批采购的方案吗？']);
 
     const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    (data.messages[c.id] ??= []).push({ id: nextId('m'), side: 'in', text: pair[0], translated: pair[1], time });
+    const message = { id: nextId('m'), side: 'in', text: pair[0], time };
+    (data.messages[c.id] ??= []).push(message);
+    aiTranslateInbound(c, message, pair[1]);
     c.preview = pair[0];
-    c.translation = pair[1];
+    c.translation = '';
     c.last = '刚刚';
     c.unread = (Number(c.unread) || 0) + 1;
     lcLog(c.id, 'inbound', closed ? '已结束跟进的客户主动发来新消息（触发复联信号）' : '收到客户最新 WhatsApp 回复消息');
@@ -3225,14 +3230,15 @@
         language: v('language'), owner: a.owner || ui.persona, account: a.id,
         tags: [], engagement: 'open',
         source: v('source'), campaign: v('campaign'), ad: '模拟进线会话',
-        unread: 1, star: false, last: '刚刚', preview: msg, translation: tr,
+        unread: 1, star: false, last: '刚刚', preview: msg, translation: '',
         followup: null, notes: '', contactRefs: [{ account: a.id, owner: a.owner || ui.persona }],
         createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', intentLevel: '高意向',
         reactivatedCount: 0,
         qualification: { demand: '新加微咨询目录与发货安排', volume: '待首响确认', deliveryRegion: a.country === 'PR' ? 'PR · San Juan' : 'US · TX', objection: '', commWindow: v('language') + '沟通' },
       };
       data.customers.unshift(c);
-      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, translated: tr, time: '刚刚' }];
+      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, time: '刚刚' }];
+      aiTranslateInbound(c, data.messages[id][0], tr);
       lcCreateTask({
         customerId: id,
         title: `首响破冰回复 ${name} 并确认具体需求`,
@@ -3344,6 +3350,157 @@
       render();
       lcRefreshOpenDossier(c.id);
     }
+  });
+
+  // AI capabilities: the single integration point for every AI feature (translation today).
+  // To add a capability: 1) list it in AI_CAPABILITIES; 2) call aiRun(id, input, meta) where the result is
+  // needed and apply the result in .then(); 3) teach the provider to answer it.
+  // Every provider call leaves one usage record in data.ai.usage and adds to the totals of its capability.
+  const AI_CAPABILITIES = [
+    { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为中文，显示在原文下方。' },
+    { id: 'translate.outbound', name: '发送前翻译', description: '把快捷回复译为客户的语言，发送前可预览。' },
+  ];
+  // A provider answers run(capabilityId, input) with { text }, or with a Promise of it.
+  // The demo provider returns the prepared sample that the caller passes along. A real provider would ignore
+  // input.sample and ask a model service through the product's own server, so that keys never reach the browser.
+  const AI_PROVIDERS = {
+    demo: { name: '本地演示', run: (capabilityId, input) => ({ text: input.sample || '' }) },
+  };
+  const AI_USAGE_KEPT = 200;
+  const AI_USAGE_SHOWN = 20;
+
+  function aiSettings() {
+    const settings = (data.ai ??= { provider: 'demo', enabled: {}, totals: {}, usage: [] });
+    for (const { id } of AI_CAPABILITIES) {
+      settings.enabled[id] ??= true;
+      settings.totals[id] ??= { calls: 0, inputChars: 0, outputChars: 0 };
+    }
+    return settings;
+  }
+
+  // One neutral record per provider call, plus running totals per capability.
+  function aiRecordUsage(capabilityId, providerId, input, result, meta) {
+    const settings = aiSettings();
+    const inputChars = String(input.text || '').length;
+    const outputChars = result.text.length;
+    settings.usage.unshift({
+      id: nextId('ai'), at: new Date().toISOString(), capability: capabilityId, provider: providerId,
+      by: ui.persona, customerId: meta.customerId || '', inputChars, outputChars, ok: result.ok,
+    });
+    settings.usage.length = Math.min(settings.usage.length, AI_USAGE_KEPT);
+    const total = settings.totals[capabilityId];
+    total.calls += 1;
+    total.inputChars += inputChars;
+    total.outputChars += outputChars;
+    persist();
+  }
+
+  // The single entry point for every AI call. Resolves to { ok, text }; it never rejects.
+  // A capability that is switched off is not sent to the provider and leaves no usage record.
+  function aiRun(capabilityId, input, meta = {}) {
+    const settings = aiSettings();
+    if (!settings.enabled[capabilityId]) return Promise.resolve({ ok: false, text: '', skipped: true });
+    const providerId = Object.hasOwn(AI_PROVIDERS, settings.provider) ? settings.provider : 'demo';
+    return Promise.resolve()
+      .then(() => AI_PROVIDERS[providerId].run(capabilityId, input))
+      .then(output => String(output?.text || ''), () => '')
+      .then(text => {
+        const result = { ok: Boolean(text), text };
+        aiRecordUsage(capabilityId, providerId, input, result, meta);
+        return result;
+      });
+  }
+
+  // Translate one incoming message into Chinese. The translation is stored on the message when it arrives,
+  // and the open conversation is refreshed if it is the one on screen.
+  function aiTranslateInbound(c, message, sample) {
+    return aiRun('translate.inbound', { text: message.text, from: c.language, to: '中文', sample }, { customerId: c.id }).then(result => {
+      if (!result.ok) return;
+      message.translated = result.text;
+      if (c.preview === message.text) c.translation = result.text;
+      persist();
+      const box = $('#messages');
+      if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
+      const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
+      box.innerHTML = messagesHTML(c);
+      paintIcons(box);
+      if (atBottom) scrollMessages();
+    });
+  }
+
+  // Redraw the translation preview above the composer and the language hint beside it.
+  function aiRefreshDraftPreview(c) {
+    const preview = $('#translation-preview');
+    if (ui.view !== 'inbox' || !preview || $('#messages')?.dataset.customer !== c.id) return;
+    preview.innerHTML = previewHTML(c);
+    paintIcons(preview);
+    const hint = $('.language-hint');
+    if (!hint) return;
+    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + (draft(c).translated ? '示例译文' : '发送原文');
+    paintIcons(hint);
+  }
+
+  // Quick replies: the earlier layers fill the draft together with its prepared sample translation.
+  // Take the sample off the draft and ask the integration point for the translation instead,
+  // so that translating before sending can be switched off and is recorded like every other AI call.
+  const aiOldFillQuick = fillQuick;
+  fillQuick = function(id) {
+    const q = data.quickReplies.find(item => item.id === id), c = selectedCustomer();
+    aiOldFillQuick(id);
+    const filled = c && ui.drafts[c.id];
+    if (!q || !filled || filled.source !== q.zh) return;
+    const sample = filled.translated;
+    filled.translated = '';
+    persist();
+    aiRefreshDraftPreview(c);
+    aiRun('translate.outbound', { text: q.zh, from: '中文', to: c.language, sample }, { customerId: c.id }).then(result => {
+      const current = ui.drafts[c.id];
+      if (!result.ok || !current || current.source !== q.zh || current.text !== q.zh) return;
+      current.translated = result.text;
+      persist();
+      aiRefreshDraftPreview(c);
+    });
+  };
+
+  function renderAiPage() {
+    const settings = aiSettings();
+    const capabilityName = id => AI_CAPABILITIES.find(item => item.id === id)?.name || id;
+    const capabilityRows = AI_CAPABILITIES.map(({ id, name, description }) => {
+      const total = settings.totals[id], on = settings.enabled[id];
+      return `<tr>
+        <td><strong>${esc(name)}</strong><small>${esc(id)}</small></td>
+        <td>${esc(description)}</td>
+        <td><label class="fid-ai-switch"><input type="checkbox" role="switch" id="fid-ai-${esc(id.replace('.', '-'))}" data-ai-capability="${esc(id)}" ${on ? 'checked' : ''} aria-label="${esc(name)}">${on ? '已启用' : '已停用'}</label></td>
+        <td>${total.calls}</td><td>${total.inputChars}</td><td>${total.outputChars}</td>
+      </tr>`;
+    }).join('');
+    const usageRows = settings.usage.filter(entry => manager() || entry.by === ui.persona).slice(0, AI_USAGE_SHOWN).map(entry => `<tr>
+        <td>${esc(fidDate(entry.at))}</td><td>${esc(capabilityName(entry.capability))}</td>
+        <td>${esc(customer(entry.customerId)?.name || '—')}</td><td>${esc(member(entry.by)?.name || '—')}</td>
+        <td>${entry.inputChars}</td><td>${entry.outputChars}</td>
+        <td><span class="lc-pill ${entry.ok ? 'ok' : 'warn'}">${entry.ok ? '成功' : '无结果'}</span></td>
+      </tr>`).join('');
+    return `<section class="fid-page"><div class="fid-panel fid-ai">
+      ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。当前为本地演示，不连接任何外部服务。')}
+      <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill info">${esc((AI_PROVIDERS[settings.provider] || AI_PROVIDERS.demo).name)}</span><span>返回预置的示例结果。正式接入时由服务端调用模型服务，密钥不进入浏览器。</span></div>
+      <h2>能力清单</h2>
+      ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
+      <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
+      <h2>最近调用</h2>
+      ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。在 WhatsApp API 中模拟对方回复或选择快捷回复后，这里会出现记录。')}
+      <p class="fid-field-help">显示最近 ${AI_USAGE_SHOWN} 次调用，本机最多保留 ${AI_USAGE_KEPT} 条；累计数见上表。</p>
+    </div></section>`;
+  }
+
+  document.addEventListener('change', event => {
+    const id = event.target.dataset?.aiCapability;
+    const capability = AI_CAPABILITIES.find(item => item.id === id);
+    if (!capability) return;
+    const on = event.target.checked;
+    aiSettings().enabled[id] = on;
+    persist();
+    render();
+    toast(`${capability.name}已${on ? '启用' : '停用'}。`);
   });
 
   const subsiteSignOutKey = KEY+'-subsite-signed-out';

@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-17T15:19:41.260Z",
+  "checkedAt": "2026-11-17T15:43:04.715Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -42,5 +42,10 @@
     "pass",
     "improve"
   ],
+  "aiCapabilities": [
+    "translate.inbound",
+    "translate.outbound"
+  ],
+  "aiProvider": "local demo (prepared sample results)",
   "externalNetworkCalls": false
 }

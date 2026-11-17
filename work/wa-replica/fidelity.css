@@ -434,6 +434,16 @@
 .fid-archive-review { display:flex; flex-direction:column; gap:8px; padding:10px 0; border-top:1px solid var(--fid-frame); border-bottom:1px solid var(--fid-frame); }
 .fid-archive-note { width:100%; height:auto; min-height:84px; padding:8px 10px; line-height:1.5; resize:vertical; }
 .fid-archive-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.fid-ai .fid-heading { margin-bottom:12px; }
+.fid-ai h2 { margin:18px 0 8px; font-size:15px; font-weight:700; line-height:22px; }
+.fid-ai-provider { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 12px; border:1px solid var(--fid-frame); border-radius:8px; background:var(--color-surface-alt); font-size:13px; line-height:20px; }
+.fid-ai-capabilities,.fid-ai-usage { min-width:640px; }
+.fid-ai-capabilities col:nth-child(1) { width:22%; }
+.fid-ai-capabilities col:nth-child(3) { width:112px; }
+.fid-ai-capabilities col:nth-child(4),.fid-ai-capabilities col:nth-child(5),.fid-ai-capabilities col:nth-child(6) { width:11%; }
+.fid-ai-capabilities td small { display:block; color:var(--fid-quiet); font-size:12px; }
+.fid-ai-switch { display:inline-flex; align-items:center; gap:6px; }
+.fid-ai-switch input { accent-color:var(--fid-violet); }
 
 .fid-stats-cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
 .fid-stat-card { display:flex; align-items:center; justify-content:center; gap:12px; min-height:82px; padding:12px; border:1px solid var(--fid-frame); border-radius:6px; }

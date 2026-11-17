@@ -62,7 +62,7 @@ for (const name of removedIdentifiers) {
 
 // 5. No lifecycle, funnel or deals wording is left in the UI source of the modules
 const removedTerms = ['生命周期', '全周期', '漏斗', '流程配置', '推进阶段', '成交与复购', '报价单', '成交订单', 'LTV', '复购培育', '复购窗口'];
-for (const file of ['fidelity-lifecycle.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html']) {
+for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html']) {
   read(path.join(__dirname, file)).split('\n').forEach((line, index) => {
     for (const term of removedTerms) assert(!line.includes(term), `${file}:${index + 1} still mentions "${term}"`);
   });
@@ -75,7 +75,7 @@ for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEng
 
 // 7. Invitation codes were removed from the prototype (2026-11-17): no wording, helper or filter field is left
 const invitationCode = /邀请码|invite/i;
-for (const file of ['fidelity-lifecycle.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html', 'fidelity.css', 'fidelity-dashboard.css', 'fidelity-lifecycle.css']) {
+for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html', 'fidelity.css', 'fidelity-dashboard.css', 'fidelity-lifecycle.css']) {
   read(path.join(__dirname, file)).split('\n').forEach((line, index) => {
     assert(!invitationCode.test(line), `${file}:${index + 1} still refers to invitation codes`);
   });
@@ -106,6 +106,23 @@ assert(moduleSource.includes("'fidArchiveOpen'"), 'the chat strip must offer mov
 assert(req.modules.some(m => m.id === 'P-CHAT-REVIEW' && m.screens.includes('chat-records')));
 assert(req.review.items.some(i => i.id === 'CHAT_REVIEW'));
 
+// 10. AI features go through one integration point that records usage; the AI module carries no commercial wording
+const aiSource = read(path.join(__dirname, 'fidelity-ai.js'));
+const openwaSource = read(path.join(__dirname, 'fidelity-openwa.js'));
+for (const required of ['function aiRun(capabilityId, input, meta = {})', 'function aiRecordUsage(', "id: 'translate.inbound'", "id: 'translate.outbound'", 'function aiTranslateInbound(c, message, sample)', 'function renderAiPage()', 'data-ai-capability=']) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+}
+assert(!/套餐|升级|付费|购买|订阅|充值|额度|计费|价格|定价|试用|会员|解锁|专业版|高级版|优惠|限时/.test(aiSource), 'the AI module must not contain pricing or sales wording');
+assert.equal((moduleSource.match(/aiTranslateInbound\(/g) || []).length, 2, 'both incoming-message paths in fidelity-lifecycle.js must translate through the integration point');
+assert(openwaSource.includes('aiTranslateInbound('), 'the OpenWA sample chat must translate through the integration point');
+for (const direct of ['translated: pair[1]', 'translated: tr,', 'translation: tr,']) {
+  assert(!moduleSource.includes(direct), `fidelity-lifecycle.js still writes a translation directly (${direct})`);
+}
+assert(!openwaSource.includes('text, translated, time'), 'fidelity-openwa.js still writes a translation directly');
+assert(appJs.includes("ai:'AI 能力'") && appJs.includes('ai:renderAiPage'), 'the AI page must be routed');
+assert(req.modules.some(m => m.id === 'P-AI' && m.screens.includes('ai')));
+assert(req.review.items.some(i => i.id === 'AI_HOOKS'));
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -121,6 +138,8 @@ const summary = {
   customerStatuses: ['converted', 'abandoned', 'organic'],
   chatHistory: 'review archive of moved-in snapshots',
   reviewResults: ['pending', 'pass', 'improve'],
+  aiCapabilities: ['translate.inbound', 'translate.outbound'],
+  aiProvider: 'local demo (prepared sample results)',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

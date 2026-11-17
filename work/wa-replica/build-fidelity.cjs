@@ -40,7 +40,7 @@ swap('if(previous){module.decision=previous.decision;module.notes=previous.notes
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
     }`);
-swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',scope:'功能范围'};
+swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';`);
 swap("view:views[location.hash.slice(1)]?location.hash.slice(1):'inbox'", "view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView");
 swap('  const ui={', "  const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');\n  const ui={");
@@ -57,8 +57,8 @@ swap('当前聊手只能使用公共标签，请切换主管视角维护。', '�
 js = js.replaceAll("ui.view==='team'&&!manager()", "['team','members'].includes(ui.view)&&!manager()").replaceAll("id!=='team'||manager()", "!['team','members'].includes(id)||manager()");
 swap('  function render() {\n', '  function render() {\n    if(!renderSignInState())return;\n');
 swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,inbox:renderInbox');
-swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,scope:renderScope");
-swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。'");
+swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope");
+swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与质检。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。'");
 swap("'P-FOLLOW':'把跟进安排成待办，完成后回写客户记录。'", "'P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'");
 swap("'P-CUSTOMERS':'客户档案、来源、阶段、标签及跨账号接触记录。'", "'P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。'");
 swap('聊手管理自己的工作，主管查看团队并处理分配。', '团队成员、账号分配和客户交接由主站管理。');
@@ -100,8 +100,9 @@ const operationsPages = read(__dirname, 'fidelity-operations.js');
 const openwaPages = read(__dirname, 'fidelity-openwa.js');
 const dashboardPage = read(__dirname, 'fidelity-dashboard.js');
 const lifecyclePages = read(__dirname, 'fidelity-lifecycle.js');
+const aiPages = read(__dirname, 'fidelity-ai.js');
 const subsiteSession = read(__dirname, 'fidelity-subsite.js');
-swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
+swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, aiPages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
@@ -134,6 +135,13 @@ requirement.review.items.push({
   id: 'CHAT_REVIEW',
   title: '聊天记录质检归档',
   question: '聊天记录只保存从 WhatsApp 会话移入的快照，移入时必须填写原因；质检结论为待质检 / 合格 / 需改进并可附评语。请评审：由谁移入、由谁质检、是否需要评分或更多结论选项。',
+  status: '待评审',
+  notes: '',
+});
+requirement.review.items.push({
+  id: 'AI_HOOKS',
+  title: 'AI 能力接入',
+  question: 'AI 功能（目前为接收消息翻译与发送前翻译）统一经由一个接入点调用，可逐项启停，并逐次记录用量。请评审：还需要接入哪些 AI 能力、由谁管理启停、用量按什么口径统计。',
   status: '待评审',
   notes: '',
 });
@@ -214,6 +222,14 @@ requirement.modules.push({
 });
 requirement.modelOutline.entities.push('ChatArchive');
 requirement.modelOutline.relationships.push('聊天记录是质检归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因；质检结论为待质检 / 合格 / 需改进，并可附评语。快照与实时会话相互独立，移入不改变实时会话。');
+requirement.modules.push({
+  id:'P-AI', name:'AI 能力接入', decision:'首轮原型', basis:'用户要求为后续接入 AI 接口预留接入点（2026-11-17）',
+  originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','本地演示提供方'],
+  notes:'当前不连接外部服务；用量记录仅作计量留存，本轮不含商业化内容。',
+});
+requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。';
+requirement.modelOutline.entities.push('AiUsage');
+requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。当前提供方为本地演示，不连接外部服务。');
 const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
 
 const index = read(__dirname, 'fidelity-index.html');

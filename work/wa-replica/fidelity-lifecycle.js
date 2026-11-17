@@ -434,6 +434,7 @@
     materials: 'Images',
     team: 'Network',
     members: 'UsersRound',
+    ai: 'Sparkles',
     scope: 'SlidersHorizontal',
   }[id] || 'FileText');
 
@@ -458,6 +459,7 @@
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
+      renderItem('ai', views.ai) +
       renderItem('scope', views.scope)
     );
   };
@@ -1108,9 +1110,11 @@
           : ['Thanks for the quick response! Could you share the recommended starter option?', '谢谢快速回复！可以推荐一下适合首批采购的方案吗？']);
 
     const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    (data.messages[c.id] ??= []).push({ id: nextId('m'), side: 'in', text: pair[0], translated: pair[1], time });
+    const message = { id: nextId('m'), side: 'in', text: pair[0], time };
+    (data.messages[c.id] ??= []).push(message);
+    aiTranslateInbound(c, message, pair[1]);
     c.preview = pair[0];
-    c.translation = pair[1];
+    c.translation = '';
     c.last = '刚刚';
     c.unread = (Number(c.unread) || 0) + 1;
     lcLog(c.id, 'inbound', closed ? '已结束跟进的客户主动发来新消息（触发复联信号）' : '收到客户最新 WhatsApp 回复消息');
@@ -1283,14 +1287,15 @@
         language: v('language'), owner: a.owner || ui.persona, account: a.id,
         tags: [], engagement: 'open',
         source: v('source'), campaign: v('campaign'), ad: '模拟进线会话',
-        unread: 1, star: false, last: '刚刚', preview: msg, translation: tr,
+        unread: 1, star: false, last: '刚刚', preview: msg, translation: '',
         followup: null, notes: '', contactRefs: [{ account: a.id, owner: a.owner || ui.persona }],
         createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', intentLevel: '高意向',
         reactivatedCount: 0,
         qualification: { demand: '新加微咨询目录与发货安排', volume: '待首响确认', deliveryRegion: a.country === 'PR' ? 'PR · San Juan' : 'US · TX', objection: '', commWindow: v('language') + '沟通' },
       };
       data.customers.unshift(c);
-      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, translated: tr, time: '刚刚' }];
+      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, time: '刚刚' }];
+      aiTranslateInbound(c, data.messages[id][0], tr);
       lcCreateTask({
         customerId: id,
         title: `首响破冰回复 ${name} 并确认具体需求`,

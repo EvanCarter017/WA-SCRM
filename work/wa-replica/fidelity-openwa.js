@@ -108,10 +108,11 @@
       country:'US', city:'San Francisco', timezone:'America/Los_Angeles', language:'英语',
       owner:a.owner||ui.persona, account:a.id, tags:[], needsFirstReply:true, // the engagement module creates the first-reply to-do on the next render
       source:'Facebook 广告', campaign:'示例广告', ad:'', unread:1, star:false,
-      last:time, preview:text, translation:translated, followup:null, notes:'',
+      last:time, preview:text, translation:'', followup:null, notes:'',
       contactRefs:[{account:a.id, owner:a.owner||ui.persona}], createdAt:fidDay(), updatedAt:fidDay(), clientType:'新增线索-实时',
     });
-    data.messages[id] = [{id:nextId('m'), side:'in', text, translated, time}];
+    data.messages[id] = [{id:nextId('m'), side:'in', text, time}];
+    aiTranslateInbound(data.customers[0], data.messages[id][0], translated);
   }
 
   function openwaFinish(pair) {

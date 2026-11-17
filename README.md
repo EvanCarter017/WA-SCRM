@@ -56,6 +56,7 @@ flowchart LR
 | `#chat-records` | **聊天记录（质检归档）** | 从 WhatsApp 会话移入的快照列表；移入原因、移入人与时间；质检结论（待质检 / 合格 / 需改进）与评语；按质检状态筛选、快照内搜索、译文开关 |
 | `#tags` / `#tag-stats` | **标签管理与标签统计** | 自建分组维护自定义标签、批量打标与客户穿透查询 |
 | `#materials` | **素材管理** | 运营常用文本、图片、名片、音视频素材分组维护与导入导出 |
+| `#ai` | **AI 能力** | AI 功能的统一接入点：能力清单与逐项启停（接收消息翻译、发送前翻译）、按能力累计的调用次数与字符数、最近调用记录；当前为本地演示，不连接外部服务 |
 | `#scope` | **功能范围与原型评审** | 模块保留/暂缓决策记录（含已暂缓的生命周期看板、流程配置与成交复购中心）、点选界面备注说明与需求评审 JSON 导出 |
 
 ---
@@ -83,6 +84,7 @@ flowchart LR
 │       ├── fidelity-lifecycle.js / .css               # 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）
 │       ├── fidelity-dashboard.js / .css               # 首页经营概览与跟进闭环概览
 │       ├── fidelity-openwa.js                         # OpenWA 扫码绑定、掉线重连与会话联动
+│       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、演示提供方、用量记录与「AI 能力」页
 │       ├── fidelity-ui.js / fidelity-customer-pages.js# 列表、标签、标签统计与聊天记录质检归档视图
 │       ├── fidelity-operations.js / fidelity-subsite.js# 素材管理与聊手子站登录态控制
 │       ├── build-fidelity.cjs                         # 零外部依赖构建打包器
