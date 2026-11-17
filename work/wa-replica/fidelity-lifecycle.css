@@ -1518,3 +1518,21 @@
     width: 100%;
   }
 }
+
+/* Engagement loop (v0.8) */
+.lc-tag-details {
+  margin: 0 0 12px;
+}
+.lc-tag-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fid-ink);
+}
+.lc-follow-tags {
+  margin-bottom: 14px;
+}
+.lc-chat-strip .tag-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}

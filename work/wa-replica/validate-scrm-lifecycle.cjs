@@ -23,11 +23,15 @@ for (const [name, hash] of Object.entries(hashes)) {
 
 // 2. Verify requirements.json integrity and lifecycle scope modules
 const req = json(path.join(out, 'requirements.json'));
-assert.equal(req.version, '0.7-scrm-pipelines');
-assert(req.modules.some(m => m.id === 'P-LIFECYCLE' && m.screens.includes('lifecycle')));
-assert(req.modules.some(m => m.id === 'P-PIPELINES' && m.screens.includes('pipelines')));
-assert(req.modules.some(m => m.id === 'P-DEALS' && m.screens.includes('deals')));
-assert(req.review.items.some(i => i.id === 'LIFECYCLE'));
+assert.equal(req.version, '0.8-scrm-engagement');
+for (const id of ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS']) {
+  const deferred = req.modules.find(m => m.id === id);
+  assert.equal(deferred?.decision, '本轮不展示', `${id} must be recorded as deferred`);
+  assert.deepEqual(deferred.screens, [], `${id} must not expose a screen`);
+}
+assert(req.modules.some(m => m.id === 'P-FOLLOW' && m.screens.includes('followups')));
+assert(req.review.items.some(i => i.id === 'ENGAGEMENT'));
+assert(!req.review.items.some(i => i.id === 'LIFECYCLE'));
 assert.equal(req.modules.find(m => m.id === 'P-BROADCAST')?.decision, '本轮不展示');
 assert.equal(req.modules.find(m => m.id === 'P-MATERIALS')?.decision, '保留');
 
@@ -45,65 +49,28 @@ for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-f
   for (const s of scripts) new vm.Script(s[1]);
 }
 
-// 4. Verify the preset pipelines are structurally sound
-const pipelineSource = read(path.join(__dirname, 'fidelity-pipelines.js'));
-const defs = vm.runInNewContext(
-  pipelineSource + '\n;({ pipelines: lcPresetPipelines(), LC_CATEGORIES, LC_CAPTURES, LC_METRICS, LC_ROLES, LC_TASK_TYPES, LC_LEGACY_STAGE_IDS, issues: lcPresetPipelines().map(lcPipelineIssues) })',
-  {}, { filename: 'fidelity-pipelines.js' }
-);
-assert(defs.pipelines.length >= 2, 'Expected at least two preset pipelines');
-assert.equal(defs.pipelines.filter(p => p.isDefault).length, 1, 'Exactly one preset pipeline must be the default');
-const allStageIds = defs.pipelines.flatMap(p => p.stages.map(s => s.id));
-assert.equal(new Set(allStageIds).size, allStageIds.length, 'Stage ids must be unique across pipelines');
-defs.pipelines.forEach((p, i) => {
-  assert.deepEqual([...defs.issues[i]], [], `Preset pipeline "${p.name}" has configuration issues`);
-  const ids = new Set(p.stages.map(s => s.id));
-  assert(p.lostReasons.length > 0, `${p.name}: lost reasons required`);
-  for (const s of p.stages) {
-    assert(Object.hasOwn(defs.LC_CATEGORIES, s.category), `${p.name}/${s.name}: unknown category`);
-    assert(Object.hasOwn(defs.LC_CAPTURES, s.capture), `${p.name}/${s.name}: unknown capture`);
-    assert(Object.hasOwn(defs.LC_METRICS, s.metric), `${p.name}/${s.name}: unknown metric`);
-    assert(defs.LC_TASK_TYPES.includes(s.taskType), `${p.name}/${s.name}: unknown task type`);
-    assert(!s.next || ids.has(s.next), `${p.name}/${s.name}: next stage missing`);
-  }
-  for (const role of Object.keys(defs.LC_ROLES)) assert(ids.has(p.roles[role]), `${p.name}: role ${role} must map to a stage`);
-});
-for (const id of Object.values(defs.LC_LEGACY_STAGE_IDS)) assert(allStageIds.includes(id), `Legacy stage alias points at missing id ${id}`);
+// 4. The stage-based modules are gone and nothing in the engagement module still refers to them
+for (const removed of ['fidelity-pipelines.js', 'fidelity-pipeline-settings.js']) {
+  assert(!fs.existsSync(path.join(__dirname, removed)), `${removed} must not exist`);
+}
+const moduleSource = read(path.join(__dirname, 'fidelity-lifecycle.js'));
+const removedIdentifiers = ['lcPipelines', 'lcDefaultPipeline', 'lcPipeline', 'lcCustomerPipeline', 'lcStageLookup', 'lcDecorate', 'lcStageMeta', 'lcStages', 'lcStageName', 'lcCategory', 'lcIsActive', 'lcIsRecovery', 'lcIsCategory', 'lcRoleStage', 'lcHasRole', 'lcIntakeStage', 'lcReactivateTarget', 'lcLostReasons', 'lcNewId', 'lcChain', 'lcNormalizeCustomer', 'lcStageBadge', 'lcMoney', 'lcDaysBetween', 'lcDwellDays', 'lcDaysUntil', 'lcCustomerQuotes', 'lcCustomerOrders', 'lcCustomerLtv', 'lcOpenQuotesValue', 'lcMatchesRadar', 'lcBoardPipeline', 'lcMatchesFilters', 'lcFilteredCustomers', 'lcCardHTML', 'renderLifecycleTable', 'lcStageMetric', 'lcPipelineTabs', 'renderLifecycle', 'lcTransitionDynamicFields', 'openLifecycleAdvance', 'renderDeals', 'openQuoteModal', 'openOrderModal', 'openOrderStepModal', 'lcFillSmartDraft', 'renderPipelines', 'lcPresetPipelines', 'LC_CATEGORIES', 'LC_CAPTURES', 'LC_METRICS', 'LC_ROLES', 'LC_TASK_TYPES', 'LC_LEGACY_STAGE_IDS', 'taskType', 'lcAdvance', 'lcJumpStage', 'lcJumpRadar', 'lcStageFilter', 'lcRadar', 'lcDealsTab', 'lcQuoteOpen', 'lcQuoteToOrder', 'lcQuoteExpire', 'lcOrderOpen', 'lcOrderStep', 'lcChatDraft', 'lcMode', 'lcResetFilters', 'lcToggleSop'];
+for (const name of removedIdentifiers) {
+  assert(!new RegExp(`\\b${name}\\b`).test(moduleSource), `fidelity-lifecycle.js still refers to removed identifier ${name}`);
+  assert(!new RegExp(`\\b${name}\\b`).test(appJs), `app.js still refers to removed identifier ${name}`);
+}
 
-// 5. Guard against hardcoding: page logic must not branch on, or assign, a stage by its display name.
-// A stage name may appear inside descriptive text; what is forbidden is using it as a value:
-//   x === '报价推进'   stage: '新进线'   data-target="需求澄明"   ['新进线', ...].includes(c.stage)
-const stageNames = [...new Set([...defs.pipelines.flatMap(p => p.stages.map(s => s.name)), ...Object.keys(defs.LC_LEGACY_STAGE_IDS)])];
-const asValue = name => [`'${name}'`, `"${name}"`, '`' + name + '`'];
-const guardedFiles = ['fidelity-lifecycle.js', 'fidelity-pipeline-settings.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js'];
-function stageNameDependency(line) {
-  for (const name of stageNames) {
-    if (line.includes(`data-target="${name}"`)) return name;
-    for (const literal of asValue(name)) {
-      let at = line.indexOf(literal);
-      while (at >= 0) {
-        const before = line.slice(0, at).trimEnd();
-        const after = line.slice(at + literal.length).trimStart();
-        const compared = /[=!]==?$/.test(before) || /^[=!]==?/.test(after);
-        const assigned = /\bstage\s*[:=]$/.test(before);
-        const listed = /\.includes\(\s*[\w.?]*\.?stage\b/.test(after.slice(after.indexOf(']') + 1)) && before.lastIndexOf('[') > before.lastIndexOf(']');
-        if (compared || assigned || listed) return name;
-        at = line.indexOf(literal, at + literal.length);
-      }
-    }
-  }
-  return '';
-}
-// The guard itself must catch the patterns the v0.6 build used.
-for (const sample of ["if (targetStage === '报价推进') {", "tags: [], stage: '新进线', stageEnteredAt: nowIso,", 'data-target="需求澄明"', "if (['新进线', '需求澄明'].includes(c.stage)) {", "c.stage = '复购培育';"]) {
-  assert(stageNameDependency(sample), `Stage-name guard failed to flag: ${sample}`);
-}
-assert.equal(stageNameDependency("taskType: '沉睡唤醒', title: '跟进「报价推进」客户'"), '', 'Stage-name guard must allow task types and descriptive text');
-for (const file of guardedFiles) {
+// 5. No lifecycle, funnel or deals wording is left in the UI source of the modules
+const removedTerms = ['生命周期', '全周期', '漏斗', '流程配置', '推进阶段', '成交与复购', '报价单', '成交订单', 'LTV', '复购培育', '复购窗口'];
+for (const file of ['fidelity-lifecycle.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html']) {
   read(path.join(__dirname, file)).split('\n').forEach((line, index) => {
-    const name = stageNameDependency(line);
-    assert(!name, `${file}:${index + 1} depends on the stage name "${name}"; use stage ids, categories or pipeline roles`);
+    for (const term of removedTerms) assert(!line.includes(term), `${file}:${index + 1} still mentions "${term}"`);
   });
+}
+
+// 6. The engagement loop is wired: two states, four signals, forced choice on completion
+for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEngagement', 'lcApplyFormTags', "'lc-close-engagement-form'", "'lc-follow-tag-filter-form'", '请填写下次跟进事项和提醒时间，或选择结束跟进。']) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 
 const summary = {
@@ -113,8 +80,9 @@ const summary = {
   projectRoot: path.basename(root),
   historicalBaselineVerified: verifiedBaseline,
   standaloneBundlesVerified: ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-fidelity.html'],
-  lifecyclePipelines: defs.pipelines.map(p => ({ id: p.id, name: p.name, default: p.isDefault, stages: p.stages.map(s => s.name) })),
-  stageNameHardcoding: 'none',
+  engagementStates: ['open', 'closed'],
+  attentionSignals: ['reply', 'overdue', 'noplan', 'recontact'],
+  deferredModules: ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS'],
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

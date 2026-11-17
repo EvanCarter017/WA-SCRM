@@ -8,9 +8,15 @@ honor its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | IN PROGRESS — executor run 1 finished Steps 1–13 and stopped on a plan defect (demo text contained a guarded term); plan amended, same executor continuing from Step 14 |
+| 001  | The prototype closes the customer-engagement loop with tags as support — lifecycle stages, pipelines and deals are removed | P1 | L | — | DONE — approved 2026-11-17 after two revision rounds (both caused by plan gaps, see the plan's Amendments) and merged to `main` on the owner's instruction |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
+
+## Review record for 001
+
+- Executor: one agent in an isolated worktree. Run 1 completed Steps 1–13 and stopped correctly on a plan defect; revision 1 applied three plan amendments and finished Steps 14–16; revision 2 fixed one stale documentation reference.
+- Reviewer checks, all re-run independently of the executor's report: build, validator and browser smoke test (13 routes, no script errors, removed wording absent); scope (only in-scope files changed, frozen baseline untouched); rebuilt outputs identical to the committed ones; full read of the rewritten module, build script, validator and docs against the plan; 16 interactive browser tests covering the forced choice on completion, ending and resuming follow-up, the re-contact signal, the tag filter and tag updates, new leads, the customer list and dossier, migration of saved v0.6/v0.7 data, and a narrow screen.
+- Not covered by any check: the OpenWA sample-chat path that sets `needsFirstReply` (verified by reading the code only).
 
 ## Dependency notes
 

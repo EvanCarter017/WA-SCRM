@@ -2645,3 +2645,21 @@ dialog>#toast,dialog>#toast.show{transform:none}
     width: 100%;
   }
 }
+
+/* Engagement loop (v0.8) */
+.lc-tag-details {
+  margin: 0 0 var(--fid-px-12);
+}
+.lc-tag-details summary {
+  cursor: pointer;
+  font-size: var(--fid-px-12);
+  font-weight: 650;
+  color: var(--fid-ink);
+}
+.lc-follow-tags {
+  margin-bottom: var(--fid-px-14);
+}
+.lc-chat-strip .tag-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
