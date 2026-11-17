@@ -2726,3 +2726,31 @@ dialog>#toast,dialog>#toast.show{transform:none}
   font-weight: 650;
   color: var(--fid-ink);
 }
+
+/* Tags on conversation cards (plan 007) */
+.conversation-tags {
+  display: flex;
+  align-items: center;
+  gap: var(--fid-px-4);
+  min-width: 0;
+  margin-top: var(--fid-px-6);
+  overflow: hidden;
+}
+.conversation-tags .tag {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: var(--fid-px-96);
+  padding: var(--fid-px-1) var(--fid-px-6);
+  font-size: var(--fid-px-11);
+  line-height: var(--fid-px-16);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-tags-more {
+  flex: 0 0 auto;
+  font-size: var(--fid-px-11);
+  line-height: var(--fid-px-16);
+  color: var(--color-text-muted);
+}

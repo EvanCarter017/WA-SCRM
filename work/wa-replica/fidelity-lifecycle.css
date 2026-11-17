@@ -1584,3 +1584,31 @@
   font-weight: 650;
   color: var(--fid-ink);
 }
+
+/* Tags on conversation cards (plan 007) */
+.conversation-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.conversation-tags .tag {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 96px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-tags-more {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--color-text-muted);
+}

@@ -215,6 +215,7 @@ const customersModule = requirement.modules.find(module => module.id === 'P-CUST
 customersModule.features = customersModule.features.map(feature => feature === '客户阶段' ? '跟进状态' : feature);
 customersModule.features.push('客户等级（S/A/B/C/D）', '客户状态（已成交/弃单/自然线索）', '按等级与状态筛选', '导出含等级与状态');
 requirement.modules.find(module => module.id === 'P-TAGS').notes = '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。';
+requirement.modules.find(module => module.id === 'P-INBOX').features.push('会话卡片显示客户标签');
 requirement.modules.push({
   id:'P-CHAT-REVIEW', name:'聊天记录归档', decision:'首轮原型', basis:'用户要求把会话移入聊天记录用于绩效复盘与审核，不设评分（2026-11-17）',
   originalIds:[], screens:['chat-records'], features:['从 WhatsApp 会话移入快照','移入原因','快照内搜索与译文开关','移出聊天记录'],

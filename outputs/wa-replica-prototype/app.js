@@ -2840,6 +2840,17 @@
   // ============================================================================
   // Page: #inbox (WhatsApp 在线聊天与跟进闭环联动)
   // ============================================================================
+  // Tags on a conversation card: the first three the viewer may see, then a count of the rest.
+  // The row never wraps; the full list is in its tooltip. A customer without tags gets no row.
+  const LC_CARD_TAGS = 3;
+  function lcConversationTags(c) {
+    const visible = new Set(myTags().map(t => t.id));
+    const names = c.tags.filter(id => visible.has(id)).map(id => tag(id).name);
+    if (!names.length) return '';
+    const more = names.length - LC_CARD_TAGS;
+    return `<span class="conversation-tags" title="${esc('标签：' + names.join('、'))}">${tagsHTML(c, LC_CARD_TAGS)}${more > 0 ? `<span class="conversation-tags-more">+${more}</span>` : ''}</span>`;
+  }
+
   conversationRows = function() {
     return filteredConversations().map(c => {
       const a = account(c.account);
@@ -2854,6 +2865,7 @@
             <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : c.language)}</span>
             ${h.primary.key === 'healthy' ? '' : `<span class="mini-stage" title="跟进状态：${esc(h.primary.label)}">${esc(h.primary.label)}</span>`}
           </span>
+          ${lcConversationTags(c)}
         </span>
       </button>`;
     }).join('') || empty('没有匹配会话', '切换筛选，或清空搜索后再试。');
