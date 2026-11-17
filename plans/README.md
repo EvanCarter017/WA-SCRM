@@ -12,6 +12,7 @@ honor its STOP conditions, and update your row when done.
 | 002  | The prototype no longer shows or uses invitation codes anywhere | P1 | S | 001 | DONE — approved 2026-11-17 on the first run, no revisions, and merged to `main` on the owner's instruction. Reviewer checks: build, validator and smoke test re-run; scope clean; full diff read; 18 interactive browser tests. The manager-only staff-accounts page cannot be opened in this agent-view build and was verified by the validator guard and code review only |
 | 003  | Customers carry a manual tier (S/A/B/C/D) and status, editable in the chat screen, and the customer list shows and filters by them | P1 | M | 002 | DONE — approved 2026-11-17 after one revision (a plan defect: an invisible byte-order-mark character in a code block, replaced by its escape sequence) and merged to `main` under the owner's standing instruction. Reviewer checks: build, validator and smoke test re-run; scope clean; full diff read; 20 interactive browser tests, including tier and status changes in the chat strip and dossier, chip filters, and the CSV export content |
 | 004  | Chat history is a review archive — conversations are moved in from the WhatsApp chat as snapshots and reviewed there | P1 | M | 003 | DONE — approved 2026-11-17 on the first run, no revisions, and merged to `main` under the owner's standing instruction. Reviewer checks: build, validator and smoke test re-run; scope clean; the rewritten page compared line by line with the plan and the tag-statistics code confirmed unchanged; 22 interactive browser tests, including moving a conversation in from the chat (reason required, duplicate refused, live chat untouched), the snapshot staying frozen when the live chat continues, saving a review result, filtering, searching, removing, reload, and a narrow screen |
+| 005  | Every AI feature goes through one integration point that can be switched per capability and records usage — translation is the first user | P1 | M | 004 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -23,7 +24,7 @@ These are planned and executed one after another, each merged before the next is
 
 - **003** — points 2 and 3 (customer tier and status).
 - **004** — point 4 (chat history as a review and audit archive).
-- **005** — point 1 (AI capability hooks). Written last so it can hook every place translation is used, including the reworked chat history.
+- **005** — point 1 (AI capability hooks). Written last so it can hook every place translation is produced. "With an eye toward future monetization" is implemented as metering only (a usage record per call, totals per capability, an on/off switch per capability); no price, plan or purchase wording appears anywhere, and the validator enforces that for the AI module. The plan was dry-run in a throwaway copy before dispatch, which corrected two of its own checks.
 
 The owner does not review plans and has given a standing instruction to merge every change that passes review. Open design points are decided by the advisor and recorded in each plan under "Decisions already made".
 
