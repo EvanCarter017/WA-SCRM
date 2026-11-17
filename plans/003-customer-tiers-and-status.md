@@ -449,7 +449,7 @@ Replace the whole customer-list section (from `const lcOrigFilteredCustomers = f
     const safe = v => '"' + (/^[=+\-@\t\r]/.test(String(v ?? '')) ? "'" : '') + String(v ?? '').replaceAll('"', '""') + '"';
     const rows = [['主账号', '联系人', '手机号', '客户等级', '客户状态', '跟进状态', '最近互动', '客户类型', '国家', '标签'],
       ...filteredCustomers().map(c => [account(c.account)?.name, c.name, c.phone, lcTier(c) || '未评级', lcCustomerStatusLabel(c), lcHealth(c).primary.label, c.last, c.clientType, country(c), c.tags.map(tag).filter(t => t && myTags().includes(t)).map(t => t.name).join('、')])];
-    const url = URL.createObjectURL(new Blob(['﻿' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = 'whatsapp-演示客户列表.csv';
@@ -672,6 +672,10 @@ Stop and report back (do not improvise) if:
 - The smoke test still reports `js_errors` after two fix attempts for the same error.
 - The work appears to require editing an out-of-scope file.
 - You believe a decision under "Decisions already made" is wrong. Report it; do not act on it.
+
+## Amendments (2026-11-17, after the first executor run)
+
+The Step 5 code block as first written contained an actual U+FEFF character inside the CSV string literal instead of the six-character escape sequence. The executor copied it faithfully and flagged it. The block now shows the escape sequence, and the executor replaced the literal character in the module in a follow-up commit. Nothing else changed.
 
 ## Maintenance notes
 
