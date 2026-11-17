@@ -1110,9 +1110,9 @@ sed -i 's/#lifecycle/#followups/g; s/客户全生命周期原型预览服务/客
 - Delete line 5, the screenshot line `![WA Desk SCRM 全周期看板概览](outputs/wa-scrm-lifecycle-overview.png)` (it shows the removed board). Do not delete the image file itself.
 - In section 4 (`安全与数据边界`), change `聊天对话、二维码、报价单与订单均为` to `聊天对话与二维码均为`.
 - In section 1, the Windows shortcut sentence: `#lifecycle` → `#followups`.
-- Replace the whole of section 2 (from its `## 2.` heading down to, but not including, `## 3.`) with:
+- Replace the whole of section 2 (from its `## 2.` heading down to, but not including, `## 3.`) with the content of the following four-backtick block (the inner ```mermaid fence is part of the content):
 
-```markdown
+````markdown
 ## 2. 客户跟进闭环设计（`v0.8-scrm-engagement`）
 
 自 v0.8 起原型不再设置生命周期阶段、漏斗、流程配置与报价/订单台账（均已暂缓，实现保留在 Git 历史 v0.7）。系统只做一件事：**保证每位客户的跟进不断档**，并以**完全自定义的标签**辅助分类与筛选。
@@ -1145,7 +1145,7 @@ flowchart LR
 | `#scope` | **功能范围与原型评审** | 模块保留/暂缓决策记录（含已暂缓的生命周期看板、流程配置与成交复购中心）、点选界面备注说明与需求评审 JSON 导出 |
 
 ---
-```
+````
 
 - In section 3's directory tree: delete the lines for `fidelity-pipelines.js` and `fidelity-pipeline-settings.js`; the `fidelity-lifecycle.js / .css` line's comment becomes `# 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）`; the `PRODUCT.md` and `DESIGN.md` comment lines become `# 产品定位、跟进闭环业务边界与范围说明` and `# 桌面/窄屏布局规范与跟进闭环交互架构`; `validate-scrm-lifecycle.cjs` comment stays.
 
@@ -1284,4 +1284,5 @@ Stop and report back (do not improvise) if:
 - **Restoring the deferred features**: the lifecycle board, pipeline settings and deals centre live in git history at commit `53b0bff` (`fidelity-pipelines.js`, `fidelity-pipeline-settings.js`, and the removed parts of `fidelity-lifecycle.js`). `outputs/wa-replica-prototype/icons.js` at that commit also holds icons this build drops (`Kanban`, `Receipt`, `Truck`, `PackageCheck`, `GitBranch`, …); on a machine without the `lucide` package they can only be recovered from that file.
 - **Naming debt accepted on purpose**: the module is still called `fidelity-lifecycle.js`, uses the `lc` prefix and `lc-*` CSS classes, the bundle is `whatsapp-scrm-lifecycle.html`, and the validator is `validate-scrm-lifecycle.cjs`. `fidelity-lifecycle.css` still contains unused rules for the removed board, stepper and settings page. A rename/cleanup is a separate, purely mechanical change.
 - **What a reviewer should scrutinise**: (1) no override listed under "Overrides you must NOT delete" was removed — otherwise the base app's stage UI resurfaces; (2) the completion handler refuses to finish a follow-up without a next step or a close reason; (3) `lcCloseEngagement` settles pending to-dos and `lcReopenEngagement` is reached from both the scheduling form and re-opening a finished task; (4) tags are never created or auto-applied by the system; (5) customer list header and row cell counts match.
+- **`validation.json`**: the validator writes the directory name (`projectRoot`) and time of its last run into `outputs/wa-replica-prototype/validation.json`. When this work is merged from a worktree, re-run the validator once in the main checkout so the committed file reflects it.
 - **Follow-ups explicitly deferred**: automated browser tests for the dialogs; renaming/cleanup above; an "awaiting reply" signal based on message direction rather than the unread count.
