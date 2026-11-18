@@ -1,0 +1,446 @@
+# Plan 013: Every order block offers "undo last step" at any time and shows the time placed beside the order number
+
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> maintain the index.
+>
+> **Drift check (run first)**: `git diff --stat bea0dce..HEAD -- work/wa-replica README.md PRODUCT.md DESIGN.md replica/build-log.md outputs/wa-replica-prototype/README.md`
+> If any in-scope file changed since this plan was written, compare the
+> "Current state" excerpts against the live code before proceeding; on a
+> mismatch, treat it as a STOP condition. (Changes under `plans/` only are expected and fine.)
+
+## Status
+
+- **Priority**: P1
+- **Effort**: S
+- **Risk**: LOW
+- **Depends on**: plans/012-order-sections-with-entries.md (DONE)
+- **Category**: direction
+- **Planned at**: commit `bea0dce`, 2026-11-18
+
+## Why this matters
+
+In the `订单追踪` tab of the customer profile drawer every order has its own block with one entry per shipping step. A step can be taken back only through the `撤销` link of the toast that follows the click; once that toast is gone the step is final, and a delivered order or an order in exception cannot be moved at all. The product owner reviewed it on 2026-11-18 and said:
+
+> "It also needs to be possible to undo top-level operations."
+
+Asked what that refers to, the owner chose a permanent "Undo last step" button on every order block: it removes the newest entry and puts the order back to the step before; it works at any time, also on delivered orders and orders in exception, replacing the earlier rule that a step cannot be reversed later; it is not shown while the first entry is the only one. With the answer the owner added:
+
+> "Furthermore, I would like the timestamp to be displayed next to the order number for each individual order block, rather than just showing the timestamp on the entry itself."
+
+After this plan the head of every order block shows the time the order was placed next to the order number, and — when the order has more than one entry — a button `撤销上一步`.
+
+### Decisions already made (do not re-open; do not ask)
+
+1. The button `撤销上一步` sits in the head of the order block, after the step buttons and before the remove button. It is shown whenever the order's history has more than one entry, in every status, and absent when the only entry is the first one (`待发货`).
+2. A click removes the newest entry of the order's history and sets the order's status to that of the entry before it. This also applies to `已签收` and `异常`; the step buttons then reappear as the status allows. Clicking again takes back the step before, down to the first entry.
+3. The first entry (the order being placed) cannot be taken back; the remove button of the order does that.
+4. Each undo writes one entry to the interaction timeline, with the same wording the toast undo already uses (`撤销：订单 … 物流状态恢复为…`), and shows a plain toast. There is no redo.
+5. The `撤销` link of the toast that follows a step click stays as it is. So do the step rules of `lcOrderShipping`: a step button still only moves one step forward or to `异常`, and never from `已签收` or `异常`.
+6. "The timestamp" next to the order number is the time the order was placed, shown as `下单时间 YYYY-MM-DD HH:MM` in muted, regular-weight text inside the block heading. The first entry keeps its own `下单时间 …` text; nothing is removed from the entries.
+7. An order saved without a stored history uses the entries its status implies (the existing `lcOrderHistory`); an undo on it stores the shortened list.
+8. The undo button uses the existing button style `slim` and the icon `RotateCcw`, which is already in `icons.js`. One declaration and one CSS rule are added. No new colour value.
+9. The version string stays `0.8-scrm-engagement`.
+
+## Current state
+
+### What this repository is
+
+A zero-dependency, offline, clickable **prototype** of an internal WhatsApp customer workbench: plain HTML/CSS/JS, no framework, no package.json. All data is fictional demo data kept in the browser's `localStorage`. UI text is **Simplified Chinese**; write UI and documentation text exactly as given in this plan.
+
+### How the build works
+
+`work/wa-replica/build-fidelity.cjs` reads a frozen baseline app (`work/wa-replica/fidelity-base/app.js`), applies string substitutions with a `swap(from, to)` helper (**never change a first argument**), and concatenates the module files into the body of one IIFE. It writes `outputs/wa-replica-prototype/*` and two identical standalone bundles, `outputs/whatsapp-scrm-lifecycle.html` and `outputs/whatsapp-replica-ui-fidelity.html`. The CSS file `fidelity-lifecycle.css` is appended after the baseline CSS. **Outputs are committed and must be regenerated by running the build, never edited by hand.**
+
+Icons: the build takes icon definitions from the existing `outputs/wa-replica-prototype/icons.js`. Restore that file from git before every build (command below). This plan adds no icon, and the build output `icons.js` must come out unchanged.
+
+### The module you edit: `work/wa-replica/fidelity-lifecycle.js`
+
+All excerpts below are from this file. It is an IIFE body fragment, so top-level code is indented two spaces.
+
+**(a) The order blocks of the `订单追踪` tab**, inside `profileHTML`:
+
+```js
+      const orderSections = orders.map(o => {
+        const [status] = lcShipping(o.shipping);
+        const next = LC_SHIPPING_NEXT[status] ? lcShipping(LC_SHIPPING_NEXT[status]) : null;
+        const stepAttrs = `${fidActionID(o.id)} data-customer="${esc(c.id)}"`;
+        const entries = lcOrderHistory(o).map((entry, i) => {
+          const [, label, tone, glyph] = lcShipping(entry.shipping);
+          return `<div class="lc-deal-item">
+            <span class="lc-pill ${tone}">${icon(glyph)}${esc(label)}</span>
+            <span class="muted" style="font-size:12px">${entry.at ? (i ? '' : '下单时间 ') + esc(fidDate(entry.at)) : '时间未记录'}</span>
+          </div>`;
+        }).join('');
+        return `<div class="lc-card-block lc-order">
+          <div class="lc-block-head lc-order-head">
+            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}</h3>
+            <div class="lc-deal-actions">
+              ${next ? fidButton(`标记${next[1]}`, 'lcOrderShipping', next[3], 'slim blue', `${stepAttrs} data-shipping="${next[0]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}"`) : ''}
+              ${next ? fidButton('标记异常', 'lcOrderShipping', 'TriangleAlert', 'slim danger', `${stepAttrs} data-shipping="problem" aria-label="订单 ${esc(o.number)}：标记异常"`) : ''}
+              <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
+            </div>
+          </div>
+          <div class="lc-deal-list">${entries}</div>
+        </div>`;
+      }).join('');
+```
+
+**(b) The step action** in `Object.assign(fidActions, {`, followed by its neighbour:
+
+```js
+    lcOrderShipping: (id, btn) => {
+      const c = customer(btn?.dataset?.customer);
+      const o = lcOrders(c).find(x => x.id === id);
+      if (!o || !myCustomers().includes(c)) return;
+      const before = lcShipping(o.shipping);
+      const next = lcShipping(btn.dataset.shipping);
+      const forward = LC_SHIPPING_NEXT[before[0]];
+      if (!forward || (next[0] !== forward && next[0] !== 'problem')) return;
+      const history = lcOrderHistory(o);
+      const apply = (status, entries, text) => {
+        o.shipping = status;
+        o.history = entries;
+        lcLog(c.id, 'order', text);
+        persist();
+        render();
+        lcRefreshOpenDossier(c.id);
+      };
+      apply(next[0], [...history, { shipping: next[0], at: new Date().toISOString() }], `订单 ${o.number} 物流状态：${before[1]} → ${next[1]}`);
+      toast(`订单 ${o.number} 已标记为「${next[1]}」。`, () => apply(before[0], history, `撤销：订单 ${o.number} 物流状态恢复为${before[1]}`));
+    },
+    lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
+```
+
+**(c) Helpers that already exist** (use them; do not redefine):
+
+- `lcOrderHistory(o)` → the shipping entries of an order, oldest first, each `{ shipping, at }`; for an order saved without a history it returns the entries its status implies. An order is `{ id, number, placedAt, shipping, history }`; `shipping` is the current status.
+- `lcShipping(id)` → the status entry `[id, label, pill tone, icon]`. `lcOrders(c)` → the customer's orders.
+- `fidButton(label, action, glyph, style, attrs)`, `fidActionID(id)`, `esc(text)`, `icon('Name')`, `fidDate(iso)` (→ `YYYY-MM-DD HH:MM`), `toast(message)`, `lcLog(customerId, category, text)`, `persist()`, `render()`, `lcRefreshOpenDossier(customerId)`, `customer(id)`, `myCustomers()`.
+- A click on any element with `data-action="NAME"` calls `fidActions.NAME(element.dataset.id, element)`.
+
+### Styles: `work/wa-replica/fidelity-lifecycle.css`
+
+Multi-line rules, one declaration per line, two-space indentation. The file ends with:
+
+```css
+/* Order blocks of the order tracking tab: the head wraps on a narrow drawer (plan 012) */
+.lc-order-head {
+  flex-wrap: wrap;
+}
+.lc-order-head h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+```
+
+`.lc-block-head h3` is an inline flex row (`display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;`).
+
+### Other files
+
+- `work/wa-replica/build-fidelity.cjs` contains the review item with `id: 'ORDER_TRACKING'` (its `question:` line begins `  question: '客户档案新增「订单追踪」栏：`) and one long line that begins `requirement.modelOutline.relationships.push('客户档案的订单追踪：`.
+- `work/wa-replica/validate-scrm-lifecycle.cjs` has, in its section 13, one long line that begins `for (const required of ["const LC_SHIPPING = [['pending', '待发货'"`. Its `summary` object contains a line that begins `  orderTracking: '`. Section 4 of the validator forbids a list of identifiers of removed features, among them `lcOrderStep`, `lcOrderOpen`. **Use exactly the names given in this plan.**
+
+### Repo conventions to match
+
+- Two-space indentation, template literals for HTML, semicolons, single quotes.
+- Commit messages: conventional commits, e.g. `feat(scrm): show each order as its own section with one entry per shipping step`.
+
+## Commands you will need
+
+Run from the repository root (inside your worktree). `node` v18 or newer works.
+
+| Purpose | Command | Expected on success |
+|---|---|---|
+| Restore icon pool (before **every** build) | `git checkout bea0dce -- outputs/wa-replica-prototype/icons.js` | exit 0 |
+| Build | `node work/wa-replica/build-fidelity.cjs` | exit 0; prints JSON with `"version": "0.8-scrm-engagement"` |
+| Validate | `node work/wa-replica/validate-scrm-lifecycle.cjs` | exit 0; prints JSON with `"status": "passed"` |
+| Browser smoke | `bash /tmp/wa-scrm-plan-013/smoke.sh` (script from Step 1; run from inside the repo) | last line `SMOKE PASS` |
+| Syntax of a module file | `node -e "new (require('vm').Script)('(()=>{'+require('fs').readFileSync(process.argv[1],'utf8')+'})')" work/wa-replica/fidelity-lifecycle.js && echo SYNTAX_OK` | `SYNTAX_OK` |
+
+There is no test suite, linter or typechecker. The build fails on a syntax error but not on a call to an undefined function; the smoke test catches those for code that runs on page load.
+
+## Scope
+
+**In scope** (the only files you may modify):
+
+- `work/wa-replica/fidelity-lifecycle.js` (Steps 2–3)
+- `work/wa-replica/fidelity-lifecycle.css` (Step 4)
+- `work/wa-replica/build-fidelity.cjs` (two requirement-record texts — Step 5)
+- `work/wa-replica/validate-scrm-lifecycle.cjs` (Step 6)
+- `README.md`, `PRODUCT.md`, `DESIGN.md`, `replica/build-log.md`, `outputs/wa-replica-prototype/README.md` (Step 7)
+- Build outputs, **only by running the build/validator**: `outputs/wa-replica-prototype/{index.html,app.js,app.css,tokens.css,components.css,demo-data.js,icons.js,element-review.js,lucide-license.txt,requirements-data.js,requirements.json,validation.json}`, `outputs/whatsapp-scrm-lifecycle.html`, `outputs/whatsapp-replica-ui-fidelity.html`
+
+**Out of scope** (do NOT touch):
+
+- `work/wa-replica/fidelity-base/**`, `fidelity-ui.js`, `fidelity-customer-pages.js`, `fidelity-ai.js`, `fidelity-dashboard.js`, `fidelity-openwa.js`, `fidelity-operations.js`, `fidelity-subsite.js`, `fidelity.css`, `fidelity-dashboard.css`, `fidelity-index.html`.
+- `lcOrderShipping` (excerpt (b) — you add a new action after it), `lcOrderRemove`, `lcOrderHistory`, `lcShipping`, `LC_SHIPPING`, `LC_SHIPPING_NEXT`, `lcOrders`, `lcSeed`, the entries of an order block, the form `登记订单`, the first-contact block, the timeline tab.
+- The version string, the localStorage key, file names, navigation.
+- `plans/**`, `outputs/review-prompts/**`, historical records, earlier entries of `replica/build-log.md`.
+- New dependencies, icons, colour values or files.
+
+## Git workflow
+
+- Work on the branch your worktree is already on. If (and only if) you find yourself on `main`, create and switch to `advisor/013-undo-last-step` first.
+- One or two commits are fine. Conventional commit message, e.g. `feat(scrm): undo an order's last step at any time and show the time placed beside the order number`.
+- Do NOT push, merge, rebase onto main, or open a PR.
+
+## Steps
+
+### Step 1: Create the browser smoke script (outside the repo) and record the baseline
+
+Save this script at the fixed path `/tmp/wa-scrm-plan-013/smoke.sh` (outside the repository; always call it by this literal path, from inside the repository). If your shell rejects heredocs, write the same content with your file-writing tool and then `chmod +x` it.
+
+```bash
+mkdir -p /tmp/wa-scrm-plan-013 && cat > /tmp/wa-scrm-plan-013/smoke.sh <<'EOF'
+#!/usr/bin/env bash
+# Renders each view of the standalone bundle in headless Chrome and checks it.
+set -u
+ROOT=$(git rev-parse --show-toplevel); OUT=$(mktemp -d); FAIL=0
+HTML="$ROOT/outputs/whatsapp-scrm-lifecycle.html"
+strip() { node -e "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8').replace(/<script[\s\S]*?<\/script>/g,'').replace(/<style[\s\S]*?<\/style>/g,'').replace(/<!--[\s\S]*?-->/g,'');fs.writeFileSync(process.argv[2],s)" "$1" "$2"; }
+for view in dashboard inbox accounts customers followups chat-records tags tag-stats materials ai scope; do
+  prof=$(mktemp -d)
+  timeout 90 /usr/bin/google-chrome --headless=new --no-sandbox --disable-gpu --user-data-dir="$prof" --enable-logging=stderr --v=0 --virtual-time-budget=4000 --dump-dom "file://$HTML#$view" 2>"$OUT/$view.log" >"$OUT/$view.html"
+  rm -rf "$prof"
+  strip "$OUT/$view.html" "$OUT/$view.txt"
+  errs=$(grep -ciE 'Uncaught|ReferenceError|TypeError|SyntaxError' "$OUT/$view.log")
+  size=$(wc -c <"$OUT/$view.txt")
+  echo "view=$view js_errors=$errs rendered_bytes=$size"
+  { [ "$errs" = 0 ] && [ "$size" -gt 15000 ]; } || FAIL=1
+done
+need() { grep -q "$2" "$OUT/$1.txt" && echo "ok   $1 contains: $2" || { echo "MISS $1 should contain: $2"; FAIL=1; }; }
+inbundle() { grep -qF "$1" "$HTML" && echo "ok   bundle contains: $1" || { echo "MISS bundle should contain: $1"; FAIL=1; }; }
+need inbox 'data-action="openConversation"'
+need customers 'Olivia Bennett'
+need followups 'lc-todo-table'
+need chat-records '归档会话'
+need ai '能力清单'
+inbundle 'lcOrderShipping: (id, btn) =>'
+inbundle 'function lcOrderHistory(o) {'
+inbundle 'lcOrderUndo: (id, btn) =>'
+inbundle "fidButton('撤销上一步', 'lcOrderUndo', 'RotateCcw', 'slim'"
+inbundle '<span class="lc-order-time">'
+inbundle '.lc-order-time {'
+echo "artifacts: $OUT"
+[ "$FAIL" = 0 ] && echo "SMOKE PASS" || { echo "SMOKE FAIL"; exit 1; }
+EOF
+chmod +x /tmp/wa-scrm-plan-013/smoke.sh && ls -l /tmp/wa-scrm-plan-013/smoke.sh
+```
+
+(The drawer is closed on a fresh page, so the order blocks are not on screen; the `inbundle` lines check the built file, and the `view=` lines check that every page still runs without errors. The button itself is checked by the reviewer in a scripted browser session.)
+
+**Verify**: `git checkout bea0dce -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && bash /tmp/wa-scrm-plan-013/smoke.sh; git status --porcelain` → every `view=` line shows `js_errors=0`; the only failing checks are four `MISS bundle should contain: ...` lines (`lcOrderUndo…`, `fidButton('撤销上一步'…`, `<span class="lc-order-time">`, `.lc-order-time {`), so the run ends with `SMOKE FAIL` (expected at this point); `git status --porcelain` prints **nothing**. If `js_errors` is non-zero, another check fails, or `git status` shows changes, STOP.
+
+### Step 2: The head of an order block (`work/wa-replica/fidelity-lifecycle.js`, `profileHTML`, excerpt (a))
+
+2a. Replace the line `        const entries = lcOrderHistory(o).map((entry, i) => {` with these two lines:
+
+```js
+        const history = lcOrderHistory(o);
+        const entries = history.map((entry, i) => {
+```
+
+2b. Replace the line `            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}</h3>` with:
+
+```js
+            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span></h3>
+```
+
+2c. Directly above the line that begins `              <button type="button" class="icon-button" data-action="lcOrderRemove"`, add:
+
+```js
+              ${history.length > 1 ? fidButton('撤销上一步', 'lcOrderUndo', 'RotateCcw', 'slim', `${stepAttrs} aria-label="订单 ${esc(o.number)}：撤销上一步"`) : ''}
+```
+
+**Verify**: syntax command → `SYNTAX_OK`; `grep -c "lc-order-time" work/wa-replica/fidelity-lifecycle.js` → `1`; `grep -c "'lcOrderUndo'" work/wa-replica/fidelity-lifecycle.js` → `1`; `grep -c "lcOrderHistory(o)" work/wa-replica/fidelity-lifecycle.js` → `3`.
+
+### Step 3: The undo action (`Object.assign(fidActions, {` block)
+
+Directly above the line that begins `    lcFollowTab: id =>` (after the `lcOrderShipping` action, excerpt (b)), add:
+
+```js
+    // Order tracking tab: take back the latest step of an order, at any time. The newest entry of its
+    // history is removed and the order returns to the step before — also from `delivered` or `problem`.
+    // The first entry (the order being placed) is never taken back; removing the order does that.
+    lcOrderUndo: (id, btn) => {
+      const c = customer(btn?.dataset?.customer);
+      const o = lcOrders(c).find(x => x.id === id);
+      if (!o || !myCustomers().includes(c)) return;
+      const history = lcOrderHistory(o);
+      if (history.length < 2) return;
+      const back = lcShipping(history[history.length - 2].shipping);
+      o.history = history.slice(0, -1);
+      o.shipping = back[0];
+      lcLog(c.id, 'order', `撤销：订单 ${o.number} 物流状态恢复为${back[1]}`);
+      persist();
+      render();
+      lcRefreshOpenDossier(c.id);
+      toast(`已撤销订单 ${o.number} 的上一步，当前为「${back[1]}」。`);
+    },
+```
+
+**Verify**: syntax command → `SYNTAX_OK`; `grep -c "lcOrderUndo: (id, btn) =>" work/wa-replica/fidelity-lifecycle.js` → `1`; `grep -c "lcOrderHistory(o)" work/wa-replica/fidelity-lifecycle.js` → `4`; `git diff bea0dce --stat -- work/wa-replica/fidelity-lifecycle.js | tail -1` → `1 file changed, 22 insertions(+), 2 deletions(-)`.
+
+### Step 4: Styles (`work/wa-replica/fidelity-lifecycle.css`)
+
+4a. In the last rule of the file, `.lc-order-head h3 {`, add one declaration after `  overflow-wrap: anywhere;`, so that the rule reads:
+
+```css
+.lc-order-head h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+}
+```
+
+4b. Append to the end of the file:
+
+```css
+
+/* Time placed beside the order number in the head of an order block (plan 013) */
+.lc-order-time {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+```
+
+**Verify**: `grep -c "lc-order-time" work/wa-replica/fidelity-lifecycle.css` → `1`; `grep -c "flex-wrap: wrap;" work/wa-replica/fidelity-lifecycle.css` → one more than `git show bea0dce:work/wa-replica/fidelity-lifecycle.css | grep -c "flex-wrap: wrap;"`. Then `git checkout bea0dce -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs >/dev/null && bash /tmp/wa-scrm-plan-013/smoke.sh` → every `view=` line has `js_errors=0` and the run ends with `SMOKE PASS`; `git diff bea0dce -- outputs/wa-replica-prototype/icons.js | wc -l` → `0`.
+
+### Step 5: Requirement records (`work/wa-replica/build-fidelity.cjs`)
+
+5a. In the review item with `id: 'ORDER_TRACKING'`, replace the whole `question:` line with:
+
+```js
+  question: '客户档案新增「订单追踪」栏：显示客户首次联系时间，并按订单号分区列出每笔订单，订单号旁显示下单时间。每个订单的分区内，订单每到达一个物流状态就新增一条记录（状态与时间）：登记订单时为「待发货」并带下单时间，此后由两个按钮更新——沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前标记为「异常」；「撤销上一步」可随时撤回最近一步，已签收与异常同样可撤回。订单由聊手手动登记，未对接店铺或物流系统。请评审：物流路径与状态是否齐全，撤销是否需要限制，订单还需要记录哪些信息，日后是否对接业务系统。',
+```
+
+5b. Replace the whole line that begins `requirement.modelOutline.relationships.push('客户档案的订单追踪：` with:
+
+```js
+requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后推进按钮只能沿「待发货 → 已发货 → 已签收」逐步前进，或在签收前转为「异常」，已签收与异常之后不再有推进。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录，订单号旁显示下单时间。「撤销上一步」随时移除最新一条物流记录并回到上一个状态，已签收与异常同样可撤回；第一条记录不可撤回，删除订单才会移除。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
+```
+
+**Verify**: `git checkout bea0dce -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` → exit 0; `grep -c '撤销是否需要限制' outputs/wa-replica-prototype/requirements.json` → `1`; `grep -c '随时移除最新一条物流记录并回到上一个状态' outputs/wa-replica-prototype/requirements.json` → `1`.
+
+### Step 6: Validator (`work/wa-replica/validate-scrm-lifecycle.cjs`)
+
+6a. Replace the whole line that begins `for (const required of ["const LC_SHIPPING = [['pending', '待发货'"` with:
+
+```js
+for (const required of ["const LC_SHIPPING = [['pending', '待发货'", "['shipped', '已发货'", "['delivered', '已签收'", "['problem', '异常（退回/丢件）'", "const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };", "['orders', '订单追踪', lcOrders(c).length]", '<form id="lc-order-form"', "'lc-order-form': (f, v) =>", "shipping: 'pending', history: [{ shipping: 'pending', at: placedAt }] }, ...lcOrders(c)];", 'function lcOrderHistory(o) {', 'class="lc-card-block lc-order"', 'o.history = entries;', "'时间未记录'", 'lcOrderShipping: (id, btn) =>', 'data-shipping="problem"', 'lcOrderUndo: (id, btn) =>', "history.length > 1 ? fidButton('撤销上一步', 'lcOrderUndo'", 'if (history.length < 2) return;', '<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span>', 'lcOrderRemove: (id, btn) =>', '首次联系时间', "order: '订单记录'", 'data.lcSeededOrders = true;', 'data.lcSeededOrderHistory = true;']) {
+```
+
+6b. In the `summary` object, replace the whole line that begins `  orderTracking: '` with:
+
+```js
+  orderTracking: 'profile tab: first contact; one block per order headed with its number and time placed, one entry per shipping step reached; two step buttons; undo last step at any time down to the first entry',
+```
+
+**Verify**: `node work/wa-replica/validate-scrm-lifecycle.cjs` → exit 0 with `"status": "passed"` and the new `"orderTracking"` text in the output.
+
+### Step 7: Documentation, final rebuild and verification
+
+7a. `README.md` — replace the whole line beginning `- **订单追踪**` with:
+
+```
+- **订单追踪**：客户档案的「订单追踪」栏显示客户首次联系时间，并按订单号分区列出每笔订单，订单号旁显示下单时间。每个订单的分区内，订单每到达一个物流状态就有一条记录（状态与时间）：登记订单时为「待发货」并带下单时间；点击「标记已发货」「标记已签收」或「标记异常」后新增对应记录。物流状态沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前标记为「异常」；「撤销上一步」可随时撤回最近一步。订单由聊手手动登记，未对接店铺或物流系统。
+```
+
+7b. `PRODUCT.md` — replace the whole line beginning `10. **订单追踪**` with:
+
+```
+10. **订单追踪**：客户档案的「订单追踪」栏显示客户首次联系时间，并按订单号分区列出该客户的每笔订单，订单号旁显示下单时间。登记订单是独立的一步：只填写订单号与下单时间，订单的分区内随即出现第一条记录「待发货」（带下单时间）。物流状态有两条路径、由两个按钮更新：推进按钮沿「待发货 → 已发货 → 已签收」每次前进一步；「标记异常」在签收前随时可用。每点击一次，该订单的分区内就新增一条对应记录（状态与点击时间），之前的记录保留。已签收或异常的订单不再有这两个按钮。每个订单分区另有「撤销上一步」：随时移除最新一条记录并回到上一个状态，已签收与异常同样可以撤回，可连续撤回直到只剩第一条「待发货」记录；点击后提示条里的「撤销」仍然可用。登记有误的订单可删除。每次变更写入互动轨迹。未对接店铺、支付或物流系统；登记订单不改变客户状态、等级或标签。
+```
+
+7c. `DESIGN.md` — in the line beginning `4. **客户 360° 档案抽屉`, make these two replacements (nothing else on that line):
+
+- replace `标题为「订单」加订单号，右侧是物流按钮与删除按钮；` with `标题为「订单」加订单号，订单号后以浅色小字显示下单时间，右侧依次是物流按钮、「撤销上一步」与删除按钮；`
+- replace `每次点击都会在该订单的分区内新增一条记录，提示条提供「撤销」（撤销即移除这条记录）；删除订单同样可撤销。` with:
+
+```
+每次点击都会在该订单的分区内新增一条记录，提示条提供「撤销」（撤销即移除这条记录）；删除订单同样可撤销。订单的记录多于一条时，标题右侧常驻显示「撤销上一步」：随时移除最新一条记录并回到上一个状态，已签收与异常同样可撤回，撤回后按当前状态重新显示物流按钮；只剩第一条「待发货」记录时不显示该按钮。
+```
+
+7d. `outputs/wa-replica-prototype/README.md` — in the section `## 订单追踪`, replace the whole line beginning `- 每个订单号单独一块` with:
+
+```
+- 每个订单号单独一块，订单号旁显示下单时间。新订单先有一条「待发货」记录（带下单时间）；点击「标记已发货」后，该订单下新增一条「已发货」记录与时间，「标记已签收」「标记异常」同理，之前的记录保留。已签收或异常的订单不再显示这两个按钮。
+- 点错或需要回退时，点击该订单的「撤销上一步」：最新一条记录被移除，订单回到上一个状态；已签收、异常的订单同样可以撤回，可连续点击直到只剩「待发货」。垃圾桶按钮删除订单，提示条可撤销。
+```
+
+7e. Append to the end of `replica/build-log.md` (do not change earlier entries):
+
+```markdown
+
+## 订单可随时撤销上一步，订单号旁显示下单时间 · 2026-11-18
+
+按产品负责人意见，每个订单分区的标题右侧新增常驻按钮「撤销上一步」：点击后移除该订单最新一条物流记录并回到上一个状态，随时可用，已签收与异常的订单同样可以撤回，撤回后按当前状态重新显示物流按钮；可连续撤回，直到只剩第一条「待发货」记录，此时不显示该按钮。每次撤回写入互动轨迹。此前「步骤一旦离开提示条便不可撤回」的限制取消；提示条里的「撤销」保留。
+
+订单分区的标题在订单号后以浅色小字显示下单时间，第一条「待发货」记录上的下单时间保留。物流按钮的规则、登记订单表单与删除订单不变。
+```
+
+7f. Final run:
+
+```bash
+git checkout bea0dce -- outputs/wa-replica-prototype/icons.js
+node work/wa-replica/build-fidelity.cjs
+node work/wa-replica/validate-scrm-lifecycle.cjs
+bash /tmp/wa-scrm-plan-013/smoke.sh
+git status --porcelain
+```
+
+**Verify**: build exit 0 with `"version": "0.8-scrm-engagement"`; validator `"status": "passed"`; smoke ends with `SMOKE PASS`; `git status --porcelain` lists only in-scope paths. Commit everything. After the commit `git status --porcelain` must be empty.
+
+## Test plan
+
+This repo's verification pattern is the static validator plus browser checks; follow it.
+
+- **Validator** — the changed line of section 13 (Step 6).
+- **Browser smoke** (`/tmp/wa-scrm-plan-013/smoke.sh`) — every view renders without JavaScript errors; the built bundle contains the undo action, the undo button, the time element and its style.
+- **Verified by the reviewer in a scripted browser session, not by you**: the head of every order block shows `下单时间` and the time placed after the order number, and the first entry still shows it too; an order with one entry has no undo button; after a step the button is there, also after a reload; a click removes exactly the newest entry, restores the status and the matching step buttons, writes one timeline entry and leaves the other orders untouched; repeated clicks walk a delivered sample order back to its first entry, where the button disappears; an order in exception returns to the status it had before; an order saved without a history is walked back along its implied entries; calling the action on an order with one entry changes nothing; the toast undo after a step still works; narrow-screen layout of the head.
+
+## Done criteria
+
+Machine-checkable. ALL must hold:
+
+- [ ] `git checkout bea0dce -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"`
+- [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
+- [ ] `bash /tmp/wa-scrm-plan-013/smoke.sh` ends with `SMOKE PASS`
+- [ ] `grep -c "lcOrderUndo" work/wa-replica/fidelity-lifecycle.js` → `2`
+- [ ] `grep -c "lc-order-time" work/wa-replica/fidelity-lifecycle.js` → `1`
+- [ ] `grep -c "lcOrderHistory(o)" work/wa-replica/fidelity-lifecycle.js` → `4`
+- [ ] `git diff bea0dce --stat -- work/wa-replica/fidelity-lifecycle.js | tail -1` → `1 file changed, 22 insertions(+), 2 deletions(-)`
+- [ ] `git diff bea0dce --stat -- work/wa-replica/fidelity-lifecycle.css | tail -1` → `1 file changed, 8 insertions(+)`
+- [ ] `git diff bea0dce -- outputs/wa-replica-prototype/icons.js | wc -l` → `0` (no icon is added, dropped or reordered by this plan)
+- [ ] `cmp outputs/whatsapp-scrm-lifecycle.html outputs/whatsapp-replica-ui-fidelity.html` → identical (no output)
+- [ ] `git diff --stat bea0dce -- work/wa-replica/fidelity-base work/wa-replica/fidelity-ui.js work/wa-replica/fidelity-customer-pages.js work/wa-replica/fidelity-ai.js work/wa-replica/fidelity-dashboard.js work/wa-replica/fidelity-openwa.js work/wa-replica/fidelity-operations.js work/wa-replica/fidelity-subsite.js work/wa-replica/fidelity.css work/wa-replica/fidelity-dashboard.css work/wa-replica/fidelity-index.html outputs/review-prompts` → empty
+- [ ] `git status --porcelain` is empty after your final commit, and `git diff --name-only bea0dce..HEAD` lists only in-scope paths (plus `plans/` files changed by commits that are not yours)
+- [ ] `plans/README.md` status row updated (skip if a reviewer dispatched you and said they maintain the index)
+
+## STOP conditions
+
+Stop and report back (do not improvise) if:
+
+- Step 1's baseline check fails (JavaScript errors at the planned commit, a failing check other than the four named ones, or the build is not reproducible there).
+- Any excerpt in "Current state" does not match the file.
+- `grep -c "lcOrderUndo\|lc-order-time" work/wa-replica/fidelity-lifecycle.js work/wa-replica/fidelity-lifecycle.css | grep -vc ":0"` is not `0` before your edits (a name of this plan is already taken).
+- The validator fails in its section 4 or 5 after your edits (a forbidden identifier or term) — you used a name or wording that is not in this plan.
+- A `swap(...)` in the build script throws `Missing prototype source anchor` after your edit — you changed a first argument; revert that edit.
+- `icons.js` differs from the planned commit after the build.
+- The smoke test still reports `js_errors` after two fix attempts for the same error.
+- The work appears to require editing an out-of-scope file.
+- You believe a decision under "Decisions already made" is wrong. Report it; do not act on it.
+
+## Maintenance notes
+
+- There are now two ways to take a step back: the `撤销` link of the toast right after a step (it restores the exact list the order had before that click) and the permanent `撤销上一步` button (it drops the newest entry, whatever it is). Both end in the same state when used right after a step.
+- `lcOrderUndo` is the only way out of `delivered` and `problem`; `lcOrderShipping` still refuses to move such an order. If the owner later wants to limit undo (for example to the person who made the step, or within a time window), this action is the place.
+- Undo never removes the first entry, so an order always keeps the entry for being placed; `lcOrderRemove` removes the whole order.
+- The time in the block head is `o.placedAt`, the same value the first entry shows. If the time placed ever becomes editable, both follow.
+- What a reviewer should scrutinise: undo removes exactly one entry and keeps `shipping` equal to the last remaining entry; nothing else in `lcOrderShipping` changed; the head wraps on a narrow drawer with the time and three buttons; `icons.js` is byte-identical.
+- `validation.json`: re-run the validator once in the main checkout after merging from a worktree.
