@@ -140,10 +140,11 @@ assert(moduleSource.includes("if (ui.view !== 'followups') lcState.followFocus =
 assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('tr.lc-row-focus td {'), 'the highlighted row needs its style');
 assert(req.modules.find(m => m.id === 'P-INBOX').features.includes('协同条的跟进状态与下次跟进可跳转到跟进闭环并定位该客户'));
 
-// 13. Order tracking is a tab of the customer profile: first contact, orders typed in by hand, four shipping statuses
-for (const required of ["const LC_SHIPPING = [['pending', '待发货'", "['shipped', '已发货'", "['delivered', '已签收'", "['problem', '异常（退回/丢件）'", "['orders', '订单追踪', lcOrders(c).length]", '<form id="lc-order-form"', "'lc-order-form': (f, v) =>", 'data-lc-order-shipping=', 'if (t.dataset.lcOrderShipping) {', 'lcOrderRemove: (id, btn) =>', '首次联系时间', "order: '订单记录'", 'data.lcSeededOrders = true;']) {
+// 13. Order tracking is a tab of the customer profile: first contact, orders typed in by hand; shipping moves by two step buttons along fixed paths
+for (const required of ["const LC_SHIPPING = [['pending', '待发货'", "['shipped', '已发货'", "['delivered', '已签收'", "['problem', '异常（退回/丢件）'", "const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };", "['orders', '订单追踪', lcOrders(c).length]", '<form id="lc-order-form"', "'lc-order-form': (f, v) =>", "shipping: 'pending' }, ...lcOrders(c)];", 'lcOrderShipping: (id, btn) =>', 'data-shipping="problem"', 'lcOrderRemove: (id, btn) =>', '首次联系时间', "order: '订单记录'", 'data.lcSeededOrders = true;']) {
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
+assert(!moduleSource.includes('data-lc-order-shipping') && !moduleSource.includes('name="shipping"') && !moduleSource.includes("v('shipping')"), 'shipping changes only through the two step buttons, and adding an order sets no status');
 assert(!moduleSource.includes('data.orders'), 'orders live on the customer (c.orders); data.orders belongs to saved data of the removed deals centre');
 assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('.lc-timeline-item.cat-order {'), 'order entries in the interaction timeline need their style');
 assert(customersRecord.features.some(f => f.startsWith('订单追踪')), 'P-CUSTOMERS must record order tracking');
@@ -168,7 +169,7 @@ const summary = {
   aiProvider: 'local demo (prepared sample results)',
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
-  orderTracking: 'profile tab: first contact, orders entered by hand, shipping status pending / shipped / delivered / problem',
+  orderTracking: 'profile tab: first contact, orders entered by hand; new orders start as pending; two step buttons move shipping pending → shipped → delivered, or to problem before delivery',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');
