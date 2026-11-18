@@ -636,7 +636,8 @@
         const [status] = lcShipping(o.shipping);
         const next = LC_SHIPPING_NEXT[status] ? lcShipping(LC_SHIPPING_NEXT[status]) : null;
         const stepAttrs = `${fidActionID(o.id)} data-customer="${esc(c.id)}"`;
-        const entries = lcOrderHistory(o).map((entry, i) => {
+        const history = lcOrderHistory(o);
+        const entries = history.map((entry, i) => {
           const [, label, tone, glyph] = lcShipping(entry.shipping);
           return `<div class="lc-deal-item">
             <span class="lc-pill ${tone}">${icon(glyph)}${esc(label)}</span>
@@ -645,10 +646,11 @@
         }).join('');
         return `<div class="lc-card-block lc-order">
           <div class="lc-block-head lc-order-head">
-            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}</h3>
+            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span></h3>
             <div class="lc-deal-actions">
               ${next ? fidButton(`标记${next[1]}`, 'lcOrderShipping', next[3], 'slim blue', `${stepAttrs} data-shipping="${next[0]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}"`) : ''}
               ${next ? fidButton('标记异常', 'lcOrderShipping', 'TriangleAlert', 'slim danger', `${stepAttrs} data-shipping="problem" aria-label="订单 ${esc(o.number)}：标记异常"`) : ''}
+              ${history.length > 1 ? fidButton('撤销上一步', 'lcOrderUndo', 'RotateCcw', 'slim', `${stepAttrs} aria-label="订单 ${esc(o.number)}：撤销上一步"`) : ''}
               <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
             </div>
           </div>
@@ -1326,6 +1328,24 @@
       };
       apply(next[0], [...history, { shipping: next[0], at: new Date().toISOString() }], `订单 ${o.number} 物流状态：${before[1]} → ${next[1]}`);
       toast(`订单 ${o.number} 已标记为「${next[1]}」。`, () => apply(before[0], history, `撤销：订单 ${o.number} 物流状态恢复为${before[1]}`));
+    },
+    // Order tracking tab: take back the latest step of an order, at any time. The newest entry of its
+    // history is removed and the order returns to the step before — also from `delivered` or `problem`.
+    // The first entry (the order being placed) is never taken back; removing the order does that.
+    lcOrderUndo: (id, btn) => {
+      const c = customer(btn?.dataset?.customer);
+      const o = lcOrders(c).find(x => x.id === id);
+      if (!o || !myCustomers().includes(c)) return;
+      const history = lcOrderHistory(o);
+      if (history.length < 2) return;
+      const back = lcShipping(history[history.length - 2].shipping);
+      o.history = history.slice(0, -1);
+      o.shipping = back[0];
+      lcLog(c.id, 'order', `撤销：订单 ${o.number} 物流状态恢复为${back[1]}`);
+      persist();
+      render();
+      lcRefreshOpenDossier(c.id);
+      toast(`已撤销订单 ${o.number} 的上一步，当前为「${back[1]}」。`);
     },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },

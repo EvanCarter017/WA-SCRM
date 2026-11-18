@@ -1639,4 +1639,12 @@
 .lc-order-head h3 {
   min-width: 0;
   overflow-wrap: anywhere;
+  flex-wrap: wrap;
+}
+
+/* Time placed beside the order number in the head of an order block (plan 013) */
+.lc-order-time {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-muted);
 }
