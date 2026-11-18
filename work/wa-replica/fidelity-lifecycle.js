@@ -52,6 +52,7 @@
     customerStatus: 'all',
     dossierTab: 'overview',
     timelineFilter: 'all',
+    orderOpen: [],
   };
 
   function lcSeed() {
@@ -331,7 +332,7 @@
   const lcOrigResetExtras = fidResetExtras;
   fidResetExtras = function() {
     lcOrigResetExtras();
-    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], followFocus: null, customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all' });
+    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], followFocus: null, customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all', orderOpen: [] });
     lcSeed();
   };
 
@@ -520,6 +521,8 @@
   // Shipping moves along one path, pending → shipped → delivered, or leaves it for `problem` at any
   // point before delivery. A delivered order and an order marked `problem` have no further step.
   const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };
+  // The forward path as a list: the three segments of the progress bar in the head of an order block.
+  const LC_SHIPPING_PATH = ['pending', 'shipped', 'delivered'];
   // The customer's orders, newest first (a copy; write through c.orders).
   const lcOrders = c => (Array.isArray(c?.orders) ? c.orders : []).slice().sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
   // The shipping entries of an order, oldest first: { shipping, at }. An order saved before the history
@@ -633,10 +636,16 @@
       // One block per order number. Inside it, one entry per shipping step the order has reached,
       // oldest first; the first entry carries the time the order was placed.
       const orderSections = orders.map(o => {
-        const [status] = lcShipping(o.shipping);
+        const [status, statusLabel, statusTone] = lcShipping(o.shipping);
         const next = LC_SHIPPING_NEXT[status] ? lcShipping(LC_SHIPPING_NEXT[status]) : null;
         const stepAttrs = `${fidActionID(o.id)} data-customer="${esc(c.id)}"`;
         const history = lcOrderHistory(o);
+        // Collapsed by default; lcState.orderOpen lists the blocks the viewer has opened.
+        const open = lcState.orderOpen.includes(o.id);
+        // Progress bar: one segment per step of the forward path, filled up to the furthest step the order
+        // has reached (an order in exception keeps what it had reached), in the colour of the current status.
+        const reached = Math.max(0, ...history.map(entry => LC_SHIPPING_PATH.indexOf(lcShipping(entry.shipping)[0]))) + 1;
+        const progress = `<span class="lc-order-progress ${statusTone}" role="img" title="${esc(statusLabel)}" aria-label="物流状态：${esc(statusLabel)}">${LC_SHIPPING_PATH.map((step, i) => `<i${i < reached ? ' class="on"' : ''}></i>`).join('')}</span>`;
         const entries = history.map((entry, i) => {
           const [, label, tone, glyph] = lcShipping(entry.shipping);
           return `<div class="lc-deal-item">
@@ -644,9 +653,9 @@
             <span class="muted" style="font-size:12px">${entry.at ? (i ? '' : '下单时间 ') + esc(fidDate(entry.at)) : '时间未记录'}</span>
           </div>`;
         }).join('');
-        return `<div class="lc-card-block lc-order">
+        return `<div class="lc-card-block lc-order${open ? ' is-open' : ''}">
           <div class="lc-block-head lc-order-head">
-            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span></h3>
+            <h3><button type="button" class="lc-order-toggle" data-action="lcOrderToggle" ${stepAttrs} aria-expanded="${open}" title="${open ? '收起物流记录' : '展开物流记录'}">${icon(open ? 'ChevronDown' : 'ChevronRight')}订单 ${esc(o.number)}</button><span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span>${progress}</h3>
             <div class="lc-deal-actions">
               ${next ? `<button type="button" class="icon-button lc-step-next" data-action="lcOrderShipping" ${stepAttrs} data-shipping="${next[0]}" title="标记${next[1]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}">${icon(next[3])}</button>` : ''}
               ${next ? `<button type="button" class="icon-button lc-step-problem" data-action="lcOrderShipping" ${stepAttrs} data-shipping="problem" title="标记异常" aria-label="订单 ${esc(o.number)}：标记异常">${icon('TriangleAlert')}</button>` : ''}
@@ -654,7 +663,7 @@
               <button type="button" class="icon-button" data-action="lcOrderRemove" ${stepAttrs} title="删除订单" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
             </div>
           </div>
-          <div class="lc-deal-list">${entries}</div>
+          ${open ? `<div class="lc-deal-list">${entries}</div>` : ''}
         </div>`;
       }).join('');
       tabBody = `
@@ -1346,6 +1355,14 @@
       render();
       lcRefreshOpenDossier(c.id);
       toast(`已撤销订单 ${o.number} 的上一步，当前为「${back[1]}」。`);
+    },
+    // Order tracking tab: open or close an order block. Blocks are collapsed by default; which ones are
+    // open is view state only (kept while the page is open, never saved). The drawer is re-rendered, so
+    // the focus is put back on the button that was used.
+    lcOrderToggle: (id, btn) => {
+      lcState.orderOpen = lcState.orderOpen.includes(id) ? lcState.orderOpen.filter(x => x !== id) : [...lcState.orderOpen, id];
+      lcRefreshOpenDossier(btn?.dataset?.customer || ui.customer);
+      [...document.querySelectorAll('#dialog [data-action="lcOrderToggle"]')].find(b => b.dataset.id === id)?.focus();
     },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },

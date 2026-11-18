@@ -1632,14 +1632,22 @@
   border-left-color: var(--fid-mint);
 }
 
-/* Order blocks of the order tracking tab: the head wraps on a narrow drawer (plan 012) */
+/* Order blocks of the order tracking tab. The head is one row at every width: the title area takes the
+   free width and wraps inside itself, the icons stay at the top right (plans 012 and 015) */
 .lc-order-head {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: flex-start;
 }
 .lc-order-head h3 {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 32px;
   overflow-wrap: anywhere;
   flex-wrap: wrap;
+}
+.lc-order-head .lc-deal-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 /* Time placed beside the order number in the head of an order block (plan 013) */
@@ -1660,4 +1668,46 @@
 .lc-order-head .icon-button:disabled {
   opacity: 0.35;
   background: transparent;
+}
+
+/* Collapsible order blocks: the order number is the toggle; a collapsed block is its head only.
+   Progress bar in the head: three segments, the filled ones in the colour of the status (plan 015) */
+.lc-order:not(.is-open) .lc-order-head {
+  margin-bottom: 0;
+}
+.lc-order-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.lc-order-progress {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+}
+.lc-order-progress i {
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fid-frame);
+}
+.lc-order-progress i.on {
+  background: currentColor;
+}
+.lc-order-progress.warn {
+  color: var(--fid-amber);
+}
+.lc-order-progress.info {
+  color: var(--fid-royal);
+}
+.lc-order-progress.ok {
+  color: var(--fid-mint);
+}
+.lc-order-progress.hot {
+  color: var(--color-danger);
 }
