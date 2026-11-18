@@ -2790,3 +2790,16 @@ dialog>#toast,dialog>#toast.show{transform:none}
   font-weight: 400;
   color: var(--color-text-muted);
 }
+
+/* Icon buttons in the head of an order block: advance in the accent colour, exception in the danger
+   colour, and a greyed-out look for the undo icon while there is nothing to undo (plan 014) */
+.lc-order-head .lc-step-next {
+  color: var(--color-accent);
+}
+.lc-order-head .lc-step-problem {
+  color: var(--color-danger);
+}
+.lc-order-head .icon-button:disabled {
+  opacity: 0.35;
+  background: transparent;
+}

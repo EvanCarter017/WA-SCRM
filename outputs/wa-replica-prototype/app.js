@@ -2553,10 +2553,10 @@
           <div class="lc-block-head lc-order-head">
             <h3>${icon('ClipboardList')}订单 ${esc(o.number)}<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span></h3>
             <div class="lc-deal-actions">
-              ${next ? fidButton(`标记${next[1]}`, 'lcOrderShipping', next[3], 'slim blue', `${stepAttrs} data-shipping="${next[0]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}"`) : ''}
-              ${next ? fidButton('标记异常', 'lcOrderShipping', 'TriangleAlert', 'slim danger', `${stepAttrs} data-shipping="problem" aria-label="订单 ${esc(o.number)}：标记异常"`) : ''}
-              ${history.length > 1 ? fidButton('撤销上一步', 'lcOrderUndo', 'RotateCcw', 'slim', `${stepAttrs} aria-label="订单 ${esc(o.number)}：撤销上一步"`) : ''}
-              <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
+              ${next ? `<button type="button" class="icon-button lc-step-next" data-action="lcOrderShipping" ${stepAttrs} data-shipping="${next[0]}" title="标记${next[1]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}">${icon(next[3])}</button>` : ''}
+              ${next ? `<button type="button" class="icon-button lc-step-problem" data-action="lcOrderShipping" ${stepAttrs} data-shipping="problem" title="标记异常" aria-label="订单 ${esc(o.number)}：标记异常">${icon('TriangleAlert')}</button>` : ''}
+              <button type="button" class="icon-button" data-action="lcOrderUndo" ${stepAttrs} title="${history.length > 1 ? '撤销上一步' : '暂无可撤销的步骤'}" aria-label="订单 ${esc(o.number)}：撤销上一步" ${history.length > 1 ? '' : 'disabled'}>${icon('RotateCcw')}</button>
+              <button type="button" class="icon-button" data-action="lcOrderRemove" ${stepAttrs} title="删除订单" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
             </div>
           </div>
           <div class="lc-deal-list">${entries}</div>

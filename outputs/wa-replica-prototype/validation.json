@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-18T11:36:17.098Z",
+  "checkedAt": "2026-11-18T11:59:34.971Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -44,6 +44,6 @@
   "aiProvider": "local demo (prepared sample results)",
   "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
   "chatStripFollowLink": "status and next-follow-up labels open the follow-up centre on the customer row",
-  "orderTracking": "profile tab: first contact; one block per order headed with its number and time placed, one entry per shipping step reached; two step buttons; undo last step at any time down to the first entry",
+  "orderTracking": "profile tab: first contact; one block per order headed with its number and time placed, one entry per shipping step reached; icon buttons with tooltips in fixed positions: next step, exception, undo last step (disabled at the first entry), remove",
   "externalNetworkCalls": false
 }
