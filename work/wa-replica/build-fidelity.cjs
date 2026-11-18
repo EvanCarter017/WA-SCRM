@@ -148,7 +148,7 @@ requirement.review.items.push({
 requirement.review.items.push({
   id: 'ORDER_TRACKING',
   title: '订单追踪',
-  question: '客户档案新增「订单追踪」栏：显示客户首次联系时间，以及每笔订单的下单时间与物流状态。登记订单只填写订单号与下单时间，新订单从「待发货」开始；物流状态由两个按钮更新——沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前标记为「异常」。订单由聊手手动登记，未对接店铺或物流系统。请评审：物流路径与状态是否齐全，订单还需要记录哪些信息，日后是否对接业务系统。',
+  question: '客户档案新增「订单追踪」栏：显示客户首次联系时间，并按订单号分区列出每笔订单。每个订单的分区内，订单每到达一个物流状态就新增一条记录（状态与时间）：登记订单时为「待发货」并带下单时间，此后由两个按钮更新——沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前标记为「异常」。订单由聊手手动登记，未对接店铺或物流系统。请评审：物流路径与状态是否齐全，订单还需要记录哪些信息，日后是否对接业务系统。',
   status: '待评审',
   notes: '',
 });
@@ -241,7 +241,7 @@ requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍�
 requirement.modelOutline.entities.push('AiUsage');
 requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。当前提供方为本地演示，不连接外部服务。');
 requirement.modelOutline.entities.push('Order');
-requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间与物流状态，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后物流状态只能沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前转为「异常」，已签收与异常为终点。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
+requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后物流状态只能沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前转为「异常」，已签收与异常为终点。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
 const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
 
 const index = read(__dirname, 'fidelity-index.html');

@@ -283,6 +283,26 @@
       data.lcSeededOrders = true;
     }
 
+    // Shipping history of the sample orders (seeded once): each further step some days after the order
+    // was placed. It also reaches sample orders saved before the history existed, unless their status
+    // was changed since.
+    if (!data.lcSeededOrderHistory) {
+      const sampleSteps = {
+        'ord-c3-1': [['shipped', 1.1], ['delivered', 5.8]],
+        'ord-c3-2': [['shipped', 0.8], ['delivered', 3.7]],
+        'ord-c6-1': [['shipped', 0.7], ['delivered', 4.0]],
+        'ord-c11-1': [['shipped', 2.0]],
+      };
+      for (const c of data.customers) {
+        for (const o of Array.isArray(c.orders) ? c.orders : []) {
+          const steps = sampleSteps[o.id];
+          if (!steps || Array.isArray(o.history) || o.shipping !== steps[steps.length - 1][0]) continue;
+          o.history = [{ shipping: 'pending', at: o.placedAt }, ...steps.map(([shipping, days]) => ({ shipping, at: new Date(Date.parse(o.placedAt) + days * 86400000).toISOString() }))];
+        }
+      }
+      data.lcSeededOrderHistory = true;
+    }
+
     // Ensure every customer has an engagement state and safe defaults
     for (const c of data.customers) {
       lcMigrateEngagement(c);
@@ -502,6 +522,13 @@
   const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };
   // The customer's orders, newest first (a copy; write through c.orders).
   const lcOrders = c => (Array.isArray(c?.orders) ? c.orders : []).slice().sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
+  // The shipping entries of an order, oldest first: { shipping, at }. An order saved before the history
+  // existed gets the steps its status implies, with no time for the steps that were never recorded.
+  function lcOrderHistory(o) {
+    if (Array.isArray(o.history)) return o.history;
+    const implied = { shipped: ['shipped'], delivered: ['shipped', 'delivered'], problem: ['problem'] }[lcShipping(o.shipping)[0]] || [];
+    return [{ shipping: 'pending', at: o.placedAt }, ...implied.map(shipping => ({ shipping, at: null }))];
+  }
 
   profileHTML = function(c) {
     const a = account(c.account);
@@ -603,20 +630,29 @@
         </div>`;
     } else if (tab === 'orders') {
       const orders = lcOrders(c);
-      const orderItems = orders.map(o => {
-        const [status, label, tone, glyph] = lcShipping(o.shipping);
+      // One block per order number. Inside it, one entry per shipping step the order has reached,
+      // oldest first; the first entry carries the time the order was placed.
+      const orderSections = orders.map(o => {
+        const [status] = lcShipping(o.shipping);
         const next = LC_SHIPPING_NEXT[status] ? lcShipping(LC_SHIPPING_NEXT[status]) : null;
         const stepAttrs = `${fidActionID(o.id)} data-customer="${esc(c.id)}"`;
-        return `<div class="lc-deal-item">
-          <div class="lc-deal-main">
-            <strong>${esc(o.number)} <span class="lc-pill ${tone}">${icon(glyph)}${esc(label)}</span></strong>
-            <small>下单时间 ${esc(fidDate(o.placedAt))}</small>
+        const entries = lcOrderHistory(o).map((entry, i) => {
+          const [, label, tone, glyph] = lcShipping(entry.shipping);
+          return `<div class="lc-deal-item">
+            <span class="lc-pill ${tone}">${icon(glyph)}${esc(label)}</span>
+            <span class="muted" style="font-size:12px">${entry.at ? (i ? '' : '下单时间 ') + esc(fidDate(entry.at)) : '时间未记录'}</span>
+          </div>`;
+        }).join('');
+        return `<div class="lc-card-block lc-order">
+          <div class="lc-block-head lc-order-head">
+            <h3>${icon('ClipboardList')}订单 ${esc(o.number)}</h3>
+            <div class="lc-deal-actions">
+              ${next ? fidButton(`标记${next[1]}`, 'lcOrderShipping', next[3], 'slim blue', `${stepAttrs} data-shipping="${next[0]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}"`) : ''}
+              ${next ? fidButton('标记异常', 'lcOrderShipping', 'TriangleAlert', 'slim danger', `${stepAttrs} data-shipping="problem" aria-label="订单 ${esc(o.number)}：标记异常"`) : ''}
+              <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
+            </div>
           </div>
-          <div class="lc-deal-actions">
-            ${next ? fidButton(`标记${next[1]}`, 'lcOrderShipping', next[3], 'slim blue', `${stepAttrs} data-shipping="${next[0]}" aria-label="订单 ${esc(o.number)}：标记${next[1]}"`) : ''}
-            ${next ? fidButton('标记异常', 'lcOrderShipping', 'TriangleAlert', 'slim danger', `${stepAttrs} data-shipping="problem" aria-label="订单 ${esc(o.number)}：标记异常"`) : ''}
-            <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
-          </div>
+          <div class="lc-deal-list">${entries}</div>
         </div>`;
       }).join('');
       tabBody = `
@@ -625,10 +661,10 @@
           <div class="info-row"><span>首次联系时间</span><span><strong>${esc(fidDate(c.createdAt))}</strong></span></div>
           <div class="info-row"><span>进线渠道</span><span>${esc(c.source || '—')}</span></div>
         </div>
-        <div class="lc-card-block">
-          <div class="lc-block-head"><h3>${icon('ClipboardList')}订单与物流（${orders.length}）</h3></div>
-          ${orderItems ? `<div class="lc-deal-list">${orderItems}</div>` : '<p class="muted" style="font-size:12px">暂无订单。客户下单后，在下方登记订单号与下单时间。</p>'}
-        </div>
+        ${orderSections || `<div class="lc-card-block">
+          <div class="lc-block-head"><h3>${icon('ClipboardList')}订单与物流</h3></div>
+          <p class="muted" style="font-size:12px">暂无订单。客户下单后，在下方登记订单号与下单时间。</p>
+        </div>`}
         <form id="lc-order-form" class="lc-card-block">
           <input type="hidden" name="customerId" value="${esc(c.id)}">
           <div class="lc-block-head">
@@ -1269,7 +1305,8 @@
       toast(`已删除订单 ${o.number}。`, () => apply([...lcOrders(c), o], `恢复订单记录 ${o.number}`));
     },
     // Order tracking tab: the two step buttons of an order. Shipping only moves one step forward
-    // (LC_SHIPPING_NEXT) or to `problem`, and only while the order is not delivered; the toast offers undo.
+    // (LC_SHIPPING_NEXT) or to `problem`, and only while the order is not delivered. Each step adds an
+    // entry to the order's history; the toast offers undo, which takes that entry away again.
     lcOrderShipping: (id, btn) => {
       const c = customer(btn?.dataset?.customer);
       const o = lcOrders(c).find(x => x.id === id);
@@ -1278,15 +1315,17 @@
       const next = lcShipping(btn.dataset.shipping);
       const forward = LC_SHIPPING_NEXT[before[0]];
       if (!forward || (next[0] !== forward && next[0] !== 'problem')) return;
-      const apply = (status, text) => {
+      const history = lcOrderHistory(o);
+      const apply = (status, entries, text) => {
         o.shipping = status;
+        o.history = entries;
         lcLog(c.id, 'order', text);
         persist();
         render();
         lcRefreshOpenDossier(c.id);
       };
-      apply(next[0], `订单 ${o.number} 物流状态：${before[1]} → ${next[1]}`);
-      toast(`订单 ${o.number} 已标记为「${next[1]}」。`, () => apply(before[0], `撤销：订单 ${o.number} 物流状态恢复为${before[1]}`));
+      apply(next[0], [...history, { shipping: next[0], at: new Date().toISOString() }], `订单 ${o.number} 物流状态：${before[1]} → ${next[1]}`);
+      toast(`订单 ${o.number} 已标记为「${next[1]}」。`, () => apply(before[0], history, `撤销：订单 ${o.number} 物流状态恢复为${before[1]}`));
     },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },
@@ -1362,9 +1401,11 @@
       if (Number.isNaN(placed.getTime())) return error('请填写有效的下单时间。');
       if (placed.getTime() > Date.now()) return error('下单时间不能晚于当前时间。');
       if (lcOrders(c).some(o => o.number === number)) return error(`该客户已登记订单号 ${number}。`);
-      // Adding an order is a step of its own: a new order always starts at the first step of the shipping path.
-      c.orders = [{ id: nextId('ord'), number, placedAt: placed.toISOString(), shipping: 'pending' }, ...lcOrders(c)];
-      lcLog(c.id, 'order', `登记订单 ${number}（下单时间 ${fidDate(placed.toISOString())}）`);
+      // Adding an order is a step of its own: a new order always starts at the first step of the shipping
+      // path, and that step, at the time the order was placed, is the first entry of its history.
+      const placedAt = placed.toISOString();
+      c.orders = [{ id: nextId('ord'), number, placedAt, shipping: 'pending', history: [{ shipping: 'pending', at: placedAt }] }, ...lcOrders(c)];
+      lcLog(c.id, 'order', `登记订单 ${number}（下单时间 ${fidDate(placedAt)}）`);
       persist();
       render();
       lcRefreshOpenDossier(c.id);

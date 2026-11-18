@@ -1631,3 +1631,12 @@
 .lc-timeline-item.cat-order {
   border-left-color: var(--fid-mint);
 }
+
+/* Order blocks of the order tracking tab: the head wraps on a narrow drawer (plan 012) */
+.lc-order-head {
+  flex-wrap: wrap;
+}
+.lc-order-head h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
