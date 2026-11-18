@@ -2446,6 +2446,8 @@
     const dirtyNote = Object.hasOwn(ui.noteDrafts, c.id);
 
     let tabBody = '';
+    // Content pinned below the scrolling body; only the 订单追踪 tab uses it (the order form).
+    let tabFoot = '';
     if (tab === 'overview') {
       const nextCard = h.nextTask
         ? `<div class="lc-card-block ${h.overdue ? 'hot-block' : ''}">
@@ -2580,7 +2582,9 @@
         ${orderSections || `<div class="lc-card-block">
           <div class="lc-block-head"><h3>${icon('ClipboardList')}订单与物流</h3></div>
           <p class="muted" style="font-size:12px">暂无订单。客户下单后，在下方登记订单号与下单时间。</p>
-        </div>`}
+        </div>`}`;
+      // The order form is pinned to the bottom of the drawer; the list of orders scrolls above it.
+      tabFoot = `
         <form id="lc-order-form" class="lc-card-block">
           <input type="hidden" name="customerId" value="${esc(c.id)}">
           <div class="lc-block-head">
@@ -2652,6 +2656,7 @@
         ).join('')}
       </div>
       <div class="lc-dossier-body">${tabBody}</div>
+      ${tabFoot ? `<div class="lc-dossier-foot">${tabFoot}</div>` : ''}
     </aside>`;
   };
 
@@ -2663,6 +2668,7 @@
     else if (ui.profileTab === 'notes') { lcState.dossierTab = 'notes'; ui.profileTab = 'details'; }
     modal('客户 360° 档案', '<div class="profile-dialog">' + profileHTML(c, true) + '</div>', '', { drawer: true });
     $('#dialog').classList.add('lc-dossier-drawer');
+    lcSyncDossierFoot();
   };
 
   function lcRefreshOpenDossier(cid) {
@@ -2670,10 +2676,21 @@
     if (dlg?.open && dlg.classList.contains('lc-dossier-drawer') && ui.customer === cid) {
       const c = customer(cid);
       if (c) {
+        // Re-rendering the same tab keeps the reading position; a change of tab starts at the top.
+        const sameTab = $('#dialog .lc-dossier-tab.active')?.dataset.id === lcState.dossierTab;
+        const scrollTop = sameTab ? $('#dialog .lc-dossier-body')?.scrollTop || 0 : 0;
         $('#dialog .profile-dialog').innerHTML = profileHTML(c, true);
         paintIcons(dlg);
+        if (scrollTop) $('#dialog .lc-dossier-body').scrollTop = scrollTop;
+        lcSyncDossierFoot();
       }
     }
+  }
+
+  // Toasts are placed at the bottom of the dialog. The drawer records the height of its pinned footer
+  // (0 when the tab has none) so that the stylesheet can place them above it.
+  function lcSyncDossierFoot() {
+    $('#dialog').style.setProperty('--lc-dossier-foot', ($('#dialog .lc-dossier-foot')?.offsetHeight || 0) + 'px');
   }
 
   // ============================================================================
@@ -3267,7 +3284,7 @@
     lcOrderToggle: (id, btn) => {
       lcState.orderOpen = lcState.orderOpen.includes(id) ? lcState.orderOpen.filter(x => x !== id) : [...lcState.orderOpen, id];
       lcRefreshOpenDossier(btn?.dataset?.customer || ui.customer);
-      [...document.querySelectorAll('#dialog [data-action="lcOrderToggle"]')].find(b => b.dataset.id === id)?.focus();
+      [...document.querySelectorAll('#dialog [data-action="lcOrderToggle"]')].find(b => b.dataset.id === id)?.focus({ preventScroll: true });
     },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },

@@ -1711,3 +1711,15 @@
 .lc-order-progress.hot {
   color: var(--color-danger);
 }
+
+/* Pinned footer of the profile drawer (the order form): it stays at the bottom edge, the tab's content
+   scrolls above it, and the toasts of the drawer sit above it (plan 016) */
+.lc-dossier-foot {
+  flex-shrink: 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--fid-frame);
+  background: var(--color-surface);
+}
+.fidelity #dialog.drawer.lc-dossier-drawer > #toast {
+  bottom: calc(var(--lc-dossier-foot, 0px) + 20px);
+}
