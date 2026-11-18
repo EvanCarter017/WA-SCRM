@@ -107,7 +107,7 @@ new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
 requirement.version = '0.8-scrm-engagement';
-requirement.updatedOn = '2026-11-17';
+requirement.updatedOn = '2026-11-18';
 const connection = 'OpenWA 桥接';
 Object.assign(requirement.connectionDecision, {
   status: '已确认',
@@ -142,6 +142,13 @@ requirement.review.items.push({
   id: 'AI_HOOKS',
   title: 'AI 能力接入',
   question: 'AI 功能（目前为接收消息翻译与发送前翻译）统一经由一个接入点调用，可逐项启停，并逐次记录用量。请评审：还需要接入哪些 AI 能力、由谁管理启停、用量按什么口径统计。',
+  status: '待评审',
+  notes: '',
+});
+requirement.review.items.push({
+  id: 'ORDER_TRACKING',
+  title: '订单追踪',
+  question: '客户档案新增「订单追踪」栏：显示客户首次联系时间，以及每笔订单的下单时间与物流状态（待发货 / 已发货 / 已签收 / 异常）。订单由聊手手动登记与更新，未对接店铺或物流系统。请评审：物流状态选项是否齐全，订单还需要记录哪些信息，日后是否对接业务系统。',
   status: '待评审',
   notes: '',
 });
@@ -214,6 +221,7 @@ Object.assign(follow, {
 const customersModule = requirement.modules.find(module => module.id === 'P-CUSTOMERS');
 customersModule.features = customersModule.features.map(feature => feature === '客户阶段' ? '跟进状态' : feature);
 customersModule.features.push('客户等级（S/A/B/C/D）', '客户状态（已成交/弃单/自然线索）', '按等级与状态筛选', '导出含等级与状态');
+customersModule.features.push('订单追踪（首次联系时间、订单下单时间与物流状态，手动登记）');
 requirement.modules.find(module => module.id === 'P-TAGS').notes = '标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。';
 requirement.modules.find(module => module.id === 'P-INBOX').features.push('会话卡片显示客户标签');
 requirement.modules.find(module => module.id === 'P-INBOX').features.push('协同条的跟进状态与下次跟进可跳转到跟进闭环并定位该客户');
@@ -232,6 +240,8 @@ requirement.modules.push({
 requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。';
 requirement.modelOutline.entities.push('AiUsage');
 requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。当前提供方为本地演示，不连接外部服务。');
+requirement.modelOutline.entities.push('Order');
+requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间与物流状态（待发货 / 已发货 / 已签收 / 异常），由聊手手动登记与更新，每次变更写入互动轨迹；未对接店铺、支付或物流系统。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
 const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
 
 const index = read(__dirname, 'fidelity-index.html');

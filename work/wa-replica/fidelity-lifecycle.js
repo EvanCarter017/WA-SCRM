@@ -261,6 +261,28 @@
       data.lcSeededV06 = true;
     }
 
+    // Sample orders (seeded once) for the demo customers whose story already mentions an order. The
+    // first-contact time of c3 and c6 is moved back so that it precedes their orders.
+    if (!data.lcSeededOrders) {
+      const samples = {
+        c3: { createdAt: fidDay(-58.2), orders: [
+          { id: 'ord-c3-1', number: 'ORD-202609-031', placedAt: fidDay(-55.3), shipping: 'delivered' },
+          { id: 'ord-c3-2', number: 'ORD-202610-077', placedAt: fidDay(-27.1), shipping: 'delivered' },
+        ] },
+        c6: { createdAt: fidDay(-47.4), orders: [
+          { id: 'ord-c6-1', number: 'ORD-202610-012', placedAt: fidDay(-44.2), shipping: 'delivered' },
+        ] },
+        c11: { orders: [
+          { id: 'ord-c11-1', number: 'ORD-202611-104', placedAt: fidDay(-3.1), shipping: 'shipped' },
+        ] },
+      };
+      for (const [cid, sample] of Object.entries(samples)) {
+        const target = customer(cid);
+        if (target && !Array.isArray(target.orders)) Object.assign(target, sample);
+      }
+      data.lcSeededOrders = true;
+    }
+
     // Ensure every customer has an engagement state and safe defaults
     for (const c of data.customers) {
       lcMigrateEngagement(c);
@@ -468,11 +490,21 @@
   // ============================================================================
   // Customer 360° dossier drawer
   // ============================================================================
+  // Order tracking (the 订单追踪 tab). Orders are typed in by hand — no shop or courier system is
+  // connected — and live on the customer as c.orders: { id, number, placedAt, shipping }.
+  // The top-level orders list that saved data of the removed deals centre may still hold has another
+  // shape and is never read or written here.
+  // Shipping status: [id, label, pill tone, icon].
+  const LC_SHIPPING = [['pending', '待发货', 'warn', 'Clock3'], ['shipped', '已发货', 'info', 'Send'], ['delivered', '已签收', 'ok', 'CircleCheck'], ['problem', '异常（退回/丢件）', 'hot', 'TriangleAlert']];
+  const lcShipping = id => LC_SHIPPING.find(s => s[0] === id) || LC_SHIPPING[0];
+  // The customer's orders, newest first (a copy; write through c.orders).
+  const lcOrders = c => (Array.isArray(c?.orders) ? c.orders : []).slice().sort((a, b) => new Date(b.placedAt) - new Date(a.placedAt));
+
   profileHTML = function(c) {
     const a = account(c.account);
     const m = member(c.owner);
     const h = lcHealth(c);
-    const tab = ['overview', 'timeline', 'notes'].includes(lcState.dossierTab) ? lcState.dossierTab : 'overview';
+    const tab = ['overview', 'timeline', 'orders', 'notes'].includes(lcState.dossierTab) ? lcState.dossierTab : 'overview';
     const dirtyNote = Object.hasOwn(ui.noteDrafts, c.id);
 
     let tabBody = '';
@@ -543,7 +575,7 @@
         </div>`;
     } else if (tab === 'timeline') {
       const raw = data.activities[c.id] || [];
-      const catLabels = { all: '全部轨迹', followup: '跟进动作', inbound: '客户来信', profile: '资料与标签' };
+      const catLabels = { all: '全部轨迹', followup: '跟进动作', inbound: '客户来信', order: '订单记录', profile: '资料与标签' };
       const filtered = raw.filter(item => {
         if (lcState.timelineFilter === 'all') return true;
         const cat = item.category || (item.text.includes('跟进') ? 'followup' : 'profile');
@@ -566,6 +598,44 @@
               }).join('')
             : '<p class="muted" style="padding:18px 0;text-align:center">该分类下暂无操作轨迹</p>'}
         </div>`;
+    } else if (tab === 'orders') {
+      const orders = lcOrders(c);
+      const orderItems = orders.map(o => {
+        const [status, label, tone, glyph] = lcShipping(o.shipping);
+        return `<div class="lc-deal-item">
+          <div class="lc-deal-main">
+            <strong>${esc(o.number)} <span class="lc-pill ${tone}">${icon(glyph)}${esc(label)}</span></strong>
+            <small>下单时间 ${esc(fidDate(o.placedAt))}</small>
+          </div>
+          <div class="lc-deal-actions">
+            <label class="lc-inline-select"><span>更新状态</span><select class="fid-select" data-lc-order-shipping="${esc(o.id)}" data-customer="${esc(c.id)}" aria-label="订单 ${esc(o.number)} 的物流状态">${LC_SHIPPING.map(([id, text]) => option(id, text, status)).join('')}</select></label>
+            <button type="button" class="icon-button" data-action="lcOrderRemove" ${fidActionID(o.id)} data-customer="${esc(c.id)}" aria-label="删除订单 ${esc(o.number)}">${icon('Trash2')}</button>
+          </div>
+        </div>`;
+      }).join('');
+      tabBody = `
+        <div class="lc-card-block">
+          <div class="lc-block-head"><h3>${icon('MessageCircle')}首次联系</h3></div>
+          <div class="info-row"><span>首次联系时间</span><span><strong>${esc(fidDate(c.createdAt))}</strong></span></div>
+          <div class="info-row"><span>进线渠道</span><span>${esc(c.source || '—')}</span></div>
+        </div>
+        <div class="lc-card-block">
+          <div class="lc-block-head"><h3>${icon('ClipboardList')}订单与物流（${orders.length}）</h3></div>
+          ${orderItems ? `<div class="lc-deal-list">${orderItems}</div>` : '<p class="muted" style="font-size:12px">暂无订单。客户下单后，在下方登记订单号、下单时间与物流状态。</p>'}
+        </div>
+        <form id="lc-order-form" class="lc-card-block">
+          <input type="hidden" name="customerId" value="${esc(c.id)}">
+          <div class="lc-block-head">
+            <h3>${icon('SquarePen')}登记订单</h3>
+            <button type="submit" class="fid-btn slim blue">${icon('Plus')}添加订单</button>
+          </div>
+          <div class="lc-qual-grid">
+            <label class="lc-field"><span>订单号</span><input class="fid-input" name="number" required maxlength="40" placeholder="如 ORD-202611-105"></label>
+            <label class="lc-field"><span>下单时间</span><input class="fid-input" type="datetime-local" name="placedAt" required value="${inputDate(new Date().toISOString())}"></label>
+            <label class="lc-field full"><span>物流状态</span><select class="fid-select" name="shipping">${LC_SHIPPING.map(([id, text]) => option(id, text, 'pending')).join('')}</select></label>
+          </div>
+          <div id="form-error" class="form-error" role="alert"></div>
+        </form>`;
     } else {
       tabBody = `
         <div class="lc-card-block customer-profile" style="border:1px solid var(--fid-frame)">
@@ -618,6 +688,7 @@
         ${[
           ['overview', '画像与跟进', ''],
           ['timeline', '互动轨迹', (data.activities[c.id] || []).length],
+          ['orders', '订单追踪', lcOrders(c).length],
           ['notes', '沟通备注', ''],
         ].map(([id, label, count]) =>
           `<button type="button" role="tab" class="lc-dossier-tab ${tab === id ? 'active' : ''}" data-action="lcDossierTab" ${fidActionID(id)} data-customer="${esc(c.id)}" aria-selected="${tab === id}">${esc(label)}${count !== '' ? `<b>${count}</b>` : ''}</button>`
@@ -1177,6 +1248,21 @@
       lcState.timelineFilter = id;
       lcRefreshOpenDossier(btn?.dataset?.customer || ui.customer);
     },
+    // Order tracking tab: remove an order at once; the toast offers to put it back.
+    lcOrderRemove: (id, btn) => {
+      const c = customer(btn?.dataset?.customer);
+      const o = lcOrders(c).find(x => x.id === id);
+      if (!o || !myCustomers().includes(c)) return;
+      const apply = (orders, text) => {
+        c.orders = orders;
+        lcLog(c.id, 'order', text);
+        persist();
+        render();
+        lcRefreshOpenDossier(c.id);
+      };
+      apply(lcOrders(c).filter(x => x !== o), `删除订单记录 ${o.number}`);
+      toast(`已删除订单 ${o.number}。`, () => apply([...lcOrders(c), o], `恢复订单记录 ${o.number}`));
+    },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },
     lcSignal: id => { lcState.signal = id; render(); },
@@ -1240,6 +1326,24 @@
       render();
       openProfile(c.id, 'overview');
       toast('客户需求画像已保存并写入轨迹。');
+    },
+
+    'lc-order-form': (f, v) => {
+      const c = customer(v('customerId'));
+      if (!c || !myCustomers().includes(c)) return;
+      const number = v('number');
+      const placed = new Date(v('placedAt'));
+      if (!number) return error('请填写订单号。');
+      if (Number.isNaN(placed.getTime())) return error('请填写有效的下单时间。');
+      if (placed.getTime() > Date.now()) return error('下单时间不能晚于当前时间。');
+      if (lcOrders(c).some(o => o.number === number)) return error(`该客户已登记订单号 ${number}。`);
+      const shipping = lcShipping(v('shipping'));
+      c.orders = [{ id: nextId('ord'), number, placedAt: placed.toISOString(), shipping: shipping[0] }, ...lcOrders(c)];
+      lcLog(c.id, 'order', `登记订单 ${number}（下单时间 ${fidDate(placed.toISOString())}，物流状态：${shipping[1]}）`);
+      persist();
+      render();
+      lcRefreshOpenDossier(c.id);
+      toast(`订单 ${number} 已登记。`);
     },
 
     'lc-followup-form': (f, v) => {
@@ -1412,7 +1516,7 @@
     lcWrapRender();
   };
 
-  // Field toggles of the completion dialog, and the tier / status drop-downs
+  // Field toggles of the completion dialog, the tier / status drop-downs, and the shipping-status drop-downs of the orders tab
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'lc-complete-next') {
@@ -1440,6 +1544,20 @@
         lcLog(c.id, 'profile', `客户状态：${before} → ${lcCustomerStatusLabel(c)}`);
         toast(`已将 ${c.name} 的客户状态设为「${lcCustomerStatusLabel(c)}」。`);
       }
+      persist();
+      render();
+      lcRefreshOpenDossier(c.id);
+    }
+    if (t.dataset.lcOrderShipping) {
+      const c = customer(t.dataset.customer);
+      const o = lcOrders(c).find(x => x.id === t.dataset.lcOrderShipping);
+      if (!o || !myCustomers().includes(c)) return;
+      const next = lcShipping(t.value);
+      const before = lcShipping(o.shipping);
+      if (next[0] === before[0]) return;
+      o.shipping = next[0];
+      lcLog(c.id, 'order', `订单 ${o.number} 物流状态：${before[1]} → ${next[1]}`);
+      toast(`订单 ${o.number} 的物流状态已更新为「${next[1]}」。`);
       persist();
       render();
       lcRefreshOpenDossier(c.id);

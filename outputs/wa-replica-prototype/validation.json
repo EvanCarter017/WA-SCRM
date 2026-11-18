@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-17T20:04:26.276Z",
+  "checkedAt": "2026-11-18T09:45:18.252Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -44,5 +44,6 @@
   "aiProvider": "local demo (prepared sample results)",
   "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
   "chatStripFollowLink": "status and next-follow-up labels open the follow-up centre on the customer row",
+  "orderTracking": "profile tab: first contact, orders entered by hand, shipping status pending / shipped / delivered / problem",
   "externalNetworkCalls": false
 }

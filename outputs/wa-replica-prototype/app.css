@@ -2768,3 +2768,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-table tbody tr.lc-row-focus td:first-child {
   box-shadow: inset var(--fid-px-3) 0 0 var(--fid-royal);
 }
+
+/* Order entries in the interaction timeline of the customer profile (plan 010) */
+.lc-timeline-item.cat-order {
+  border-left-color: var(--fid-mint);
+}

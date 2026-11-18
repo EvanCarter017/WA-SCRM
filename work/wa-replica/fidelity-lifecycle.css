@@ -1626,3 +1626,8 @@
 .fid-table tbody tr.lc-row-focus td:first-child {
   box-shadow: inset 3px 0 0 var(--fid-royal);
 }
+
+/* Order entries in the interaction timeline of the customer profile (plan 010) */
+.lc-timeline-item.cat-order {
+  border-left-color: var(--fid-mint);
+}
