@@ -366,7 +366,7 @@
 
   toolsRailHTML = function(c) {
     const t=(label,action,glyph,needs=false)=>`<button class="icon-button" data-action="${action}" ${fidActionID(c?.id||'')} aria-label="${label}" ${needs&&!c?'disabled':''}>${icon(glyph)}</button>`;
-    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('翻译设置','translation','Languages')}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新演示视图','refreshUI','RefreshCw')}${t('权限说明','fidChatPermissions','ShieldCheck')}</aside>`;
+    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新演示视图','refreshUI','RefreshCw')}${t('权限说明','fidChatPermissions','ShieldCheck')}</aside>`;
   };
   const fidOldFillQuick=fillQuick;
   fillQuick = function(id) {

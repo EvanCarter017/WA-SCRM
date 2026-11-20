@@ -85,6 +85,13 @@ swap(
   '',
 );
 swap("if(t.id==='receive-translation'){ui.receiveTranslation=t.checked;persist();if(ui.view==='inbox'){const c=selectedCustomer();$('#messages').innerHTML=messagesHTML(c);paintIcons($('#messages'))}", "if(t.id==='receive-translation'){ui.receiveTranslation=t.checked;persist();if(ui.view==='inbox'&&$('#messages')){const c=selectedCustomer();$('#messages').innerHTML=messagesHTML(c);paintIcons($('#messages'))}");
+// The translation settings were removed on 2026-11-20: the entries in the baseline's tool rail and
+// narrow-screen tools menu, the action and its dialog. Sample translations themselves are not affected.
+swap(`<button class="icon-button" data-action="translation" aria-label="翻译设置">'+icon('Languages')+'</button>`, '');
+swap(`<button data-action="translation">'+icon('Languages')+'翻译设置</button>`, '');
+swap("      case 'translation':openTranslation();break;\n", '');
+js = js.replace(/^  function openTranslation\(\)\{[^\n]*\}\n/m, '');
+assert(!js.includes('openTranslation') && !js.includes('data-action="translation"'), 'the translation settings must be gone from the baseline');
 swap('实际接入方式待确认，本轮不会连接 WhatsApp。', '在「号码管理」可体验 OpenWA 扫码绑定。');
 swap("      case 'connect':openConnect(id);break;\n      case 'simulateConnect':{const a=account(id);a.state='online';a.lastSync='刚刚';persist();close();render();toast('已模拟恢复在线；没有连接真实 WhatsApp。');break}\n", '');
 js = js.replace(/^  function openConnect\(id\)\{[^\n]*\}\n/m, '');
@@ -107,7 +114,7 @@ new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
 requirement.version = '0.8-scrm-engagement';
-requirement.updatedOn = '2026-11-18';
+requirement.updatedOn = '2026-11-20';
 const connection = 'OpenWA 桥接';
 Object.assign(requirement.connectionDecision, {
   status: '已确认',
@@ -237,7 +244,7 @@ requirement.modules.push({
   originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','本地演示提供方'],
   notes:'当前不连接外部服务；用量记录仅作计量留存，本轮不含商业化内容。',
 });
-requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。';
+requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，是否产生译文在「AI 能力」页启停。';
 requirement.modelOutline.entities.push('AiUsage');
 requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。当前提供方为本地演示，不连接外部服务。');
 requirement.modelOutline.entities.push('Order');

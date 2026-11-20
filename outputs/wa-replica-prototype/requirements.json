@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "project": "WhatsApp 内部客户工作台",
   "version": "0.8-scrm-engagement",
-  "updatedOn": "2026-11-18",
+  "updatedOn": "2026-11-20",
   "phase": "interactive-prototype-review",
   "language": "zh-CN",
   "sourceInventory": "../chm123-complete-modules.json",
@@ -370,7 +370,7 @@
         "示例话术",
         "发送前语言提示"
       ],
-      "notes": "翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。"
+      "notes": "翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，是否产生译文在「AI 能力」页启停。"
     },
     {
       "id": "P-WALLET",

@@ -1142,7 +1142,6 @@
       ${t('安排客户跟进', 'followup', 'CalendarPlus', true)}
       ${t('客户标签', 'assignTags', 'Tags', true)}
       ${t('客户沟通备注', 'profileNote', 'StickyNote', true)}
-      ${t('翻译设置', 'translation', 'Languages')}
       <span class="tool-separator"></span>
       ${t('刷新视图', 'refreshUI', 'RefreshCw')}
       ${t('权限说明', 'fidChatPermissions', 'ShieldCheck')}

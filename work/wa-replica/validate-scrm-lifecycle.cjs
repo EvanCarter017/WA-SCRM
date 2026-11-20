@@ -153,6 +153,16 @@ assert(customersRecord.features.some(f => f.startsWith('订单追踪')), 'P-CUST
 assert(req.review.items.some(i => i.id === 'ORDER_TRACKING'));
 assert.equal(req.modules.find(m => m.id === 'P-ORDERS')?.decision, '待定', 'connecting a business system stays undecided');
 
+// 14. The translation settings (entry points, action, dialog) were removed from the chat screen on 2026-11-20
+const indexHtml = read(path.join(out, 'index.html'));
+for (const removed of ['openTranslation', 'data-action="translation"', '翻译与发送偏好', 'id="receive-translation"']) {
+  assert(!appJs.includes(removed), `app.js still contains the translation settings (${removed})`);
+}
+assert(!indexHtml.includes('data-action="translation"') && !indexHtml.includes('fid-header-lang'), 'the top bar must not offer the translation settings');
+assert(!moduleSource.includes("'translation'") && !read(path.join(__dirname, 'fidelity-ui.js')).includes("'translation'"), 'no tool rail may offer the translation settings');
+assert(aiSource.includes('ui.receiveTranslation = true;'), 'translations of incoming messages must always be shown now that their display switch is gone');
+assert(appJs.includes('fid-record-translation'), 'the chat-history page keeps its own translation switch');
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -172,6 +182,7 @@ const summary = {
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
   orderTracking: 'profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer',
+  translationSettings: 'removed from the chat screen (tool rail, top bar, narrow-screen menu, dialog); sample translations stay and are always shown, switched per capability on the AI page',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

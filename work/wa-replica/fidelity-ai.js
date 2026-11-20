@@ -15,6 +15,11 @@
   const AI_USAGE_KEPT = 200;
   const AI_USAGE_SHOWN = 20;
 
+  // The translation settings dialog held the only switch for showing translations below incoming messages
+  // and was removed on 2026-11-20. A translation a message carries is now always shown; whether new
+  // messages get one is decided by the switch of the capability translate.inbound on the AI page.
+  ui.receiveTranslation = true;
+
   function aiSettings() {
     const settings = (data.ai ??= { provider: 'demo', enabled: {}, totals: {}, usage: [] });
     for (const { id } of AI_CAPABILITIES) {
