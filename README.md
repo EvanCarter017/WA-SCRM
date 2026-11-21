@@ -24,11 +24,19 @@ WA_SCRM_AI_ENV=/path/to/private/ai.env node work/wa-replica/serve.cjs
 ```
 未设置该变量、文件不完整，或以方式 A 打开单文件时，没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
+#### 服务器端账号与数据（可选；页面尚未接入）
+预览服务可以保存账号和一个子站的数据。把环境变量 `WA_SCRM_DATA_DIR` 指向**仓库以外**的私有目录后，服务提供登录接口（`/api/auth/*`）与数据接口（`/api/data`），AI 中转接口同时改为只对已登录用户开放。这部分需要 Node 22.13 或更新版本（使用内置 SQLite）。账号用管理工具创建：
+```bash
+WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
+```
+工具只显示一次临时密码，持有人首次登录后必须修改。子站编号由 `WA_SCRM_SITE_ID` 指定（默认 `default`）。未设置 `WA_SCRM_DATA_DIR` 时以上接口关闭，页面仍把数据保存在浏览器中；页面改为使用这些接口是下一步工作（见 `plans/`）。
+
 ### 重新编译与完整性校验
 ```bash
 node work/wa-replica/build-fidelity.cjs
 node work/wa-replica/validate-scrm-lifecycle.cjs
 node --test work/wa-replica/ai-relay.test.cjs   # AI 中转接口的测试（使用本地替身，不调用真实服务）
+node --test work/wa-replica/site-api.test.cjs   # 账号、会话与数据接口的测试（需要 Node 22.13 或更新版本）
 ```
 
 ---
@@ -95,10 +103,13 @@ flowchart LR
 │       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务）及其测试
 │       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
+│       ├── site-auth.cjs / site-data.cjs              # 账号与登录会话；子站数据文档（内置 SQLite）
+│       ├── site-api.cjs / site-api.test.cjs           # 登录与数据接口及其测试
+│       ├── site-admin.cjs                             # 账号与数据管理工具（在服务器上运行）
 │       ├── fidelity-ui.js / fidelity-customer-pages.js# 列表、标签、标签统计与聊天记录归档视图
 │       ├── fidelity-operations.js / fidelity-subsite.js# 素材管理与聊手子站登录态控制
 │       ├── build-fidelity.cjs                         # 零外部依赖构建打包器
-│       ├── serve.cjs                                  # 本地静态预览与 AI 中转服务
+│       ├── serve.cjs                                  # 预览服务：页面、AI 中转，以及可选的账号与数据接口
 │       └── validate-scrm-lifecycle.cjs                # 离线产物无外呼与语法完整性自动校验
 └── replica/                                           # 界面勘察说明、对比验证与测试记录
 ```

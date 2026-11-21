@@ -175,7 +175,7 @@ for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' 
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
 assert(!/console\.(log|error)\([^\n]*(config\.key|\.text\b(?!\.length)|input\b)/.test(relaySource), 'the relay must not log the key or message text');
-assert(serveSource.includes("if (pathname.startsWith('/api/ai/')) await aiRelay.handle(req, res, pathname);"), 'the preview server must route /api/ai/* to the relay');
+assert(serveSource.includes("pathname.startsWith('/api/ai/')") && serveSource.includes('await aiRelay.handle(req, res, pathname);'), 'the preview server must route /api/ai/* to the relay');
 assert(fs.existsSync(path.join(__dirname, 'ai-relay.test.cjs')) && fs.existsSync(path.join(__dirname, 'ai.env.example')), 'the relay needs its tests and its example settings file');
 assert(!/AI_API_KEY=\S/.test(read(path.join(__dirname, 'ai.env.example'))), 'the example settings file must not contain a key');
 assert(!appJs.includes('中文译文</span>') && !appJs.includes('示例译文'), 'translation labels must not claim a fixed language or a sample');
@@ -212,6 +212,24 @@ for (const source of [moduleSource, openwaSource]) {
   assert(!/aiTranslateInbound\([^()]*,[^()]*,[^()]*\)/.test(source), 'callers must not hand a prepared translation to the AI module');
 }
 
+// 19. Server side of a sub-site: accounts, sessions and data behind WA_SCRM_DATA_DIR; the relay behind sign-in
+const siteSources = Object.fromEntries(['site-auth.cjs', 'site-data.cjs', 'site-api.cjs', 'site-admin.cjs', 'site-api.test.cjs'].map(name => [name, read(path.join(__dirname, name))]));
+for (const required of ['crypto.scrypt(', 'crypto.timingSafeEqual(', "crypto.createHash('sha256')", 'const LOCK_AFTER = 5;']) {
+  assert(siteSources['site-auth.cjs'].includes(required), `site-auth.cjs is missing ${required}`);
+}
+for (const required of ["if (baseVersion !== current) throw problem('version-conflict', { version: current });", "db.exec('BEGIN IMMEDIATE');"]) {
+  assert(siteSources['site-data.cjs'].includes(required), `site-data.cjs is missing ${required}`);
+}
+for (const required of ['Path=/; HttpOnly; SameSite=Lax;', "req.headers['sec-fetch-site'] === 'cross-site'", "if (!mayWrite(user)) throw problem('read-only');"]) {
+  assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
+}
+for (const [name, source] of Object.entries(siteSources)) {
+  if (name.endsWith('.test.cjs')) continue;
+  assert(!/console\.(log|error)\([^\n]*\$\{[^}]*(password|token|body|json)\b/i.test(source.replace(/temporary password: \$\{password\}/g, '')), `${name} must not log a password, a token or data`);
+}
+assert(serveSource.includes("if (site && !site.allows(req)) {") && serveSource.includes('process.env.WA_SCRM_DATA_DIR'), 'the preview server must put the relay behind sign-in when it keeps accounts');
+assert(!/\b(localhost|127\.0\.0\.1):\d+\/api\/(auth|data)/.test(appJs), 'the page does not use the account and data routes yet');
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -235,6 +253,7 @@ const summary = {
   orderTracking: 'profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer',
   translationSettings: 'removed from the chat screen (tool rail, top bar, narrow-screen menu, dialog); sample translations stay and are always shown, switched per capability on the AI page',
   reviewerTools: 'removed: review panel and its two buttons, requirements page and export, element notes tool and its server endpoint; requirements.json stays as a build-time record',
+  serverSide: 'optional, behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only; the page still keeps its data in the browser',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');
