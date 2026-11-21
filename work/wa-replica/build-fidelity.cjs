@@ -115,6 +115,25 @@ const lifecyclePages = read(__dirname, 'fidelity-lifecycle.js');
 const aiPages = read(__dirname, 'fidelity-ai.js');
 const subsiteSession = read(__dirname, 'fidelity-subsite.js');
 swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, aiPages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
+// Reviewer tools removed (plan 019): the review panel, the requirements page with its export, and the notes
+// tool. The app no longer loads the requirement records; they remain a build-time record in requirements.json.
+const cut = (pattern, what) => { const next = js.replace(pattern, ''); assert(next !== js, 'Missing reviewer-tool code: ' + what); js = next; };
+cut(/^  let req=clone\(window\.WA_REQUIREMENTS\);\n[\s\S]*?item\.notes=previous\.notes\}\}\}\n/m, 'loading of the requirement records');
+swap('{version:6,data,requirements:req,', '{version:6,data,');
+swap("$('#pending-count').textContent=req.modules.filter(m=>m.decision==='待定').length;$('.scope-link').classList.toggle('active',ui.view==='scope');", '');
+cut(/^    \$\('#app-shell'\)\.dataset\.reviewPerspective=[^\n]*\n/m, 'review perspective');
+cut(/^    const reviewed=req\.review\.items[^\n]*\n/m, 'review counter');
+swap("ai:'AI 能力',scope:'功能范围'}", "ai:'AI 能力'}");
+swap('ai:renderAiPage,scope:renderScope}', 'ai:renderAiPage}');
+cut(/^  function scopeCard\(m\) \{\n[\s\S]*?^  function renderScope\(\) \{\n[\s\S]*?^  \}\n/m, 'requirements page');
+cut(/^  function openReview\(\)\{[^\n]*\}\n/m, 'review panel');
+cut(/^  function exportReq\(\)\{[^\n]*\}\n/m, 'requirements export');
+swap("      case 'review':openReview();break;\n      case 'reviewDone':persist();renderNav();paintIcons();close();toast('评审备注已保存在本机，可导出后继续迭代。');break;\n      case 'export':exportReq();break;\n", '');
+cut(/^    if\(t\.dataset\.reviewNote\)[^\n]*\n    if\(t\.dataset\.scopeNotes\)[^\n]*\n/m, 'note handlers');
+cut(/^    if\(t\.dataset\.reviewStatus\)[^\n]*\n    if\(t\.dataset\.scopeDecision\)[^\n]*\n/m, 'status handlers');
+swap('<br><button class="link" data-action="review">记录评审意见</button>', '');
+swap('  window.initWAElementReview(toast);\n', '');
+assert(!/\breq\b|WA_REQUIREMENTS|openReview|renderScope|scopeCard|exportReq|data-action="review"|data-action="export"|initWAElementReview/.test(js), 'the reviewer tools must be gone from the app');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
@@ -254,7 +273,6 @@ requirement.modelOutline.entities.push('AiUsage');
 requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。提供方有两种：服务器中转（页面只调用本站服务器的 /api/ai 接口，由服务器携带密钥调用模型服务）与本地演示（服务器未配置或页面以文件方式打开时使用）。');
 requirement.modelOutline.entities.push('Order');
 requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后推进按钮只能沿「待发货 → 已发货 → 已签收」逐步前进，或在签收前转为「异常」，已签收与异常之后不再有推进。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录，订单号旁显示下单时间。「撤销上一步」随时移除最新一条物流记录并回到上一个状态，已签收与异常同样可撤回；第一条记录不可撤回，删除订单才会移除。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
-const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
 
 const index = read(__dirname, 'fidelity-index.html');
 let lucideIcons = null;
@@ -290,8 +308,7 @@ const assets = {
   'index.html':index,'app.js':js,'app.css':read(base,'app.css')+'\n'+fidelityCSS,
   'tokens.css':tokenCSS,'components.css':read(base,'components.css'),
   'demo-data.js':read(base,'demo-data.js'),'icons.js':iconJS,
-  'element-review.js':read(__dirname,'review-prompt-format.js')+'\n'+read(__dirname,'element-review.js'),
-  'lucide-license.txt':read(base,'lucide-license.txt'),'requirements-data.js':requirementJS,
+  'lucide-license.txt':read(base,'lucide-license.txt'),
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };
 let standalone=index.replace('<head>',()=>'<head>\n<!-- Lucide license\n'+assets['lucide-license.txt'].replaceAll('-->','-- >')+'\n-->');

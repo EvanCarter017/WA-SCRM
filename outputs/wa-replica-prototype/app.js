@@ -4,14 +4,7 @@
   const clone=x=>JSON.parse(JSON.stringify(x));
   let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}
   let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
-  let req=clone(window.WA_REQUIREMENTS);
-  if(saved?.requirements){for(const module of req.modules){const previous=saved.requirements.modules?.find(x=>x.id===module.id);if(previous){
-      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。','P-CHAT-REVIEW':'快照与实时会话相互独立；正式版由主管在主站质检，原型开放操作以便评审。'};
-      const revisedScope=Object.hasOwn(previousDefaultNotes,module.id)&&previous.basis!==module.basis;
-      if(!revisedScope)module.decision=previous.decision;
-      if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
-    }}for(const item of req.review.items){const previous=saved.requirements.review?.items?.find(x=>x.id===item.id);if(previous){item.status=previous.status;item.notes=previous.notes}}}
-  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
+  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
   const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');
   const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:'c1',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
@@ -63,7 +56,7 @@
   const unreadCount=()=>myCustomers().reduce((n,c)=>n+c.unread,0);
   const pendingTasks=()=>myTasks().filter(t=>!t.done);
   const draft=c=>ui.drafts[c.id]||{text:'',translated:'',source:''};
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,requirements:req,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
   function toast(message,undo=null) {
     const box=$('#toast'),host=$('#dialog').open?$('#dialog'):document.body;if(box.parentElement!==host)host.append(box);box.dataset.dismissOnClose=undo&&$('#dialog').open?'1':'';box.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.textContent='撤销';button.addEventListener('click',()=>{undo();box.classList.remove('show')},{once:true});box.append(button)}
@@ -79,10 +72,8 @@
   function renderNav() {
     const allowed=Object.keys(views).filter(id=>!['team','members'].includes(id)||manager());ui.openTabs=ui.openTabs.filter(id=>allowed.includes(id));if(!ui.openTabs.includes(ui.view))ui.openTabs.push(ui.view);
     $('#app-shell').classList.toggle('nav-collapsed',ui.navCollapsed);
-    $('#nav').innerHTML=menuHTML();$('#pending-count').textContent=req.modules.filter(m=>m.decision==='待定').length;$('.scope-link').classList.toggle('active',ui.view==='scope');
-    $('#app-shell').dataset.reviewPerspective='聊手 · '+me().name;
+    $('#nav').innerHTML=menuHTML();
     $('#header-tasks').textContent=pendingTasks().length;$('#header-tasks').hidden=!pendingTasks().length;
-    const reviewed=req.review.items.filter(i=>i.notes||i.status!=='待评审').length;$('#review-count').textContent=reviewed;$('#review-count').hidden=!reviewed;
     $('#workspace-tabs').innerHTML=ui.openTabs.map(id=>'<div class="workspace-tab '+(id===ui.view?'active':'')+'"><a href="#'+id+'" data-nav="'+id+'"'+(id===ui.view?' aria-current="page"':'')+'>'+icon(viewIcon(id))+'<span>'+views[id]+'</span></a>'+(id==='inbox'||id==='dashboard'||id!==ui.view?'':'<button class="icon-button" aria-label="关闭'+views[id]+'页签" data-action="closeTab" data-id="'+id+'">'+icon('X')+'</button>')+'</div>').join('');
     const collapse=$('.collapse-button');collapse.setAttribute('aria-label',ui.navCollapsed?'展开菜单':'折叠菜单');collapse.innerHTML=icon(ui.navCollapsed?'PanelLeftOpen':'PanelLeftClose')+'<span class="nav-label">'+(ui.navCollapsed?'展开':'收起')+'</span>';
     if(location.hash!=='#'+ui.view)history.replaceState(null,'','#'+ui.view);persist();
@@ -91,7 +82,7 @@
     if(!renderSignInState())return;
     const active=document.activeElement,action=active?.dataset?.action,actionId=active?.dataset?.id,activeId=active?.id,stage=active?.dataset?.stage,nav=active?.dataset?.nav;
     const old=$('#messages'),position=old?{customer:old.dataset.customer,top:old.scrollTop,bottom:old.scrollHeight-old.clientHeight-old.scrollTop}:null;
-    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope};
+    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage};
     $('#view').innerHTML=pages[ui.view]();paintIcons();
     if(ui.view==='inbox')requestAnimationFrame(()=>{const el=$('#messages');if(el)el.scrollTop=position&&position.customer===el.dataset.customer&&position.bottom>40?position.top:el.scrollHeight});
     let target=activeId?document.getElementById(activeId):null;
@@ -128,7 +119,7 @@
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
   function profileHTML(c,drawer=false) {
     const m=member(c.owner),a=account(c.account),task=data.tasks.filter(t=>t.customer===c.id&&!t.done).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],dirty=Object.hasOwn(ui.noteDrafts,c.id);
-    const details='<section class="profile-section"><h3>客户标签<button class="link" data-action="assignTags" data-id="'+c.id+'">'+icon('Plus')+'添加</button></h3><div class="tag-row">'+(tagsHTML(c,99,true)||'<span class="muted">还没有标签</span>')+'</div></section><section class="profile-section"><h3>客户归属'+(manager()?'<button class="link" data-action="transfer" data-id="'+c.id+'">转交</button>':'')+'</h3><div class="info-row"><span>负责人</span><span class="small-avatar">'+avatar(m||{name:'未分配'},'small')+esc(m?.name||'未分配')+'</span></div><div class="info-row"><span>聊天账号</span><span>'+esc(a?.name)+'</span></div>'+(c.contactRefs.length>1?'<button class="duplicate-note" data-action="duplicate" data-id="'+c.id+'">'+icon('Copy')+'另有 '+(c.contactRefs.length-1)+' 个账号接触记录'+icon('ChevronRight')+'</button>':'')+'</section><section class="profile-section"><h3>来源信息<span class="sample-label">演示</span></h3><div class="profile-origin">'+icon('Target')+esc(c.source)+'</div><div class="origin-details">'+esc(c.campaign||'未关联广告活动')+'<br>'+esc(c.ad||'来源详情待补充')+'</div></section><div class="profile-permission">归属及可见范围为待确认方案。<br><button class="link" data-action="review">记录评审意见</button></div>';
+    const details='<section class="profile-section"><h3>客户标签<button class="link" data-action="assignTags" data-id="'+c.id+'">'+icon('Plus')+'添加</button></h3><div class="tag-row">'+(tagsHTML(c,99,true)||'<span class="muted">还没有标签</span>')+'</div></section><section class="profile-section"><h3>客户归属'+(manager()?'<button class="link" data-action="transfer" data-id="'+c.id+'">转交</button>':'')+'</h3><div class="info-row"><span>负责人</span><span class="small-avatar">'+avatar(m||{name:'未分配'},'small')+esc(m?.name||'未分配')+'</span></div><div class="info-row"><span>聊天账号</span><span>'+esc(a?.name)+'</span></div>'+(c.contactRefs.length>1?'<button class="duplicate-note" data-action="duplicate" data-id="'+c.id+'">'+icon('Copy')+'另有 '+(c.contactRefs.length-1)+' 个账号接触记录'+icon('ChevronRight')+'</button>':'')+'</section><section class="profile-section"><h3>来源信息<span class="sample-label">演示</span></h3><div class="profile-origin">'+icon('Target')+esc(c.source)+'</div><div class="origin-details">'+esc(c.campaign||'未关联广告活动')+'<br>'+esc(c.ad||'来源详情待补充')+'</div></section><div class="profile-permission">归属及可见范围为待确认方案。</div>';
     const activity=(data.activities[c.id]||[]).map(item=>'<div class="activity">'+esc(item.text)+'<small>'+esc(item.by)+' · '+esc(item.time)+'</small></div>').join('')||empty('还没有跟进记录','更新标签、备注或安排跟进后会显示在这里。');
     const notes='<textarea class="profile-note" data-note-customer="'+c.id+'" id="customer-note-'+c.id+(drawer?'-drawer':'')+'" aria-label="客户备注" placeholder="记下客户需求或下一步计划…">'+esc(dirty?ui.noteDrafts[c.id]:c.notes)+'</textarea><div class="note-save"><span role="status">'+(dirty?'未保存的修改':'已保存到本机')+'</span><button class="button small" data-action="saveNote" data-id="'+c.id+'">保存备注</button></div>';
     return '<aside class="customer-profile'+(drawer?' in-drawer':'')+'" aria-label="客户资料"><div class="profile-head"><span>客户资料</span><button class="icon-button" '+(drawer?'data-action="close" aria-label="关闭客户资料"':'data-action="toggleProfile" aria-label="收起客户资料"')+'>'+icon('X')+'</button></div><div class="profile-top"><div class="profile-topline">'+avatar(c,'large')+'<div><h2>'+esc(c.name)+'</h2><p>'+esc(c.phone)+'</p></div></div><div class="profile-location"><span>'+esc(country(c))+'，'+esc(c.city)+'</span><span>当地 '+esc(localTime(c))+'</span></div></div><div class="profile-stage"><span>客户阶段</span><select data-stage="'+c.id+'" aria-label="客户阶段">'+['新客户','跟进中','已报价','已成交','培育中'].map(s=>option(s,s,c.stage)).join('')+'</select></div><section class="profile-next"><div class="profile-next-title"><strong>下一步跟进</strong><button class="icon-button" aria-label="新增跟进" data-action="followup" data-id="'+c.id+'">'+icon('Plus')+'</button></div>'+(task?'<div class="followup-card"><strong>'+esc(task.title)+'</strong><span class="due '+(beforeToday(task.due)?'overdue':'')+'">'+icon('Clock3')+dateLabel(task.due)+(beforeToday(task.due)?' · 已逾期':'')+'</span><button class="link" aria-label="完成此跟进" data-action="taskDone" data-id="'+task.id+'">'+icon('CircleCheck')+'</button></div>':'<button class="button small full" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button>')+'</section><div class="profile-tabs" role="group" aria-label="客户资料内容">'+[['details','资料'],['activity','记录'],['notes','备注']].map(([id,title])=>'<button class="profile-tab '+(ui.profileTab===id?'active':'')+'" data-action="profileTab" data-id="'+id+'" data-customer="'+c.id+'" aria-pressed="'+(ui.profileTab===id)+'">'+title+'</button>').join('')+'</div><div class="profile-content">'+(ui.profileTab==='notes'?notes:ui.profileTab==='activity'?activity:details)+'</div></aside>';
@@ -158,13 +149,6 @@
   function renderTeam(){if(!manager())return '<div class="view-empty"><div><h2>团队管理在主站</h2><p>子站显示当前聊手的工作范围。</p></div></div>';return '<section class="section-page">'+pageHeader('TEAM & ACCESS','团队与权限','先明确谁管理账号、谁负责客户，再决定团队数据如何共享。','<button class="button primary" data-action="addMember">'+icon('UserRoundPlus')+'新增成员</button>')+'<div class="role-count"><strong>'+data.members.length+'</strong> 位演示成员 <span style="margin:0 12px;color:#cad8bf">/</span> '+data.accounts.length+' 个账号 · '+data.customers.length+' 位客户</div><div class="page-panel"><div class="panel-header"><div><h2>团队成员</h2><p>人数、角色和账号分配均可继续扩展</p></div><span class="tag slate">权限方案待确认</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>团队</th><th>角色</th><th>负责账号</th><th>客户</th><th>待跟进</th><th>操作</th></tr></thead><tbody>'+data.members.map(m=>'<tr><td><div class="customer-cell">'+avatar(m,'small')+'<strong>'+esc(m.name)+'</strong></div></td><td>'+esc(m.team)+'</td><td><span class="tag '+(m.role==='manager'?'purple':'jade')+'">'+(m.role==='manager'?'主管':'聊手')+'</span></td><td>'+data.accounts.filter(a=>a.owner===m.id).length+'</td><td>'+data.customers.filter(c=>c.owner===m.id).length+'</td><td>'+data.tasks.filter(t=>t.owner===m.id&&!t.done).length+'</td><td><button class="link" data-action="memberAccounts" data-id="'+m.id+'">分配账号</button></td></tr>').join('')+'</tbody></table></div></div><div class="permission-grid"><section class="permission-card"><h3>'+icon('UserRound')+'聊手 <span class="tag jade">我的工作空间</span></h3><ul><li>使用获分配的 WhatsApp 账号</li><li>查看、标记并跟进自己负责的客户</li><li>使用公共标签，维护自己的个人标签</li><li>主管可见范围与转交规则需你确认</li></ul></section><section class="permission-card"><h3>'+icon('ShieldCheck')+'主管 <span class="tag purple">团队工作空间</span></h3><ul><li>查看团队账号、客户与待办</li><li>维护公共标签，分配账号和转交客户</li><li>成员与角色可在后续扩展</li><li>此页是权限方案评审，不代表已实现真实鉴权</li></ul></section></div><p class="team-section-note">“客户属于聊手还是团队”“账号转移后历史归谁”“离职交接如何处理”仍待确认。当前只是可操作的默认方案。</p></section>'}
   const scopeDescriptions={
     'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与审核。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
-  function scopeCard(m) {
-    const choices=['首轮原型','保留','魔改','待定','本轮不展示'];
-    return '<article class="scope-card"><h3>'+esc(m.name)+'<span class="tag '+(m.decision==='待定'?'gold':m.decision==='本轮不展示'?'slate':'jade')+'">'+esc(m.decision)+'</span></h3><p>'+esc(scopeDescriptions[m.id]||m.explanation||m.notes)+(m.id==='P-WALLET'?'<br>原站解析时标注客户端检测仍在开发。':'')+'</p><div class="scope-form"><select data-scope-decision="'+m.id+'" aria-label="'+esc(m.name)+'范围选择">'+choices.map(x=>option(x,x,m.decision)).join('')+'</select></div><textarea class="scope-notes" data-scope-notes="'+m.id+'" aria-label="'+esc(m.name)+'修改意见" placeholder="写下需要保留、去掉或魔改的细节…">'+esc(m.notes)+'</textarea><div class="scope-source">原清单关联：'+esc(m.originalIds.join('、')||'新增业务需求')+'</div></article>';
-  }
-  function renderScope() {
-    return '<section class="section-page">'+pageHeader('','本轮功能范围','确定保留、魔改与暂不需要的模块，记录下一轮修改方向。','<button class="button" data-action="review">'+icon('MessageSquareText')+'布局评审</button><button class="button primary" data-action="export">'+icon('Download')+'导出需求 JSON</button>')+'<div class="scope-intro">'+icon('Info')+'<div><strong>已明确：WhatsApp 聚合、多聊手各自管理账号、客户和标签，内部自用。</strong><br>当前为聊手子站。客户归属规则仍待评审。此处记录你的判断，原始325项模块清单保持不变。</div></div>'+[['本轮呈现的工作流',req.modules.filter(m=>m.screens.length&&m.id!=='P-ATTRIBUTION')],['等待判断的模块',req.modules.filter(m=>!m.screens.length&&!["P-COMMERCIAL","P-TEAM","P-AUTO","P-REPLY-MANAGEMENT","P-BROADCAST","P-LIFECYCLE","P-PIPELINES","P-DEALS"].includes(m.id)||m.id==='P-ATTRIBUTION')],['内部使用的范围调整',req.modules.filter(m=>["P-COMMERCIAL","P-TEAM","P-AUTO","P-REPLY-MANAGEMENT","P-BROADCAST","P-LIFECYCLE","P-PIPELINES","P-DEALS"].includes(m.id))]].map(([name,list])=>'<div class="scope-section"><h2>'+name+'</h2><span>'+list.length+' 项</span></div><div class="scope-grid">'+list.map(scopeCard).join('')+'</div>').join('')+'<div class="reset-note"><span>演示操作和评审意见保存在当前浏览器。导出 JSON 后可交给下一轮迭代。</span><button class="link" data-action="resetDemo">恢复演示数据</button></div></section>';
-  }
   function modal(title,body,footer='',options={}) {
     const dlg=$('#dialog');if(dlg.open)dlg.close();dlg.className=options.drawer?'drawer':options.wide?'wide':'';dlg.setAttribute('aria-label',title);
     $('#dialog-content').innerHTML='<div class="modal-head"><h2>'+esc(title)+'</h2><button class="icon-button" data-action="close" aria-label="关闭弹窗">'+icon('X')+'</button></div>'+body+(footer?'<div class="modal-footer">'+footer+'</div>':'');paintIcons(dlg);dlg.showModal();
@@ -190,7 +174,6 @@
   function openTransfer(ids){if(!manager())return;const list=ids.map(customer).filter(Boolean);if(!list.length)return toast('请先选择客户。');formModal('转交客户','transfer-form','<input name="ids" type="hidden" value="'+list.map(c=>c.id).join(',')+'"><p class="modal-description">把 '+list.map(c=>esc(c.name)).join('、')+' 转给新的负责人。这个演示只改变客户与未完成跟进的负责人，不移动账号。</p><label class="field">接收成员<select name="owner">'+data.members.filter(m=>m.role==='agent').map(m=>option(m.id,m.name+(m.id===list[0].owner?'（当前负责人）':''),'')).join('')+'</select></label><label class="field" style="margin-top:18px">交接说明<textarea name="reason" placeholder="写明客户现状与下一步事项"></textarea></label><p class="transfer-note">转交后的消息访问、历史档案、个人标签和账号授权之间的关系，需要进一步确定。</p>','确认演示转交')}
   function openDuplicate(id){const c=customer(id);modal('跨账号接触记录','<div class="modal-body"><p class="modal-description">'+esc(c.name)+' 在多个账号下有接触记录。原型只做提示，没有自动合并、抢单或改归属。</p>'+c.contactRefs.map(r=>{const mine=manager()||r.owner===ui.persona;return '<div class="duplicate-item">'+icon(mine?'MessageCircle':'LockKeyhole')+'<div><strong>'+esc(mine?account(r.account)?.name:'其他成员负责的账号')+'</strong><small>'+esc(mine?member(r.owner)?.name:'当前视角不展示对方客户资料')+'</small></div></div>'}).join('')+'<p class="review-hint">要统一客户还是各聊手独立维护、重复进线由谁跟进，等你评审后确定。</p></div>','<button class="button primary" data-action="close">知道了</button>')}
   function openQuick(){modal('快捷回复','<div class="modal-body"><p class="modal-description">选择一条填入输入框，可修改后再发送。此处使用演示话术。</p><div class="quick-list">'+data.quickReplies.filter(q=>!q.owner||q.owner===ui.persona||manager()).map(q=>'<button class="quick-card" data-action="quick" data-id="'+q.id+'"><strong>'+esc(q.title)+'<small>'+esc(q.scope)+'</small></strong><p>'+esc(q.zh)+'</p></button>').join('')+'</div></div>','',{eyebrow:'QUICK REPLIES'})}
-  function openReview(){modal('原型评审','<div class="modal-body"><div class="review-summary"><div><strong>你的初步需求 · SCRM 跟进闭环原型</strong>只评审布局与功能，尚未进入正式开发。</div>'+icon('PanelsTopLeft')+'</div>'+"<div class=\"element-review-launch\"><button class=\"button small\" type=\"button\" data-element-review-start>点选界面备注</button><span>也可按 Alt + 左键</span></div>"+req.review.items.map(i=>'<section class="review-section"><h3>'+esc(i.title)+'</h3><small>'+esc(i.question)+'</small><select data-review-status="'+i.id+'" aria-label="'+esc(i.title)+'评审状态">'+['待评审','方向认可','需要调整'].map(s=>option(s,s,i.status)).join('')+'</select><textarea data-review-note="'+i.id+'" aria-label="'+esc(i.title)+'评审备注" placeholder="写下你的具体想法…">'+esc(i.notes)+'</textarea></section>').join('')+'<p class="review-hint">备注会保存在当前浏览器。导出 JSON 后可用于下一轮迭代；导出不会表示你已批准正式开发。</p></div>','<button class="button" data-action="export">'+icon('Download')+'导出需求与评审</button><button class="button primary" data-action="reviewDone">保存评审备注</button>',{drawer:true,eyebrow:'REVIEW & ITERATE'})}
   function fillQuick(id){const q=data.quickReplies.find(q=>q.id===id),c=selectedCustomer();if(!q||!c)return;ui.drafts[c.id]={text:q.zh,translated:c.language==='西班牙语'?q.es:q.en,source:q.zh};persist();if($('#dialog').open)close();if(ui.view!=='inbox')navigate('inbox');else{const box=$('.chat-pane');box.outerHTML=chatHTML(c);paintIcons();scrollMessages()}$('#composer-text')?.focus()}
   function send() {
     const c=selectedCustomer(),el=$('#composer-text');if(!c||!el)return;
@@ -200,7 +183,6 @@
     (data.messages[c.id]??=c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]).push({id:nextId('m'),side:'out',text:outgoing,attachment:ui.attachment,time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}),local:true});
     c.preview=outgoing||'[附件]';c.last='刚刚';c.unread=0;ui.drafts[c.id]={text:'',translated:'',source:''};ui.attachment=null;persist();render();toast('演示消息已保存到本地。');
   }
-  function exportReq(){const obj={...clone(req),exportedAt:new Date().toISOString(),prototypeReview:{activeView:ui.view,persona:me().role,layout:'reference-aligned-scrm-lifecycle',receiveTranslation:ui.receiveTranslation,note:'本文件仅包含需求和评审，不包含演示聊天或真实客户数据。'}};const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='whatsapp-scrm-lifecycle-reviewed.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已导出需求与评审 JSON。')}
   function refreshInboxProfiles(c) {
     const profile=$('#dialog .customer-profile');if($('#dialog').open&&profile){profile.outerHTML=profileHTML(c,true);paintIcons($('#dialog'));if($('#conversation-list')){$('#conversation-list').innerHTML=conversationRows();paintIcons($('#conversation-list'))}return}render();
   }
@@ -247,9 +229,6 @@
       case 'accountScope':{ui.account=id;ui.query='';ui.conversationFilter='all';const c=myCustomers().find(c=>id==='all'||c.account===id);ui.customer=c?.id||null;ui.mobileChat=false;ui.profileTab='details';if($('#dialog').open)close();render();break}
       case 'switchAccount':openAccountSwitcher();break;
       case 'toggleProfile':ui.profileOpen=!ui.profileOpen;persist();render();break;
-      case 'review':openReview();break;
-      case 'reviewDone':persist();renderNav();paintIcons();close();toast('评审备注已保存在本机，可导出后继续迭代。');break;
-      case 'export':exportReq();break;
       case 'openConversation':{const c=customer(id);if(!c||!myCustomers().includes(c))return;ui.customer=id;if(ui.view==='dashboard'){ui.query='';ui.conversationFilter='all'}if(ui.view!=='inbox'||(ui.account!=='all'&&c.account!==ui.account))ui.account='all';ui.mobileChat=true;c.unread=0;ui.profileTab='details';if($('#dialog').open)close();persist();navigate('inbox');break}
       case 'backList':ui.mobileChat=false;render();break;
       case 'conversationFilter':ui.conversationFilter=id;render();break;
@@ -296,8 +275,6 @@
     if(t.id==='customer-search'&&!t.closest('.fid-customer-filter')){ui.customerQuery=t.value;ui.selected.clear();updateCustomerRows()}
     if(t.id==='composer-text'){const c=selectedCustomer();const old=draft(c);ui.drafts[c.id]={text:t.value,translated:old.source===t.value?old.translated:'',source:old.source};$('#translation-preview').innerHTML=previewHTML(c);paintIcons($('#translation-preview'));persist();updateSendState(c);const hint=$('.language-hint');if(hint){hint.innerHTML=icon('Languages')+esc(c.language)+' · '+(ui.drafts[c.id].translated?'发送译文':'发送原文');paintIcons(hint)}}
     if(t.dataset.noteCustomer){ui.noteDrafts[t.dataset.noteCustomer]=t.value;persist();t.closest('.customer-profile').querySelector('.note-save span').textContent='未保存的修改'}
-    if(t.dataset.reviewNote){const i=req.review.items.find(i=>i.id===t.dataset.reviewNote);i.notes=t.value;persist();renderNav();paintIcons()}
-    if(t.dataset.scopeNotes){req.modules.find(m=>m.id===t.dataset.scopeNotes).notes=t.value;persist()}
   });
   function updateCustomerRows() {
     if(!$('#customer-rows'))return;ui.pages.customers=0;$('#customer-rows').innerHTML=customerRows();$('#customer-total').textContent='当前 '+filteredCustomers().length+' 位客户';$('#selected-count').textContent=ui.selected.size;$('#batchbar').hidden=!ui.selected.size;$('#select-all-customers').checked=filteredCustomers().length>0&&filteredCustomers().every(c=>ui.selected.has(c.id));$('#customers-pager').outerHTML=pagerHTML(filteredCustomers().length,'customers');paintIcons($('#view'));
@@ -312,8 +289,6 @@
     if(t.dataset.selectCustomer){if(t.checked)ui.selected.add(t.dataset.selectCustomer);else ui.selected.delete(t.dataset.selectCustomer);$('#selected-count').textContent=ui.selected.size;$('#batchbar').hidden=!ui.selected.size}
     if(t.id==='select-all-customers'){filteredCustomers().forEach(c=>t.checked?ui.selected.add(c.id):ui.selected.delete(c.id));updateCustomerRows()}
     if(t.id==='receive-translation'){ui.receiveTranslation=t.checked;persist();if(ui.view==='inbox'&&$('#messages')){const c=selectedCustomer();$('#messages').innerHTML=messagesHTML(c);paintIcons($('#messages'))}toast(t.checked?'已展开示例中文译文。':'已收起中文译文。')}
-    if(t.dataset.reviewStatus){req.review.items.find(i=>i.id===t.dataset.reviewStatus).status=t.value;persist();renderNav();paintIcons()}
-    if(t.dataset.scopeDecision){req.modules.find(m=>m.id===t.dataset.scopeDecision).decision=t.value;persist();renderNav();const badge=t.closest('.scope-card').querySelector('h3 .tag');badge.textContent=t.value;badge.className='tag '+(t.value==='待定'?'gold':t.value==='本轮不展示'?'slate':'jade');paintIcons()}
   });
   document.addEventListener('keydown',e=>{if(e.key==='/'&&!$('#dialog').open&&!e.target.closest('input,textarea,select,[contenteditable]')){const search=$('#conversation-search')||$('#customer-search');if(search){e.preventDefault();search.focus()}}if(e.target.id==='composer-text'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
   document.addEventListener('submit',e=>{
@@ -461,13 +436,13 @@
     fidDialog(title,`<div class="modal-body"><p>${esc(message)}</p></div>`,fidButton('确 定',action,'',style,fidActionID(id))+fidButton('取 消','close'));
   }
 
-  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound',scope:'SlidersHorizontal'}[id]||'FileText');
+  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound'}[id]||'FileText');
   menuLink = function(id,label,child=false,mobile=false) {
-    return `<a class="nav-item ${ui.view===id?'active':''} ${id==='scope'?'scope-link':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${id==='scope'&&!mobile?'<span class="nav-count" id="pending-count"></span>':''}</a>`;
+    return `<a class="nav-item ${ui.view===id?'active':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span></a>`;
   };
   menuHTML = function(mobile=false) {
     const navGroup=(title,glyph,action,opened,ids)=>`<button class="nav-group-button ${ids.includes(ui.view)?'group-active':''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened?'ChevronUp':'ChevronDown')}</button><div class="submenu" ${opened?'':'hidden'}>${ids.map(id=>menuLink(id,views[id],true)).join('')}</div>`;
-    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'')+'<div class="nav-caption">工作台设置</div>'+menuLink('scope',views.scope,false,mobile);
+    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'');
   };
 
   const fidTagCount = (id, customers=myCustomers()) => customers.filter(c=>c.tags.includes(id)).length;
@@ -2382,7 +2357,6 @@
     team: 'Network',
     members: 'UsersRound',
     ai: 'Sparkles',
-    scope: 'SlidersHorizontal',
   }[id] || 'FileText');
 
   menuHTML = function(mobile = false) {
@@ -2390,10 +2364,8 @@
     const renderItem = (id, label) => {
       const badge = id === 'followups' && attention && !mobile
         ? `<span class="nav-count" title="待处理信号">${attention}</span>`
-        : id === 'scope' && !mobile
-          ? '<span class="nav-count" id="pending-count"></span>'
-          : '';
-      return `<a class="nav-item ${ui.view === id ? 'active' : ''} ${id === 'scope' ? 'scope-link' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
+        : '';
+      return `<a class="nav-item ${ui.view === id ? 'active' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
     };
     const navGroup = (title, glyph, action, opened, ids) =>
       `<button class="nav-group-button ${ids.includes(ui.view) ? 'group-active' : ''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened ? 'ChevronUp' : 'ChevronDown')}</button><div class="submenu" ${opened ? '' : 'hidden'}>${ids.map(id => renderItem(id, views[id])).join('')}</div>`;
@@ -2406,8 +2378,7 @@
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
-      renderItem('ai', views.ai) +
-      renderItem('scope', views.scope)
+      renderItem('ai', views.ai)
     );
   };
 
@@ -3797,13 +3768,11 @@
     shell.hidden = signedOut;
     login.hidden = !signedOut;
     $('.skip-link').hidden = signedOut;
-    $('.fid-float-review').hidden = signedOut;
     if (!signedOut) return true;
 
     if (location.hash!=='#login') history.replaceState(null,'','#login');
     if (enteringLogin) {
       if ($('#dialog').open) close();
-      if ($('#element-review-dialog').open) $('#element-review-dialog').close();
       $('#view').replaceChildren();
       $('#toast').classList.remove('show');
       paintIcons(login);
@@ -3838,5 +3807,4 @@
   });
 
   render();
-  window.initWAElementReview(toast);
 })();

@@ -47,7 +47,7 @@ for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-f
   const standalone = read(path.join(root, 'outputs', bundleName));
   assert(!/<script\b[^>]*\bsrc=|<link\b[^>]*\brel="stylesheet"|chm123\.com/i.test(standalone), `External asset found in ${bundleName}`);
   const scripts = [...standalone.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 5, `Expected 5 inline script blocks in ${bundleName}`);
+  assert.equal(scripts.length, 3, `Expected 3 inline script blocks in ${bundleName}`);
   for (const s of scripts) new vm.Script(s[1]);
 }
 
@@ -175,10 +175,23 @@ for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' 
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
 assert(!/console\.(log|error)\([^\n]*(config\.key|\.text\b(?!\.length)|input\b)/.test(relaySource), 'the relay must not log the key or message text');
-assert(serveSource.includes("else if (pathname.startsWith('/api/ai/')) await aiRelay.handle(req, res, pathname);"), 'the preview server must route /api/ai/* to the relay');
+assert(serveSource.includes("if (pathname.startsWith('/api/ai/')) await aiRelay.handle(req, res, pathname);"), 'the preview server must route /api/ai/* to the relay');
 assert(fs.existsSync(path.join(__dirname, 'ai-relay.test.cjs')) && fs.existsSync(path.join(__dirname, 'ai.env.example')), 'the relay needs its tests and its example settings file');
 assert(!/AI_API_KEY=\S/.test(read(path.join(__dirname, 'ai.env.example'))), 'the example settings file must not contain a key');
 assert(!appJs.includes('中文译文</span>') && !appJs.includes('示例译文'), 'translation labels must not claim a fixed language or a sample');
+
+// 16. The reviewer tools are removed: no review panel, requirements page, export, notes tool or notes endpoint
+for (const gone of ['openReview', 'renderScope', 'scopeCard', 'exportReq', 'WA_REQUIREMENTS', 'initWAElementReview', 'data-action="review"', 'data-action="export"', "scope:'功能范围'", "renderItem('scope'", 'pending-count', 'review-count']) {
+  assert(!appJs.includes(gone), `app.js still contains reviewer-tool code (${gone})`);
+}
+for (const gone of ['fid-float-review', 'fid-header-review', 'element-review', 'requirements-data.js', 'data-action="review"']) {
+  assert(!indexHtml.includes(gone), `index.html still contains a reviewer tool (${gone})`);
+}
+for (const file of [path.join(out, 'element-review.js'), path.join(out, 'requirements-data.js'), path.join(__dirname, 'element-review.js'), path.join(__dirname, 'review-prompt-format.js')]) {
+  assert(!fs.existsSync(file), `${path.basename(file)} must not exist`);
+}
+assert(!/review-prompts|promptFormat|saveReviewPrompt/.test(serveSource), 'the preview server must not offer the notes endpoint');
+assert(fs.existsSync(path.join(out, 'requirements.json')), 'the requirement records stay as a build-time record');
 
 const summary = {
   version: req.version,
@@ -201,6 +214,7 @@ const summary = {
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
   orderTracking: 'profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer',
   translationSettings: 'removed from the chat screen (tool rail, top bar, narrow-screen menu, dialog); sample translations stay and are always shown, switched per capability on the AI page',
+  reviewerTools: 'removed: review panel and its two buttons, requirements page and export, element notes tool and its server endpoint; requirements.json stays as a build-time record',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

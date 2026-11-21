@@ -124,13 +124,13 @@
     fidDialog(title,`<div class="modal-body"><p>${esc(message)}</p></div>`,fidButton('确 定',action,'',style,fidActionID(id))+fidButton('取 消','close'));
   }
 
-  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound',scope:'SlidersHorizontal'}[id]||'FileText');
+  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound'}[id]||'FileText');
   menuLink = function(id,label,child=false,mobile=false) {
-    return `<a class="nav-item ${ui.view===id?'active':''} ${id==='scope'?'scope-link':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${id==='scope'&&!mobile?'<span class="nav-count" id="pending-count"></span>':''}</a>`;
+    return `<a class="nav-item ${ui.view===id?'active':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span></a>`;
   };
   menuHTML = function(mobile=false) {
     const navGroup=(title,glyph,action,opened,ids)=>`<button class="nav-group-button ${ids.includes(ui.view)?'group-active':''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened?'ChevronUp':'ChevronDown')}</button><div class="submenu" ${opened?'':'hidden'}>${ids.map(id=>menuLink(id,views[id],true)).join('')}</div>`;
-    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'')+'<div class="nav-caption">工作台设置</div>'+menuLink('scope',views.scope,false,mobile);
+    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'');
   };
 
   const fidTagCount = (id, customers=myCustomers()) => customers.filter(c=>c.tags.includes(id)).length;

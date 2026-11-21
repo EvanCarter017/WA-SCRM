@@ -4134,7 +4134,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
     <div class="main-shell">
       <header class="topbar">
         <div class="header-left"><button class="icon-button" type="button" data-action="toggleSidebar" aria-label="切换导航"><span data-icon="Menu"></span></button><span class="fid-edition"><b>内部版</b><span>当前工作台： <strong>WhatsApp</strong></span></span></div>
-        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="icon-button fid-header-review" data-action="review" aria-label="评审原型"><span data-icon="MessageSquareText"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
+        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
       </header>
       <nav class="workspace-tabs" id="workspace-tabs" aria-label="已打开的页面"></nav>
       <main id="view" tabindex="-1"></main>
@@ -4147,31 +4147,9 @@ dialog>#toast,dialog>#toast.show{transform:none}
       <button class="fid-btn gradient" data-action="subsiteEnterDemo" type="button">进入演示工作台<span data-icon="ChevronRight"></span></button>
     </div>
   </main>
-  <button class="fid-float-review" data-action="review" aria-label="打开原型评审"><span data-icon="MessageSquare"></span><span>原型评审</span><i id="review-count" hidden></i><span data-icon="ChevronRight"></span></button>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
-  <dialog id="element-review-dialog" aria-labelledby="element-review-title">
-    <form id="element-review-entry" novalidate>
-      <div class="modal-head">
-        <h2 id="element-review-title">界面备注</h2>
-        <button class="icon-button" type="button" data-element-review-dismiss aria-label="关闭界面备注"><span data-icon="X"></span></button>
-      </div>
-      <div class="modal-body">
-        <p id="element-review-context"></p>
-        <label class="field" for="element-review-note">希望怎么改</label>
-        <textarea id="element-review-note" name="review-note" rows="5" placeholder="写下你希望如何调整这个控件…" required></textarea>
-        <p id="element-review-error" role="alert" hidden></p>
-      </div>
-      <div class="modal-footer">
-        <small id="element-review-destination"></small>
-        <button type="button" class="button" data-element-review-download hidden>下载 .md</button>
-        <button type="button" class="button" data-element-review-dismiss>取消</button>
-        <button type="submit" class="button primary">提交备注</button>
-      </div>
-    </form>
-  </dialog>
-  <script>window.WA_ICONS={"MessagesSquare":[["path",{"d":"M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"}],["path",{"d":"M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"}]],"PanelLeftClose":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m16 15-3-3 3-3"}]],"Menu":[["path",{"d":"M4 5h16"}],["path",{"d":"M4 12h16"}],["path",{"d":"M4 19h16"}]],"Bell":[["path",{"d":"M10.268 21a2 2 0 0 0 3.464 0"}],["path",{"d":"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}]],"MessageSquareText":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"M7 11h10"}],["path",{"d":"M7 15h6"}],["path",{"d":"M7 7h8"}]],"LogOut":[["path",{"d":"m16 17 5-5-5-5"}],["path",{"d":"M21 12H9"}],["path",{"d":"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]],"ChevronRight":[["path",{"d":"m9 18 6-6-6-6"}]],"MessageSquare":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}]],"X":[["path",{"d":"M18 6 6 18"}],["path",{"d":"m6 6 12 12"}]],"PanelLeftOpen":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m14 9 3 3-3 3"}]],"Inbox":[["polyline",{"points":"22 12 16 12 14 15 10 15 8 12 2 12"}],["path",{"d":"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"}]],"Star":[["path",{"d":"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"}]],"PanelsTopLeft":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M3 9h18"}],["path",{"d":"M9 21V9"}]],"SquarePen":[["path",{"d":"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}],["path",{"d":"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"}]],"MessageCircle":[["path",{"d":"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"}]],"ChevronDown":[["path",{"d":"m6 9 6 6 6-6"}]],"Search":[["path",{"d":"m21 21-4.34-4.34"}],["circle",{"cx":"11","cy":"11","r":"8"}]],"ShieldCheck":[["path",{"d":"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"}],["path",{"d":"m9 12 2 2 4-4"}]],"ArrowLeft":[["path",{"d":"m12 19-7-7 7-7"}],["path",{"d":"M19 12H5"}]],"CalendarPlus":[["path",{"d":"M16 19h6"}],["path",{"d":"M16 2v4"}],["path",{"d":"M19 16v6"}],["path",{"d":"M21 12.598V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8.5"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 2v4"}]],"ContactRound":[["path",{"d":"M16 2v2"}],["path",{"d":"M17.915 22a6 6 0 0 0-12 0"}],["path",{"d":"M8 2v2"}],["circle",{"cx":"12","cy":"12","r":"4"}],["rect",{"x":"3","y":"4","width":"18","height":"18","rx":"2"}]],"EllipsisVertical":[["circle",{"cx":"12","cy":"12","r":"1"}],["circle",{"cx":"12","cy":"5","r":"1"}],["circle",{"cx":"12","cy":"19","r":"1"}]],"Target":[["circle",{"cx":"12","cy":"12","r":"10"}],["circle",{"cx":"12","cy":"12","r":"6"}],["circle",{"cx":"12","cy":"12","r":"2"}]],"Link":[["path",{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["path",{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]],"WifiOff":[["path",{"d":"M12 20h.01"}],["path",{"d":"M8.5 16.429a5 5 0 0 1 7 0"}],["path",{"d":"M5 12.859a10 10 0 0 1 5.17-2.69"}],["path",{"d":"M19 12.859a10 10 0 0 0-2.007-1.523"}],["path",{"d":"M2 8.82a15 15 0 0 1 4.177-2.643"}],["path",{"d":"M22 8.82a15 15 0 0 0-11.288-3.764"}],["path",{"d":"m2 2 20 20"}]],"File":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}]],"Languages":[["path",{"d":"m5 8 6 6"}],["path",{"d":"m4 14 6-6 2-3"}],["path",{"d":"M2 5h12"}],["path",{"d":"M7 2h1"}],["path",{"d":"m22 22-5-10-5 10"}],["path",{"d":"M14 18h6"}]],"Check":[["path",{"d":"M20 6 9 17l-5-5"}]],"CheckCheck":[["path",{"d":"M18 6 7 17l-5-5"}],["path",{"d":"m22 10-7.5 7.5L13 16"}]],"Paperclip":[["path",{"d":"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"}]],"Send":[["path",{"d":"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"}],["path",{"d":"m21.854 2.147-10.94 10.939"}]],"Keyboard":[["path",{"d":"M10 8h.01"}],["path",{"d":"M12 12h.01"}],["path",{"d":"M14 8h.01"}],["path",{"d":"M16 12h.01"}],["path",{"d":"M18 8h.01"}],["path",{"d":"M6 8h.01"}],["path",{"d":"M7 16h10"}],["path",{"d":"M8 12h.01"}],["rect",{"width":"20","height":"16","x":"2","y":"4","rx":"2"}]],"Plus":[["path",{"d":"M5 12h14"}],["path",{"d":"M12 5v14"}]],"Copy":[["rect",{"width":"14","height":"14","x":"8","y":"8","rx":"2","ry":"2"}],["path",{"d":"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"}]],"Clock3":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 6v6h4"}]],"CircleCheck":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"RotateCcw":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}]],"RefreshCw":[["path",{"d":"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}],["path",{"d":"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"}],["path",{"d":"M8 16H3v5"}]],"Pencil":[["path",{"d":"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"}],["path",{"d":"m15 5 4 4"}]],"Info":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 16v-4"}],["path",{"d":"M12 8h.01"}]],"Tags":[["path",{"d":"M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"}],["path",{"d":"M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193"}],["circle",{"cx":"10.5","cy":"6.5","r":".5","fill":"currentColor"}]],"ArrowRightLeft":[["path",{"d":"m16 3 4 4-4 4"}],["path",{"d":"M20 7H4"}],["path",{"d":"m8 21-4-4 4-4"}],["path",{"d":"M4 17h16"}]],"UserRoundPlus":[["path",{"d":"M2 21a8 8 0 0 1 13.292-6"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M19 16v6"}],["path",{"d":"M22 19h-6"}]],"ClipboardList":[["rect",{"width":"8","height":"4","x":"8","y":"2","rx":"1","ry":"1"}],["path",{"d":"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"}],["path",{"d":"M12 11h4"}],["path",{"d":"M12 16h4"}],["path",{"d":"M8 11h.01"}],["path",{"d":"M8 16h.01"}]],"UserRound":[["circle",{"cx":"12","cy":"8","r":"5"}],["path",{"d":"M20 21a8 8 0 0 0-16 0"}]],"Download":[["path",{"d":"M12 15V3"}],["path",{"d":"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}],["path",{"d":"m7 10 5 5 5-5"}]],"LockKeyhole":[["circle",{"cx":"12","cy":"16","r":"1"}],["rect",{"x":"3","y":"10","width":"18","height":"12","rx":"2"}],["path",{"d":"M7 10V7a5 5 0 0 1 10 0v3"}]],"Settings2":[["path",{"d":"M14 17H5"}],["path",{"d":"M19 7h-9"}],["circle",{"cx":"17","cy":"17","r":"3"}],["circle",{"cx":"7","cy":"7","r":"3"}]],"UsersRound":[["path",{"d":"M18 21a8 8 0 0 0-16 0"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"}]],"SlidersHorizontal":[["path",{"d":"M10 5H3"}],["path",{"d":"M12 19H3"}],["path",{"d":"M14 3v4"}],["path",{"d":"M16 17v4"}],["path",{"d":"M21 12h-9"}],["path",{"d":"M21 19h-5"}],["path",{"d":"M21 5h-7"}],["path",{"d":"M8 10v4"}],["path",{"d":"M8 12H3"}]],"FileText":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M10 9H8"}],["path",{"d":"M16 13H8"}],["path",{"d":"M16 17H8"}]],"ChevronUp":[["path",{"d":"m18 15-6-6-6 6"}]],"NotebookPen":[["path",{"d":"M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"}],["path",{"d":"M2 6h4"}],["path",{"d":"M2 10h4"}],["path",{"d":"M2 14h4"}],["path",{"d":"M2 18h4"}],["path",{"d":"M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"}]],"ChevronLeft":[["path",{"d":"m15 18-6-6 6-6"}]],"LayoutDashboard":[["rect",{"width":"7","height":"9","x":"3","y":"3","rx":"1"}],["rect",{"width":"7","height":"5","x":"14","y":"3","rx":"1"}],["rect",{"width":"7","height":"9","x":"14","y":"12","rx":"1"}],["rect",{"width":"7","height":"5","x":"3","y":"16","rx":"1"}]],"Smartphone":[["rect",{"width":"14","height":"20","x":"5","y":"2","rx":"2","ry":"2"}],["path",{"d":"M12 18h.01"}]],"ChartColumn":[["path",{"d":"M3 3v16a2 2 0 0 0 2 2h16"}],["path",{"d":"M18 17V9"}],["path",{"d":"M13 17V5"}],["path",{"d":"M8 17v-3"}]],"Images":[["path",{"d":"m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"}],["path",{"d":"M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"}],["circle",{"cx":"13","cy":"7","r":"1","fill":"currentColor"}],["rect",{"x":"8","y":"2","width":"14","height":"14","rx":"2"}]],"Network":[["rect",{"x":"16","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"2","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"9","y":"2","width":"6","height":"6","rx":"1"}],["path",{"d":"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"}],["path",{"d":"M12 12V8"}]],"Trash2":[["path",{"d":"M10 11v6"}],["path",{"d":"M14 11v6"}],["path",{"d":"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}],["path",{"d":"M3 6h18"}],["path",{"d":"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}]],"RotateCw":[["path",{"d":"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}]],"Tag":[["path",{"d":"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"}],["circle",{"cx":"7.5","cy":"7.5","r":".5","fill":"currentColor"}]],"Eraser":[["path",{"d":"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"}],["path",{"d":"m5.082 11.09 8.828 8.828"}]],"FileDown":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M12 18v-6"}],["path",{"d":"m9 15 3 3 3-3"}]],"Bot":[["path",{"d":"M12 8V4H8"}],["rect",{"width":"16","height":"12","x":"4","y":"8","rx":"2"}],["path",{"d":"M2 14h2"}],["path",{"d":"M20 14h2"}],["path",{"d":"M15 13v2"}],["path",{"d":"M9 13v2"}]],"ListOrdered":[["path",{"d":"M11 5h10"}],["path",{"d":"M11 12h10"}],["path",{"d":"M11 19h10"}],["path",{"d":"M4 4h1v5"}],["path",{"d":"M4 9h2"}],["path",{"d":"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"}]],"StickyNote":[["path",{"d":"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"}],["path",{"d":"M15 3v5a1 1 0 0 0 1 1h5"}]],"QrCode":[["rect",{"width":"5","height":"5","x":"3","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"16","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"3","y":"16","rx":"1"}],["path",{"d":"M21 16h-3a2 2 0 0 0-2 2v3"}],["path",{"d":"M21 21v.01"}],["path",{"d":"M12 7v3a2 2 0 0 1-2 2H7"}],["path",{"d":"M3 12h.01"}],["path",{"d":"M12 3h.01"}],["path",{"d":"M12 16v.01"}],["path",{"d":"M16 12h1"}],["path",{"d":"M21 12v.01"}],["path",{"d":"M12 21v-1"}]],"LoaderCircle":[["path",{"d":"M21 12a9 9 0 1 1-6.219-8.56"}]],"ScanQrCode":[["path",{"d":"M17 12v4a1 1 0 0 1-1 1h-4"}],["path",{"d":"M17 3h2a2 2 0 0 1 2 2v2"}],["path",{"d":"M17 8V7"}],["path",{"d":"M21 17v2a2 2 0 0 1-2 2h-2"}],["path",{"d":"M3 7V5a2 2 0 0 1 2-2h2"}],["path",{"d":"M7 17h.01"}],["path",{"d":"M7 21H5a2 2 0 0 1-2-2v-2"}],["rect",{"x":"7","y":"7","width":"5","height":"5","rx":"1"}]],"ArrowRight":[["path",{"d":"M5 12h14"}],["path",{"d":"m12 5 7 7-7 7"}]],"ClockAlert":[["path",{"d":"M12 6v6l4 2"}],["path",{"d":"M20 12v5"}],["path",{"d":"M20 21h.01"}],["path",{"d":"M21.25 8.2A10 10 0 1 0 16 21.16"}]],"CalendarDays":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 14h.01"}],["path",{"d":"M12 14h.01"}],["path",{"d":"M16 14h.01"}],["path",{"d":"M8 18h.01"}],["path",{"d":"M12 18h.01"}],["path",{"d":"M16 18h.01"}]],"CalendarCheck":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"m9 16 2 2 4-4"}]],"MessageSquareCheck":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.7.7 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m9 11 2 2 4-4"}]],"BadgeCheck":[["path",{"d":"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"}],["path",{"d":"m9 12 2 2 4-4"}]],"Flame":[["path",{"d":"M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"}]],"Zap":[["path",{"d":"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"}]],"TriangleAlert":[["path",{"d":"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"}],["path",{"d":"M12 9v4"}],["path",{"d":"M12 17h.01"}]],"Archive":[["rect",{"width":"20","height":"5","x":"2","y":"3","rx":"1"}],["path",{"d":"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}],["path",{"d":"M10 12h4"}]],"Sparkles":[["path",{"d":"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"}],["path",{"d":"M20 2v4"}],["path",{"d":"M22 4h-4"}],["circle",{"cx":"4","cy":"20","r":"2"}]],"CalendarClock":[["path",{"d":"M16 14v2.2l1.6 1"}],["path",{"d":"M16 2v4"}],["path",{"d":"M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"}],["path",{"d":"M3 10h5"}],["path",{"d":"M8 2v4"}],["circle",{"cx":"16","cy":"16","r":"6"}]],"CheckCircle2":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"Compass":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"}]],"Layers":[["path",{"d":"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"}],["path",{"d":"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"}],["path",{"d":"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"}]],"History":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}],["path",{"d":"M12 7v5l4 2"}]],"MessageSquareReply":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m10 8-3 3 3 3"}],["path",{"d":"M17 14v-1a2 2 0 0 0-2-2H7"}]],"Filter":[["path",{"d":"M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"}]]};
-</script><script>window.WA_REQUIREMENTS={"schemaVersion":2,"project":"WhatsApp 内部客户工作台","version":"0.8-scrm-engagement","updatedOn":"2026-11-21","phase":"interactive-prototype-review","language":"zh-CN","sourceInventory":"../chm123-complete-modules.json","sourceInventoryPreserved":true,"approvalGate":"用户敲定布局、功能和关键规则后，再安排技术方案与正式开发。","confirmedRequirements":[{"id":"R001","text":"聚焦 WhatsApp 聚合与客户管理。","origin":"user-current"},{"id":"R002","text":"多名聊手方便地管理各自负责的 WhatsApp 账号、标签与客户体系。","origin":"user-current"},{"id":"R003","text":"内部自用，不商业化。","origin":"user-current"},{"id":"R004","text":"先用原型确认布局与功能，再安排正式执行。","origin":"user-previous"},{"id":"R005","text":"人数、账号数量及未来扩展不写死。演示记录数量不代表系统容量。","origin":"user-previous"},{"id":"R006","text":"原始模块清单中的保留、删除、魔改由用户决定；未表态模块继续待定。","origin":"user-previous"}],"knownBusinessContext":{"acquisition":"Facebook 广告转 WhatsApp 私域","initialRegions":["美国","波多黎各"],"productFields":"客户模型使用通用字段，不要求填写具体产品，也不预设SKU。","previouslyMentionedNeeds":["防漏跟进","重复客户处理","翻译","员工管理","订单对接","广告归因"],"priorityBoundary":"以上既有需求不等于全部已批准本轮实施。订单、真实归因回传及其他接入待用户确认。"},"prototypeAssumptions":[{"id":"A001","text":"子站固定为已登录聊手的工作范围。顶栏提供退出登录。原型使用固定的演示身份与本地退出流程。","decision":"已确认"},{"id":"A002","text":"聊手默认只看到自己的客户和获分配账号；主管查看团队并可转交客户。","decision":"待确认"},{"id":"A003","text":"客户与 WhatsApp 账号分开建模；同一客户可有多个账号接触记录。","decision":"待确认"},{"id":"A004","text":"公共标签由主管维护、聊手可使用；个人标签由各聊手维护。","decision":"待确认"},{"id":"A005","text":"桌面在原工作台框架上补齐跟进闭环中心、客户档案与待处理信号。窄屏保留自适应切换。","decision":"待确认"},{"id":"A006","text":"语言、来源、备注和跟进时间先提供通用预设，后续可修改。客户不设固定阶段，以自定义标签分类。","decision":"待确认"}],"connectionDecision":{"status":"已确认","options":["OpenWA 桥接"],"prototypeBoundary":"本轮仅评审工作流，不接入账号、不生成可登录二维码、不获取令牌、不调用消息或广告接口。","selected":"OpenWA 桥接","provider":"rmyndharis/OpenWA"},"modelOutline":{"entities":["Member","Team","Role","WhatsAppAccount","Customer","AccountContact","Conversation","Message","TagGroup","Tag","Followup","QuickReply","ReviewNote","ChatArchive","AiUsage","Order"],"relationships":["Member 与 WhatsAppAccount 的分配关系独立于登录凭据。","Customer 对应多个 AccountContact；跨账号去重与归属规则需确认。","Tag 支持公共与个人作用域；分配给客户不改变标签定义所有权。","Followup 关联客户、负责人与会话账号。","主管转交客户后的历史访问、私有标签和账号归属行为待进一步确认。","每个标签包含一个名称并归属一个自建分组。客户可同时使用同组或不同组的多个标签。","客户跟进状态只有「跟进中」与「已结束跟进」两种。跟进中的客户必须有下一条待办，否则提示跟进断档；结束跟进需填写原因并结清待办，客户再次来信时提示复联，可重新跟进并保留全部历史。","标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。","客户另有两项手动设置的分类：客户等级（S / A / B / C / D，S 最高，默认未评级）与客户状态（已成交 / 弃单 / 自然线索，默认未标记）。两者可在聊天界面或客户档案中随时调整，系统不自动评级或改状态。","聊天记录是归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因，用于绩效复盘与审核；不设评分，也不做结论分类。快照与实时会话相互独立，移入不改变实时会话。","所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。提供方有两种：服务器中转（页面只调用本站服务器的 /api/ai 接口，由服务器携带密钥调用模型服务）与本地演示（服务器未配置或页面以文件方式打开时使用）。","客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后推进按钮只能沿「待发货 → 已发货 → 已签收」逐步前进，或在签收前转为「异常」，已签收与异常之后不再有推进。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录，订单号旁显示下单时间。「撤销上一步」随时移除最新一条物流记录并回到上一个状态，已签收与异常同样可撤回；第一条记录不可撤回，删除订单才会移除。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。"],"capacity":"所有集合均动态管理，无代码层坐席数、账号数或标签总数上限。"},"modules":[{"id":"P-DASHBOARD","name":"首页经营概览","decision":"首轮原型","basis":"用户要求首页仪表盘","originalIds":["HOME"],"screens":["dashboard"],"features":["未读与跟进概况","跟进闭环信号直达","号码状态与重连","客户来源分布"],"notes":"汇总当前聊手名下未读、待办与跟进闭环信号。"},{"id":"P-LIFECYCLE","name":"客户全生命周期看板","decision":"本轮不展示","basis":"用户确认暂缓（2026-11-17）","originalIds":["CLUE","CUST"],"screens":[],"features":["按流程切换的闭环看板/明细双视图","防漏健康度雷达","智能阶段推进门禁","360°客户全生命档案","沉睡与流失复联重激活","客户跨流程转移"],"notes":"阶段、漏斗与交易台账暂缓；聚焦跟进闭环并以标签辅助。实现保留在 Git 历史（v0.7）。"},{"id":"P-PIPELINES","name":"生命周期流程配置","decision":"本轮不展示","basis":"用户确认暂缓（2026-11-17）","originalIds":[],"screens":[],"features":["多条流程并行","阶段增删改与排序","阶段类型与进入时采集","自动流转落点","流失原因按流程维护","删除阶段/流程时迁移客户"],"notes":"阶段、漏斗与交易台账暂缓；聚焦跟进闭环并以标签辅助。实现保留在 Git 历史（v0.7）。"},{"id":"P-DEALS","name":"成交履约与复购中心","decision":"本轮不展示","basis":"用户确认暂缓（2026-11-17）","originalIds":[],"screens":[],"features":["报价单创建与一键转单","订单发货与签收闭环","签收自动开启复购周期","沉睡老客与暂缓客户唤醒池"],"notes":"阶段、漏斗与交易台账暂缓；聚焦跟进闭环并以标签辅助。实现保留在 Git 历史（v0.7）。"},{"id":"P-INBOX","name":"聚合会话","decision":"首轮原型","basis":"核心工作流提案","originalIds":["D04","D05","WAAPI"],"screens":["inbox"],"features":["按账号切换会话","未读/待回复筛选","搜索会话","本地演示发送","客户侧栏","接收译文展示","快捷话术填入","会话卡片显示客户标签","协同条的跟进状态与下次跟进可跳转到跟进闭环并定位该客户"],"notes":""},{"id":"P-ACCOUNTS","name":"WhatsApp 账号","decision":"首轮原型","basis":"用户明确","originalIds":["ACC","D04","D15"],"screens":["accounts"],"features":["账号状态","备注","负责人","新增演示账号","模拟恢复连接","按账号进入会话"],"notes":"接入方式与代理环境另行敲定。"},{"id":"P-CUSTOMERS","name":"客户库与档案","decision":"首轮原型","basis":"用户明确","originalIds":["CUST","CUSTDETAIL","D11","D12"],"screens":["customers"],"features":["搜索与筛选","跟进状态","标签","来源","归属账号与聊手","客户备注","批量标签","重复客户提示","主管转交","客户等级（S/A/B/C/D）","客户状态（已成交/弃单/自然线索）","按等级与状态筛选","导出含等级与状态","订单追踪（首次联系时间、订单下单时间与物流状态，手动登记）"],"notes":"跨账号是否合并、跨聊手是否共享需确认。"},{"id":"P-TAGS","name":"标签体系","decision":"首轮原型","basis":"用户明确；作用域是提案","originalIds":["TAGS","TAGSTATS","D11"],"screens":["tags"],"features":["公共标签","个人标签","分组","新建/编辑","颜色","按标签定位客户"],"notes":"标签完全自定义，用于筛选跟进队列，并可在完成或结束跟进时同步更新。"},{"id":"P-FOLLOW","name":"跟进闭环","decision":"首轮原型","basis":"用户此前要求防漏跟进","originalIds":["FOLLOW","D11","D14"],"screens":["followups"],"features":["待办队列（逾期/今日/全部）","待处理信号（待回复/逾期/断档/复联）","完成跟进必须安排下一步或结束跟进","已结束跟进与重新跟进","按标签筛选","操作日志"],"notes":"每位客户要么有下一步跟进，要么已明确结束跟进。"},{"id":"P-TEAM","name":"团队与权限","decision":"本轮不展示","basis":"团队管理归主站","originalIds":["ORG","STAFF","ORGAUDIT"],"screens":[],"features":["团队成员","账号分配","客户转交","权限边界展示","新增演示成员"],"notes":"团队成员、账号分配和交接归主站管理。"},{"id":"P-ASSIST","name":"翻译与快捷回复","decision":"首轮原型","basis":"此前需求；本轮做辅助交互","originalIds":["D06","D08","ops-reply"],"screens":["inbox"],"features":["接收译文","示例话术","发送前语言提示"],"notes":"翻译经由 AI 接入点调用：服务器配置了模型服务时为真实翻译，否则为演示文案。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，译文语言与是否产生译文在「AI 能力」页设置。"},{"id":"P-WALLET","name":"钱包地址监控","decision":"待定","basis":"用户表示尚不理解，未批准删除或保留","originalIds":["control-wallet"],"screens":[],"features":["地址监控","可信钱包白名单","记录/拦截/通知策略"],"explanation":"用于识别聊天内容中的加密货币钱包地址，例如防止发出非公司收款地址；并非公司钱包余额、订单或收款账本。","sourceBoundary":"2026-11-08解析时，出海猫页面明确提示客户端检测正在开发，配置仅先保存。","notes":""},{"id":"P-GUARD","name":"敏感词与敏感行为","decision":"待定","basis":"待用户评审原清单","originalIds":["control-sensitive","control-behavior","D17"],"screens":[],"features":["敏感内容策略","删除/编辑行为审计"],"notes":"规则和告警范围未确认。"},{"id":"P-MATERIALS","name":"素材管理","decision":"保留","basis":"用户评审备注确认保留","originalIds":["ops-material"],"screens":["materials"],"features":["素材分组","素材维护","预览","导入导出"],"notes":"运营管理保留素材管理。"},{"id":"P-REPLY-MANAGEMENT","name":"快捷回复管理","decision":"本轮不展示","basis":"用户评审备注确认暂缓","originalIds":["ops-reply"],"screens":[],"features":["公共快捷回复模板维护"],"notes":"运营管理的快捷回复页面暂缓。"},{"id":"P-AUTO","name":"自动回复","decision":"本轮不展示","basis":"用户评审备注确认暂缓","originalIds":["ops-keyword","ops-welcome","D09"],"screens":[],"features":["关键词回复","欢迎语"],"notes":"关键词回复和欢迎语回复暂缓。"},{"id":"P-BROADCAST","name":"群发","decision":"本轮不展示","basis":"用户评审备注确认暂缓","originalIds":["ops-mass","D10"],"screens":[],"features":["群发任务"],"notes":"群发暂时不做。"},{"id":"P-ATTRIBUTION","name":"广告来源与归因","decision":"待定","basis":"Facebook转WhatsApp的既有业务背景","originalIds":["SHUNT","openchat-settings","pool-share"],"screens":["inbox","customers"],"features":["原型中展示示例来源","真实广告关联/回传流程待确认"],"notes":"示例广告名称不代表已连接Meta。"},{"id":"P-ORDERS","name":"订单与业务系统对接","decision":"待定","basis":"此前提及需要，具体工作流尚未敲定","originalIds":[],"screens":[],"features":[],"notes":"不预设ERP、支付方式或产品结构。"},{"id":"P-NETWORK","name":"代理、网络和会话环境","decision":"待定","basis":"取决于接入路线","originalIds":["PROXY","D15","D16"],"screens":[],"features":[],"notes":"接入路线确定后再明确需要哪些配置。"},{"id":"P-LEGACY","name":"工单、底库、分流与号池","decision":"待定","basis":"用户尚未完成清单取舍","originalIds":["CLUE","BASE","TICKETVIEW","WORKSHARE","SHUNT","pool-share"],"screens":[],"features":[],"notes":"与内部客户去重、路由分配分开确认。"},{"id":"P-COMMERCIAL","name":"SaaS商业化界面","decision":"本轮不展示","basis":"用户明确内部自用、不商业化","originalIds":["PLAN","RECHARGE","RECHARGELOG","WALLETLOG","CHARLOG","BUYLOG","PROMO"],"screens":[],"features":[],"notes":"套餐、充值、推广返利、字符售卖和端口授权不进入原型导航。真实运营成本与用量可以后续单独考虑。"},{"id":"P-CHAT-REVIEW","name":"聊天记录归档","decision":"首轮原型","basis":"用户要求把会话移入聊天记录用于绩效复盘与审核，不设评分（2026-11-17）","originalIds":[],"screens":["chat-records"],"features":["从 WhatsApp 会话移入快照","移入原因","快照内搜索与译文开关","移出聊天记录"],"notes":"快照与实时会话相互独立；不设评分，也不做结论分类。"},{"id":"P-AI","name":"AI 能力接入","decision":"首轮原型","basis":"用户要求为后续接入 AI 接口预留接入点（2026-11-17）","originalIds":[],"screens":["ai","inbox"],"features":["统一 AI 接入点","能力清单与逐项启停","逐次用量记录与按能力累计","接收消息翻译与发送前翻译经接入点调用","服务器中转调用模型服务（密钥仅存于服务器）","译文语言设置","本地演示提供方（未配置或离线时）"],"notes":"服务器配置了模型服务时，翻译经本站服务器中转调用真实模型，密钥不进入浏览器；未配置或以文件方式打开时退回本地演示。中转接口目前不设访问限制。用量记录仅作计量留存，本轮不含商业化内容。"}],"review":{"items":[{"id":"LAYOUT","title":"工作台布局","question":"会话、聊天、客户档案的宽度与位置是否顺手？","status":"待评审","notes":""},{"id":"OWNERSHIP","title":"客户归属","question":"客户属于聊手、账号还是团队？重复进线和转交时如何处理？","status":"待评审","notes":""},{"id":"TAGS","title":"标签体系","question":"公共标签和个人标签是否都需要？谁能创建和修改？","status":"待评审","notes":""},{"id":"CONNECTION","title":"账号接入","question":"首版采用 OpenWA 桥接。请评审 WhatsApp Business 扫码绑定、连接状态和重新绑定流程。","status":"待评审","notes":""},{"id":"SCOPE","title":"待定模块","question":"钱包监控、自动化、订单、广告归因等逐项确定保留/魔改/不需要。","status":"待评审","notes":""},{"id":"ENGAGEMENT","title":"客户跟进闭环","question":"生命周期阶段与漏斗已暂缓。请评审跟进闭环是否够用：完成跟进时必须安排下一步或结束跟进；客户待回复、跟进已逾期、跟进断档、复联待处理四类信号；以自定义标签辅助筛选。","status":"待评审","notes":""},{"id":"CUSTOMER_GRADING","title":"客户等级与客户状态","question":"客户等级（S / A / B / C / D）与客户状态（已成交 / 弃单 / 自然线索）均为手动设置，可在聊天界面调整。请评审各等级的含义、状态选项是否齐全，以及是否需要在更多位置展示。","status":"待评审","notes":""},{"id":"CHAT_REVIEW","title":"聊天记录归档","question":"聊天记录只保存从 WhatsApp 会话移入的快照，移入时必须填写原因；不设评分，也不做结论分类。请评审：由谁移入、谁可以查看。","status":"待评审","notes":""},{"id":"AI_HOOKS","title":"AI 能力接入","question":"AI 功能（目前为接收消息翻译与发送前翻译）统一经由一个接入点调用，可逐项启停，并逐次记录用量。服务器配置了模型服务时，翻译由本站服务器中转调用真实模型，密钥只保存在服务器；未配置时返回演示结果。请评审：还需要接入哪些 AI 能力、由谁管理启停与译文语言、用量按什么口径统计，以及中转接口是否需要访问限制。","status":"待评审","notes":""},{"id":"ORDER_TRACKING","title":"订单追踪","question":"客户档案新增「订单追踪」栏：显示客户首次联系时间，并按订单号分区列出每笔订单，订单号旁显示下单时间。每个订单的分区内，订单每到达一个物流状态就新增一条记录（状态与时间）：登记订单时为「待发货」并带下单时间，此后由两个按钮更新——沿「待发货 → 已发货 → 已签收」逐步推进，或在签收前标记为「异常」；「撤销上一步」可随时撤回最近一步，已签收与异常同样可撤回。订单由聊手手动登记，未对接店铺或物流系统。请评审：物流路径与状态是否齐全，撤销是否需要限制，订单还需要记录哪些信息，日后是否对接业务系统。","status":"待评审","notes":""}]},"implementationBoundary":{"realAccounts":false,"externalMessages":false,"externalNetworkCalls":false,"productionAuth":false,"serverDatabase":false,"deployment":false,"persistence":"演示数据与评审备注仅保存在当前浏览器本地；可导出需求与评审JSON。","nextPhase":"用户确认原型布局、功能和关键规则后，再规划真实接入与开发。"},"sourceRequirements":"../whatsapp-scrm-requirements-v0.2.json","uxRevision":{"scope":"以出海猫可见界面为参照，按内部WhatsApp需求复刻UI","workflow":"Jakeschincariol/replica-skill: recon → design → build → test","productionDevelopment":false,"layout":["浅色240px分组侧栏","56px顶部工具栏","51px多页签条","白色查询与表格面板","分组和标签列表","会话与右侧工具栏"],"assetPolicy":"自己的名称、图标、文案和中性色；参考截图不进入打包"}};
+  <script>window.WA_ICONS={"MessagesSquare":[["path",{"d":"M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"}],["path",{"d":"M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"}]],"PanelLeftClose":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m16 15-3-3 3-3"}]],"Menu":[["path",{"d":"M4 5h16"}],["path",{"d":"M4 12h16"}],["path",{"d":"M4 19h16"}]],"Bell":[["path",{"d":"M10.268 21a2 2 0 0 0 3.464 0"}],["path",{"d":"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}]],"LogOut":[["path",{"d":"m16 17 5-5-5-5"}],["path",{"d":"M21 12H9"}],["path",{"d":"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]],"ChevronRight":[["path",{"d":"m9 18 6-6-6-6"}]],"X":[["path",{"d":"M18 6 6 18"}],["path",{"d":"m6 6 12 12"}]],"PanelLeftOpen":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m14 9 3 3-3 3"}]],"Inbox":[["polyline",{"points":"22 12 16 12 14 15 10 15 8 12 2 12"}],["path",{"d":"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"}]],"Star":[["path",{"d":"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"}]],"PanelsTopLeft":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M3 9h18"}],["path",{"d":"M9 21V9"}]],"SquarePen":[["path",{"d":"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}],["path",{"d":"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"}]],"MessageCircle":[["path",{"d":"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"}]],"ChevronDown":[["path",{"d":"m6 9 6 6 6-6"}]],"Search":[["path",{"d":"m21 21-4.34-4.34"}],["circle",{"cx":"11","cy":"11","r":"8"}]],"ShieldCheck":[["path",{"d":"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"}],["path",{"d":"m9 12 2 2 4-4"}]],"ArrowLeft":[["path",{"d":"m12 19-7-7 7-7"}],["path",{"d":"M19 12H5"}]],"CalendarPlus":[["path",{"d":"M16 19h6"}],["path",{"d":"M16 2v4"}],["path",{"d":"M19 16v6"}],["path",{"d":"M21 12.598V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8.5"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 2v4"}]],"ContactRound":[["path",{"d":"M16 2v2"}],["path",{"d":"M17.915 22a6 6 0 0 0-12 0"}],["path",{"d":"M8 2v2"}],["circle",{"cx":"12","cy":"12","r":"4"}],["rect",{"x":"3","y":"4","width":"18","height":"18","rx":"2"}]],"EllipsisVertical":[["circle",{"cx":"12","cy":"12","r":"1"}],["circle",{"cx":"12","cy":"5","r":"1"}],["circle",{"cx":"12","cy":"19","r":"1"}]],"Target":[["circle",{"cx":"12","cy":"12","r":"10"}],["circle",{"cx":"12","cy":"12","r":"6"}],["circle",{"cx":"12","cy":"12","r":"2"}]],"Link":[["path",{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["path",{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]],"WifiOff":[["path",{"d":"M12 20h.01"}],["path",{"d":"M8.5 16.429a5 5 0 0 1 7 0"}],["path",{"d":"M5 12.859a10 10 0 0 1 5.17-2.69"}],["path",{"d":"M19 12.859a10 10 0 0 0-2.007-1.523"}],["path",{"d":"M2 8.82a15 15 0 0 1 4.177-2.643"}],["path",{"d":"M22 8.82a15 15 0 0 0-11.288-3.764"}],["path",{"d":"m2 2 20 20"}]],"File":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}]],"Languages":[["path",{"d":"m5 8 6 6"}],["path",{"d":"m4 14 6-6 2-3"}],["path",{"d":"M2 5h12"}],["path",{"d":"M7 2h1"}],["path",{"d":"m22 22-5-10-5 10"}],["path",{"d":"M14 18h6"}]],"Check":[["path",{"d":"M20 6 9 17l-5-5"}]],"CheckCheck":[["path",{"d":"M18 6 7 17l-5-5"}],["path",{"d":"m22 10-7.5 7.5L13 16"}]],"Paperclip":[["path",{"d":"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"}]],"MessageSquareText":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"M7 11h10"}],["path",{"d":"M7 15h6"}],["path",{"d":"M7 7h8"}]],"Send":[["path",{"d":"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"}],["path",{"d":"m21.854 2.147-10.94 10.939"}]],"Keyboard":[["path",{"d":"M10 8h.01"}],["path",{"d":"M12 12h.01"}],["path",{"d":"M14 8h.01"}],["path",{"d":"M16 12h.01"}],["path",{"d":"M18 8h.01"}],["path",{"d":"M6 8h.01"}],["path",{"d":"M7 16h10"}],["path",{"d":"M8 12h.01"}],["rect",{"width":"20","height":"16","x":"2","y":"4","rx":"2"}]],"Plus":[["path",{"d":"M5 12h14"}],["path",{"d":"M12 5v14"}]],"Copy":[["rect",{"width":"14","height":"14","x":"8","y":"8","rx":"2","ry":"2"}],["path",{"d":"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"}]],"Clock3":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 6v6h4"}]],"CircleCheck":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"RotateCcw":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}]],"RefreshCw":[["path",{"d":"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}],["path",{"d":"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"}],["path",{"d":"M8 16H3v5"}]],"Pencil":[["path",{"d":"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"}],["path",{"d":"m15 5 4 4"}]],"Info":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 16v-4"}],["path",{"d":"M12 8h.01"}]],"Tags":[["path",{"d":"M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"}],["path",{"d":"M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193"}],["circle",{"cx":"10.5","cy":"6.5","r":".5","fill":"currentColor"}]],"ArrowRightLeft":[["path",{"d":"m16 3 4 4-4 4"}],["path",{"d":"M20 7H4"}],["path",{"d":"m8 21-4-4 4-4"}],["path",{"d":"M4 17h16"}]],"UserRoundPlus":[["path",{"d":"M2 21a8 8 0 0 1 13.292-6"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M19 16v6"}],["path",{"d":"M22 19h-6"}]],"ClipboardList":[["rect",{"width":"8","height":"4","x":"8","y":"2","rx":"1","ry":"1"}],["path",{"d":"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"}],["path",{"d":"M12 11h4"}],["path",{"d":"M12 16h4"}],["path",{"d":"M8 11h.01"}],["path",{"d":"M8 16h.01"}]],"UserRound":[["circle",{"cx":"12","cy":"8","r":"5"}],["path",{"d":"M20 21a8 8 0 0 0-16 0"}]],"LockKeyhole":[["circle",{"cx":"12","cy":"16","r":"1"}],["rect",{"x":"3","y":"10","width":"18","height":"12","rx":"2"}],["path",{"d":"M7 10V7a5 5 0 0 1 10 0v3"}]],"Settings2":[["path",{"d":"M14 17H5"}],["path",{"d":"M19 7h-9"}],["circle",{"cx":"17","cy":"17","r":"3"}],["circle",{"cx":"7","cy":"7","r":"3"}]],"UsersRound":[["path",{"d":"M18 21a8 8 0 0 0-16 0"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"}]],"SlidersHorizontal":[["path",{"d":"M10 5H3"}],["path",{"d":"M12 19H3"}],["path",{"d":"M14 3v4"}],["path",{"d":"M16 17v4"}],["path",{"d":"M21 12h-9"}],["path",{"d":"M21 19h-5"}],["path",{"d":"M21 5h-7"}],["path",{"d":"M8 10v4"}],["path",{"d":"M8 12H3"}]],"FileText":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M10 9H8"}],["path",{"d":"M16 13H8"}],["path",{"d":"M16 17H8"}]],"ChevronUp":[["path",{"d":"m18 15-6-6-6 6"}]],"NotebookPen":[["path",{"d":"M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"}],["path",{"d":"M2 6h4"}],["path",{"d":"M2 10h4"}],["path",{"d":"M2 14h4"}],["path",{"d":"M2 18h4"}],["path",{"d":"M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"}]],"ChevronLeft":[["path",{"d":"m15 18-6-6 6-6"}]],"LayoutDashboard":[["rect",{"width":"7","height":"9","x":"3","y":"3","rx":"1"}],["rect",{"width":"7","height":"5","x":"14","y":"3","rx":"1"}],["rect",{"width":"7","height":"9","x":"14","y":"12","rx":"1"}],["rect",{"width":"7","height":"5","x":"3","y":"16","rx":"1"}]],"Smartphone":[["rect",{"width":"14","height":"20","x":"5","y":"2","rx":"2","ry":"2"}],["path",{"d":"M12 18h.01"}]],"ChartColumn":[["path",{"d":"M3 3v16a2 2 0 0 0 2 2h16"}],["path",{"d":"M18 17V9"}],["path",{"d":"M13 17V5"}],["path",{"d":"M8 17v-3"}]],"Images":[["path",{"d":"m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"}],["path",{"d":"M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"}],["circle",{"cx":"13","cy":"7","r":"1","fill":"currentColor"}],["rect",{"x":"8","y":"2","width":"14","height":"14","rx":"2"}]],"Network":[["rect",{"x":"16","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"2","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"9","y":"2","width":"6","height":"6","rx":"1"}],["path",{"d":"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"}],["path",{"d":"M12 12V8"}]],"Trash2":[["path",{"d":"M10 11v6"}],["path",{"d":"M14 11v6"}],["path",{"d":"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}],["path",{"d":"M3 6h18"}],["path",{"d":"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}]],"RotateCw":[["path",{"d":"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}]],"Tag":[["path",{"d":"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"}],["circle",{"cx":"7.5","cy":"7.5","r":".5","fill":"currentColor"}]],"Eraser":[["path",{"d":"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"}],["path",{"d":"m5.082 11.09 8.828 8.828"}]],"FileDown":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M12 18v-6"}],["path",{"d":"m9 15 3 3 3-3"}]],"Bot":[["path",{"d":"M12 8V4H8"}],["rect",{"width":"16","height":"12","x":"4","y":"8","rx":"2"}],["path",{"d":"M2 14h2"}],["path",{"d":"M20 14h2"}],["path",{"d":"M15 13v2"}],["path",{"d":"M9 13v2"}]],"ListOrdered":[["path",{"d":"M11 5h10"}],["path",{"d":"M11 12h10"}],["path",{"d":"M11 19h10"}],["path",{"d":"M4 4h1v5"}],["path",{"d":"M4 9h2"}],["path",{"d":"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"}]],"StickyNote":[["path",{"d":"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"}],["path",{"d":"M15 3v5a1 1 0 0 0 1 1h5"}]],"QrCode":[["rect",{"width":"5","height":"5","x":"3","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"16","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"3","y":"16","rx":"1"}],["path",{"d":"M21 16h-3a2 2 0 0 0-2 2v3"}],["path",{"d":"M21 21v.01"}],["path",{"d":"M12 7v3a2 2 0 0 1-2 2H7"}],["path",{"d":"M3 12h.01"}],["path",{"d":"M12 3h.01"}],["path",{"d":"M12 16v.01"}],["path",{"d":"M16 12h1"}],["path",{"d":"M21 12v.01"}],["path",{"d":"M12 21v-1"}]],"LoaderCircle":[["path",{"d":"M21 12a9 9 0 1 1-6.219-8.56"}]],"ScanQrCode":[["path",{"d":"M17 12v4a1 1 0 0 1-1 1h-4"}],["path",{"d":"M17 3h2a2 2 0 0 1 2 2v2"}],["path",{"d":"M17 8V7"}],["path",{"d":"M21 17v2a2 2 0 0 1-2 2h-2"}],["path",{"d":"M3 7V5a2 2 0 0 1 2-2h2"}],["path",{"d":"M7 17h.01"}],["path",{"d":"M7 21H5a2 2 0 0 1-2-2v-2"}],["rect",{"x":"7","y":"7","width":"5","height":"5","rx":"1"}]],"ArrowRight":[["path",{"d":"M5 12h14"}],["path",{"d":"m12 5 7 7-7 7"}]],"ClockAlert":[["path",{"d":"M12 6v6l4 2"}],["path",{"d":"M20 12v5"}],["path",{"d":"M20 21h.01"}],["path",{"d":"M21.25 8.2A10 10 0 1 0 16 21.16"}]],"CalendarDays":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 14h.01"}],["path",{"d":"M12 14h.01"}],["path",{"d":"M16 14h.01"}],["path",{"d":"M8 18h.01"}],["path",{"d":"M12 18h.01"}],["path",{"d":"M16 18h.01"}]],"CalendarCheck":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"m9 16 2 2 4-4"}]],"MessageSquareCheck":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.7.7 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m9 11 2 2 4-4"}]],"MessageSquare":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}]],"BadgeCheck":[["path",{"d":"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"}],["path",{"d":"m9 12 2 2 4-4"}]],"Flame":[["path",{"d":"M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"}]],"Zap":[["path",{"d":"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"}]],"TriangleAlert":[["path",{"d":"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"}],["path",{"d":"M12 9v4"}],["path",{"d":"M12 17h.01"}]],"Archive":[["rect",{"width":"20","height":"5","x":"2","y":"3","rx":"1"}],["path",{"d":"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}],["path",{"d":"M10 12h4"}]],"Sparkles":[["path",{"d":"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"}],["path",{"d":"M20 2v4"}],["path",{"d":"M22 4h-4"}],["circle",{"cx":"4","cy":"20","r":"2"}]],"CalendarClock":[["path",{"d":"M16 14v2.2l1.6 1"}],["path",{"d":"M16 2v4"}],["path",{"d":"M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"}],["path",{"d":"M3 10h5"}],["path",{"d":"M8 2v4"}],["circle",{"cx":"16","cy":"16","r":"6"}]],"CheckCircle2":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"Compass":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"}]],"Layers":[["path",{"d":"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"}],["path",{"d":"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"}],["path",{"d":"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"}]],"History":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}],["path",{"d":"M12 7v5l4 2"}]],"MessageSquareReply":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m10 8-3 3 3 3"}],["path",{"d":"M17 14v-1a2 2 0 0 0-2-2H7"}]],"Filter":[["path",{"d":"M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"}]]};
 </script><script>window.WA_DEMO = (() => {
   const day = new Date(); day.setHours(10,0,0,0);
   const at = (days,hour=10) => { const d=new Date(day);d.setDate(d.getDate()+days);d.setHours(hour,0,0,0);return d.toISOString(); };
@@ -4251,397 +4229,11 @@ dialog>#toast,dialog>#toast.show{transform:none}
 })();
 </script><script>(() => {
   'use strict';
-
-  const noteLimit = 8000;
-  const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const routePattern = /^[a-z0-9_-]{1,40}$/i;
-
-  function oneLine(value, limit) {
-    return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : '';
-  }
-
-  function normalize(record) {
-    if (!record || typeof record !== 'object' || typeof record.id !== 'string' || !idPattern.test(record.id)) {
-      throw new TypeError('备注编号无效，请重新点选控件。');
-    }
-    const createdAt = new Date(record.createdAt);
-    if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== record.createdAt) {
-      throw new TypeError('备注时间无效，请重新点选控件。');
-    }
-    if (typeof record.route !== 'string' || !routePattern.test(record.route)) {
-      throw new TypeError('页面位置无效，请重新点选控件。');
-    }
-    if (typeof record.note !== 'string' || !record.note.trim() || record.note.length > noteLimit) {
-      throw new TypeError('请填写备注，最多 8000 字符。');
-    }
-
-    const selector = typeof record.selector === 'string' ? record.selector.trim() : '';
-    if (!selector || selector.length > 2048 || /[\r\n]/.test(selector)) {
-      throw new TypeError('找不到选中的控件，请重新点选。');
-    }
-
-    return {
-      id: record.id.toLowerCase(),
-      createdAt: record.createdAt,
-      route: record.route.toLowerCase(),
-      page: oneLine(record.page, 120),
-      dialog: oneLine(record.dialog, 120),
-      target: oneLine(record.target, 160),
-      selector,
-      perspective: oneLine(record.perspective, 80),
-      viewport: oneLine(record.viewport, 40),
-      version: oneLine(record.version, 60),
-      note: record.note.replace(/\r\n?/g, '\n').trimEnd(),
-    };
-  }
-
-  function localTimestamp(iso) {
-    return new Date(Date.parse(iso) + 8 * 60 * 60 * 1000).toISOString().slice(0, 19);
-  }
-
-  function fileName(record) {
-    const time = localTimestamp(record.createdAt).replace('T', '_').replaceAll(':', '-');
-    const id = record.id.replaceAll('-', '').slice(0, 12);
-    return `${time}_${record.route}_${id}.md`;
-  }
-
-  function inlineCode(value) {
-    const longest = Math.max(0, ...Array.from(value.matchAll(/`+/g), match => match[0].length));
-    const fence = '`'.repeat(longest + 1);
-    return `${fence} ${value} ${fence}`;
-  }
-
-  function markdown(record) {
-    return [
-      '# WA Desk 原型修改',
-      '',
-      `- 页面：${record.page || record.route}（${inlineCode('#' + record.route)}）`,
-      record.dialog ? `- 所在弹窗：${record.dialog}` : null,
-      `- 选中控件：${record.target || '页面元素'}`,
-      `- 元素定位：${inlineCode(record.selector)}`,
-      record.perspective ? `- 评审视角：${record.perspective}` : null,
-      record.viewport ? `- 视口：${record.viewport}` : null,
-      record.version ? `- 原型版本：${record.version}` : null,
-      `- 提交时间：${localTimestamp(record.createdAt).replace('T', ' ')}（UTC+8）`,
-      '',
-      '## 修改要求',
-      '',
-      record.note,
-      '',
-    ].filter(line => line !== null).join('\n');
-  }
-
-  const format = { noteLimit, normalize, fileName, markdown };
-  if (typeof module === 'object' && module.exports) module.exports = format;
-  else window.WAReviewPromptFormat = format;
-})();
-
-(() => {
-  'use strict';
-
-  const actionSelector = 'button, a, input:not([type="hidden"]), select, textarea, label, [role="button"], [role="tab"], [data-action], [data-nav]';
-  const selectorAttributes = ['data-action', 'data-id', 'data-nav', 'data-view', 'name', 'aria-label'];
-  const format = window.WAReviewPromptFormat;
-
-  function inspectable(element) {
-    if (!(element instanceof Element) || element.closest('#toast, #element-review-dialog')) return null;
-    if (!element.closest('#app-shell, #dialog, .fid-float-review')) return null;
-    return element.closest(actionSelector) || element.closest('svg')?.parentElement || element;
-  }
-
-  function labelFor(element) {
-    const label = element.getAttribute('aria-label') || element.labels?.[0]?.innerText ||
-      element.getAttribute('placeholder') || element.getAttribute('title') ||
-      element.innerText || element.getAttribute('name') || element.localName;
-    return label.replace(/\s+/g, ' ').trim().slice(0, 160) || element.localName;
-  }
-
-  function selectorPart(element) {
-    if (element.id) return '#' + CSS.escape(element.id);
-    const attributes = selectorAttributes.flatMap(name => {
-      const value = element.getAttribute(name);
-      return value && value.length <= 100 ? [`[${name}=${CSS.escape(value)}]`] : [];
-    });
-    if (attributes.length) return element.localName + attributes.join('');
-    const className = Array.from(element.classList).find(name => name.startsWith('fid-'));
-    return element.localName + (className ? '.' + CSS.escape(className) : '');
-  }
-
-  function locatorFor(element) {
-    const path = [];
-    for (let node = element; node && node !== document.body; node = node.parentElement) {
-      const part = selectorPart(node);
-      const candidate = [part, ...path].join(' > ');
-      const matches = document.querySelectorAll(candidate);
-      if (matches.length === 1 && matches[0] === element) return candidate;
-
-      const siblings = Array.from(node.parentElement.children);
-      const matchingSiblings = siblings.filter(sibling => sibling.matches(part));
-      if (matchingSiblings.length === 1) {
-        path.unshift(part);
-      } else {
-        const index = siblings.filter(sibling => sibling.localName === node.localName).indexOf(node) + 1;
-        path.unshift(`${part}:nth-of-type(${index})`);
-      }
-    }
-    return ['body', ...path].join(' > ');
-  }
-
-  function contextFor(element) {
-    const main = document.querySelector('#view');
-    const page = main?.querySelector('h1')?.textContent?.trim() ||
-      document.querySelector('#workspace-tabs [aria-current="page"]')?.textContent?.trim() || 'WA Desk';
-    const parentDialog = element.closest('dialog[open]');
-    return {
-      route: location.hash.slice(1) || 'inbox',
-      page,
-      dialog: parentDialog?.getAttribute('aria-label') || '',
-      target: labelFor(element),
-      selector: locatorFor(element),
-      perspective: document.getElementById('app-shell')?.dataset.reviewPerspective || '',
-      viewport: `${innerWidth} × ${innerHeight} px`,
-      version: window.WA_REQUIREMENTS?.version || '',
-    };
-  }
-
-  function downloadPrompt(record) {
-    const file = new Blob([format.markdown(record)], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = format.fileName(record);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return link.download;
-  }
-
-  async function savePrompt(record) {
-    const response = await fetch('/api/review-prompts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record),
-      signal: AbortSignal.timeout(10000),
-    }).catch(() => { throw new Error('无法连接本地预览服务。'); });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || typeof result?.filename !== 'string') {
-      throw new Error(result?.error || '预览服务未能保存备注。');
-    }
-    return result.filename;
-  }
-
-  window.initWAElementReview = function initWAElementReview(toast) {
-    const dialog = document.getElementById('element-review-dialog');
-    const form = document.getElementById('element-review-entry');
-    const textarea = document.getElementById('element-review-note');
-    const contextText = document.getElementById('element-review-context');
-    const saveHint = document.getElementById('element-review-destination');
-    const submit = form.querySelector('button[type="submit"]');
-    const fallback = form.querySelector('[data-element-review-download]');
-    const feedback = document.getElementById('element-review-error');
-    const dismissButtons = form.querySelectorAll('[data-element-review-dismiss]');
-    const localServer = location.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(location.hostname);
-
-    textarea.maxLength = format.noteLimit;
-    saveHint.textContent = localServer ? '每条备注保存为一份 Markdown 文件' : '提交后下载 Markdown 文件';
-
-    let armed = false;
-    let outline = null;
-    let selected = null;
-    let lastPointer = null;
-    let pressedTarget = null;
-    let context = null;
-    let pendingRecord = null;
-    let saving = false;
-
-    function mark(element) {
-      if (outline === element) return;
-      outline?.classList.remove('element-review-target');
-      outline = element;
-      outline?.classList.add('element-review-target');
-    }
-
-    function stopPick() {
-      armed = false;
-      pressedTarget = null;
-      document.body.classList.remove('element-review-picking');
-      if (!dialog.open) mark(null);
-    }
-
-    function showError(message = '') {
-      feedback.textContent = message;
-      feedback.hidden = !message;
-    }
-
-    function openNote(element) {
-      if (dialog.open || !element.isConnected) return;
-      stopPick();
-      context = contextFor(element);
-      selected = element;
-      mark(element);
-      contextText.textContent = [context.page, context.dialog, context.target].filter(Boolean).join(' › ');
-      textarea.value = '';
-      pendingRecord = null;
-      fallback.hidden = true;
-      showError();
-      dialog.showModal();
-      textarea.focus();
-    }
-
-    function isPicking(event) {
-      return !dialog.open && (armed || event.altKey) && !event.ctrlKey && !event.metaKey;
-    }
-
-    window.addEventListener('pointermove', event => {
-      lastPointer = { x: event.clientX, y: event.clientY };
-      if (!dialog.open) mark(isPicking(event) ? inspectable(event.target) : null);
-    }, { passive: true });
-    document.addEventListener('pointerleave', () => {
-      lastPointer = null;
-      if (!dialog.open) mark(null);
-    });
-    window.addEventListener('keydown', event => {
-      if (event.key === 'Alt' && lastPointer && !dialog.open) {
-        mark(inspectable(document.elementFromPoint(lastPointer.x, lastPointer.y)));
-      }
-      if (event.key === 'Escape' && armed) {
-        stopPick();
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-      if (event.key === 'Enter' && event.ctrlKey && dialog.open && !saving && !event.isComposing) {
-        event.preventDefault();
-        form.requestSubmit();
-      }
-    }, true);
-    window.addEventListener('keyup', event => {
-      if (event.key === 'Alt' && !dialog.open && !armed) mark(null);
-    });
-    window.addEventListener('blur', () => {
-      lastPointer = null;
-      stopPick();
-    });
-
-    // Cancel native select popups and text focus before the modified click.
-    window.addEventListener('pointerdown', event => {
-      pressedTarget = event.button === 0 && isPicking(event) ? inspectable(event.target) : null;
-      if (!pressedTarget) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }, true);
-
-    window.addEventListener('pointerup', event => {
-      const target = pressedTarget;
-      if (!target) return;
-      // Disabled controls can emit pointer events without emitting click.
-      if (event.button === 0 && target.matches(':disabled') && target === inspectable(event.target)) {
-        event.preventDefault();
-        setTimeout(() => openNote(target), 0);
-      }
-      setTimeout(() => { if (pressedTarget === target) pressedTarget = null; }, 0);
-    }, true);
-    window.addEventListener('pointercancel', () => { pressedTarget = null; });
-
-    window.addEventListener('click', event => {
-      if (!(event.target instanceof Element) || dialog.open || event.button !== 0) return;
-      const element = inspectable(event.target);
-      if (element && (isPicking(event) || pressedTarget === element)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        openNote(element);
-        return;
-      }
-      const start = event.target.closest('[data-element-review-start]');
-      if (!start) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      start.closest('dialog')?.close();
-      armed = true;
-      document.body.classList.add('element-review-picking');
-      toast('点一下要备注的元素，按 Esc 退出。');
-    }, true);
-
-    function setSaving(state) {
-      saving = state;
-      textarea.readOnly = state;
-      submit.disabled = state;
-      fallback.disabled = state;
-      dismissButtons.forEach(button => { button.disabled = state; });
-      submit.textContent = state ? '保存中…' : '提交备注';
-      form.setAttribute('aria-busy', String(state));
-    }
-
-    function recordForInput() {
-      const note = textarea.value;
-      const normalizedNote = note.replace(/\r\n?/g, '\n').trimEnd();
-      if (pendingRecord?.note === normalizedNote) return pendingRecord;
-      pendingRecord = format.normalize({ ...context, id: crypto.randomUUID(), createdAt: new Date().toISOString(), note });
-      return pendingRecord;
-    }
-
-    async function submitNote(download = false) {
-      if (saving || !dialog.open) return;
-      if (!textarea.value.trim()) {
-        showError('请填写希望修改的内容。');
-        textarea.focus();
-        return;
-      }
-      setSaving(true);
-      showError();
-      const saveLocally = localServer && !download;
-      try {
-        const record = recordForInput();
-        const filename = saveLocally ? await savePrompt(record) : downloadPrompt(record);
-        dialog.close();
-        toast(saveLocally ? `已保存 ${filename}` : `已发起下载 ${filename}`);
-      } catch (error) {
-        showError(saveLocally ? `${error.message} 备注仍在，可以重试或下载文件。` : error.message);
-        fallback.hidden = !saveLocally;
-        textarea.focus();
-      } finally {
-        setSaving(false);
-      }
-    }
-
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      void submitNote();
-    });
-    textarea.addEventListener('input', () => {
-      if (textarea.value.trim()) showError();
-    });
-    fallback.addEventListener('click', () => void submitNote(true));
-    dismissButtons.forEach(button => button.addEventListener('click', () => {
-      if (!saving) dialog.close();
-    }));
-    dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
-    dialog.addEventListener('close', () => {
-      if (dialog.open) return;
-      mark(null);
-      if (selected?.isConnected && selected.matches(actionSelector) && !selected.matches(':disabled')) {
-        selected.focus?.({ preventScroll: true });
-      }
-      selected = null;
-      context = null;
-      pendingRecord = null;
-    });
-  };
-})();
-</script><script>(() => {
-  'use strict';
   const KEY='wa-desk-scrm-lifecycle-v06';
   const clone=x=>JSON.parse(JSON.stringify(x));
   let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}
   let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
-  let req=clone(window.WA_REQUIREMENTS);
-  if(saved?.requirements){for(const module of req.modules){const previous=saved.requirements.modules?.find(x=>x.id===module.id);if(previous){
-      const previousDefaultNotes={'P-AUTO':'不因原产品存在而自动纳入。','P-TEAM':'角色切换仅用于原型评审，不是生产鉴权。','P-CHAT-REVIEW':'快照与实时会话相互独立；正式版由主管在主站质检，原型开放操作以便评审。'};
-      const revisedScope=Object.hasOwn(previousDefaultNotes,module.id)&&previous.basis!==module.basis;
-      if(!revisedScope)module.decision=previous.decision;
-      if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
-    }}for(const item of req.review.items){const previous=saved.requirements.review?.items?.find(x=>x.id===item.id);if(previous){item.status=previous.status;item.notes=previous.notes}}}
-  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
+  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
   const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');
   const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:'c1',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
@@ -4693,7 +4285,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   const unreadCount=()=>myCustomers().reduce((n,c)=>n+c.unread,0);
   const pendingTasks=()=>myTasks().filter(t=>!t.done);
   const draft=c=>ui.drafts[c.id]||{text:'',translated:'',source:''};
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,requirements:req,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
   function toast(message,undo=null) {
     const box=$('#toast'),host=$('#dialog').open?$('#dialog'):document.body;if(box.parentElement!==host)host.append(box);box.dataset.dismissOnClose=undo&&$('#dialog').open?'1':'';box.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.textContent='撤销';button.addEventListener('click',()=>{undo();box.classList.remove('show')},{once:true});box.append(button)}
@@ -4709,10 +4301,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
   function renderNav() {
     const allowed=Object.keys(views).filter(id=>!['team','members'].includes(id)||manager());ui.openTabs=ui.openTabs.filter(id=>allowed.includes(id));if(!ui.openTabs.includes(ui.view))ui.openTabs.push(ui.view);
     $('#app-shell').classList.toggle('nav-collapsed',ui.navCollapsed);
-    $('#nav').innerHTML=menuHTML();$('#pending-count').textContent=req.modules.filter(m=>m.decision==='待定').length;$('.scope-link').classList.toggle('active',ui.view==='scope');
-    $('#app-shell').dataset.reviewPerspective='聊手 · '+me().name;
+    $('#nav').innerHTML=menuHTML();
     $('#header-tasks').textContent=pendingTasks().length;$('#header-tasks').hidden=!pendingTasks().length;
-    const reviewed=req.review.items.filter(i=>i.notes||i.status!=='待评审').length;$('#review-count').textContent=reviewed;$('#review-count').hidden=!reviewed;
     $('#workspace-tabs').innerHTML=ui.openTabs.map(id=>'<div class="workspace-tab '+(id===ui.view?'active':'')+'"><a href="#'+id+'" data-nav="'+id+'"'+(id===ui.view?' aria-current="page"':'')+'>'+icon(viewIcon(id))+'<span>'+views[id]+'</span></a>'+(id==='inbox'||id==='dashboard'||id!==ui.view?'':'<button class="icon-button" aria-label="关闭'+views[id]+'页签" data-action="closeTab" data-id="'+id+'">'+icon('X')+'</button>')+'</div>').join('');
     const collapse=$('.collapse-button');collapse.setAttribute('aria-label',ui.navCollapsed?'展开菜单':'折叠菜单');collapse.innerHTML=icon(ui.navCollapsed?'PanelLeftOpen':'PanelLeftClose')+'<span class="nav-label">'+(ui.navCollapsed?'展开':'收起')+'</span>';
     if(location.hash!=='#'+ui.view)history.replaceState(null,'','#'+ui.view);persist();
@@ -4721,7 +4311,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
     if(!renderSignInState())return;
     const active=document.activeElement,action=active?.dataset?.action,actionId=active?.dataset?.id,activeId=active?.id,stage=active?.dataset?.stage,nav=active?.dataset?.nav;
     const old=$('#messages'),position=old?{customer:old.dataset.customer,top:old.scrollTop,bottom:old.scrollHeight-old.clientHeight-old.scrollTop}:null;
-    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope};
+    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage};
     $('#view').innerHTML=pages[ui.view]();paintIcons();
     if(ui.view==='inbox')requestAnimationFrame(()=>{const el=$('#messages');if(el)el.scrollTop=position&&position.customer===el.dataset.customer&&position.bottom>40?position.top:el.scrollHeight});
     let target=activeId?document.getElementById(activeId):null;
@@ -4758,7 +4348,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
   function profileHTML(c,drawer=false) {
     const m=member(c.owner),a=account(c.account),task=data.tasks.filter(t=>t.customer===c.id&&!t.done).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],dirty=Object.hasOwn(ui.noteDrafts,c.id);
-    const details='<section class="profile-section"><h3>客户标签<button class="link" data-action="assignTags" data-id="'+c.id+'">'+icon('Plus')+'添加</button></h3><div class="tag-row">'+(tagsHTML(c,99,true)||'<span class="muted">还没有标签</span>')+'</div></section><section class="profile-section"><h3>客户归属'+(manager()?'<button class="link" data-action="transfer" data-id="'+c.id+'">转交</button>':'')+'</h3><div class="info-row"><span>负责人</span><span class="small-avatar">'+avatar(m||{name:'未分配'},'small')+esc(m?.name||'未分配')+'</span></div><div class="info-row"><span>聊天账号</span><span>'+esc(a?.name)+'</span></div>'+(c.contactRefs.length>1?'<button class="duplicate-note" data-action="duplicate" data-id="'+c.id+'">'+icon('Copy')+'另有 '+(c.contactRefs.length-1)+' 个账号接触记录'+icon('ChevronRight')+'</button>':'')+'</section><section class="profile-section"><h3>来源信息<span class="sample-label">演示</span></h3><div class="profile-origin">'+icon('Target')+esc(c.source)+'</div><div class="origin-details">'+esc(c.campaign||'未关联广告活动')+'<br>'+esc(c.ad||'来源详情待补充')+'</div></section><div class="profile-permission">归属及可见范围为待确认方案。<br><button class="link" data-action="review">记录评审意见</button></div>';
+    const details='<section class="profile-section"><h3>客户标签<button class="link" data-action="assignTags" data-id="'+c.id+'">'+icon('Plus')+'添加</button></h3><div class="tag-row">'+(tagsHTML(c,99,true)||'<span class="muted">还没有标签</span>')+'</div></section><section class="profile-section"><h3>客户归属'+(manager()?'<button class="link" data-action="transfer" data-id="'+c.id+'">转交</button>':'')+'</h3><div class="info-row"><span>负责人</span><span class="small-avatar">'+avatar(m||{name:'未分配'},'small')+esc(m?.name||'未分配')+'</span></div><div class="info-row"><span>聊天账号</span><span>'+esc(a?.name)+'</span></div>'+(c.contactRefs.length>1?'<button class="duplicate-note" data-action="duplicate" data-id="'+c.id+'">'+icon('Copy')+'另有 '+(c.contactRefs.length-1)+' 个账号接触记录'+icon('ChevronRight')+'</button>':'')+'</section><section class="profile-section"><h3>来源信息<span class="sample-label">演示</span></h3><div class="profile-origin">'+icon('Target')+esc(c.source)+'</div><div class="origin-details">'+esc(c.campaign||'未关联广告活动')+'<br>'+esc(c.ad||'来源详情待补充')+'</div></section><div class="profile-permission">归属及可见范围为待确认方案。</div>';
     const activity=(data.activities[c.id]||[]).map(item=>'<div class="activity">'+esc(item.text)+'<small>'+esc(item.by)+' · '+esc(item.time)+'</small></div>').join('')||empty('还没有跟进记录','更新标签、备注或安排跟进后会显示在这里。');
     const notes='<textarea class="profile-note" data-note-customer="'+c.id+'" id="customer-note-'+c.id+(drawer?'-drawer':'')+'" aria-label="客户备注" placeholder="记下客户需求或下一步计划…">'+esc(dirty?ui.noteDrafts[c.id]:c.notes)+'</textarea><div class="note-save"><span role="status">'+(dirty?'未保存的修改':'已保存到本机')+'</span><button class="button small" data-action="saveNote" data-id="'+c.id+'">保存备注</button></div>';
     return '<aside class="customer-profile'+(drawer?' in-drawer':'')+'" aria-label="客户资料"><div class="profile-head"><span>客户资料</span><button class="icon-button" '+(drawer?'data-action="close" aria-label="关闭客户资料"':'data-action="toggleProfile" aria-label="收起客户资料"')+'>'+icon('X')+'</button></div><div class="profile-top"><div class="profile-topline">'+avatar(c,'large')+'<div><h2>'+esc(c.name)+'</h2><p>'+esc(c.phone)+'</p></div></div><div class="profile-location"><span>'+esc(country(c))+'，'+esc(c.city)+'</span><span>当地 '+esc(localTime(c))+'</span></div></div><div class="profile-stage"><span>客户阶段</span><select data-stage="'+c.id+'" aria-label="客户阶段">'+['新客户','跟进中','已报价','已成交','培育中'].map(s=>option(s,s,c.stage)).join('')+'</select></div><section class="profile-next"><div class="profile-next-title"><strong>下一步跟进</strong><button class="icon-button" aria-label="新增跟进" data-action="followup" data-id="'+c.id+'">'+icon('Plus')+'</button></div>'+(task?'<div class="followup-card"><strong>'+esc(task.title)+'</strong><span class="due '+(beforeToday(task.due)?'overdue':'')+'">'+icon('Clock3')+dateLabel(task.due)+(beforeToday(task.due)?' · 已逾期':'')+'</span><button class="link" aria-label="完成此跟进" data-action="taskDone" data-id="'+task.id+'">'+icon('CircleCheck')+'</button></div>':'<button class="button small full" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button>')+'</section><div class="profile-tabs" role="group" aria-label="客户资料内容">'+[['details','资料'],['activity','记录'],['notes','备注']].map(([id,title])=>'<button class="profile-tab '+(ui.profileTab===id?'active':'')+'" data-action="profileTab" data-id="'+id+'" data-customer="'+c.id+'" aria-pressed="'+(ui.profileTab===id)+'">'+title+'</button>').join('')+'</div><div class="profile-content">'+(ui.profileTab==='notes'?notes:ui.profileTab==='activity'?activity:details)+'</div></aside>';
@@ -4788,13 +4378,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
   function renderTeam(){if(!manager())return '<div class="view-empty"><div><h2>团队管理在主站</h2><p>子站显示当前聊手的工作范围。</p></div></div>';return '<section class="section-page">'+pageHeader('TEAM & ACCESS','团队与权限','先明确谁管理账号、谁负责客户，再决定团队数据如何共享。','<button class="button primary" data-action="addMember">'+icon('UserRoundPlus')+'新增成员</button>')+'<div class="role-count"><strong>'+data.members.length+'</strong> 位演示成员 <span style="margin:0 12px;color:#cad8bf">/</span> '+data.accounts.length+' 个账号 · '+data.customers.length+' 位客户</div><div class="page-panel"><div class="panel-header"><div><h2>团队成员</h2><p>人数、角色和账号分配均可继续扩展</p></div><span class="tag slate">权限方案待确认</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>团队</th><th>角色</th><th>负责账号</th><th>客户</th><th>待跟进</th><th>操作</th></tr></thead><tbody>'+data.members.map(m=>'<tr><td><div class="customer-cell">'+avatar(m,'small')+'<strong>'+esc(m.name)+'</strong></div></td><td>'+esc(m.team)+'</td><td><span class="tag '+(m.role==='manager'?'purple':'jade')+'">'+(m.role==='manager'?'主管':'聊手')+'</span></td><td>'+data.accounts.filter(a=>a.owner===m.id).length+'</td><td>'+data.customers.filter(c=>c.owner===m.id).length+'</td><td>'+data.tasks.filter(t=>t.owner===m.id&&!t.done).length+'</td><td><button class="link" data-action="memberAccounts" data-id="'+m.id+'">分配账号</button></td></tr>').join('')+'</tbody></table></div></div><div class="permission-grid"><section class="permission-card"><h3>'+icon('UserRound')+'聊手 <span class="tag jade">我的工作空间</span></h3><ul><li>使用获分配的 WhatsApp 账号</li><li>查看、标记并跟进自己负责的客户</li><li>使用公共标签，维护自己的个人标签</li><li>主管可见范围与转交规则需你确认</li></ul></section><section class="permission-card"><h3>'+icon('ShieldCheck')+'主管 <span class="tag purple">团队工作空间</span></h3><ul><li>查看团队账号、客户与待办</li><li>维护公共标签，分配账号和转交客户</li><li>成员与角色可在后续扩展</li><li>此页是权限方案评审，不代表已实现真实鉴权</li></ul></section></div><p class="team-section-note">“客户属于聊手还是团队”“账号转移后历史归谁”“离职交接如何处理”仍待确认。当前只是可操作的默认方案。</p></section>'}
   const scopeDescriptions={
     'P-INBOX':'按账号聚合会话，将聊天、客户档案和下一步跟进放在一起。','P-ACCOUNTS':'账号状态、备注、负责人和重新连接流程。','P-CUSTOMERS':'客户档案、来源、客户等级、客户状态、跟进状态、标签及跨账号接触记录。','P-TAGS':'公共与个人标签分组，支持打标和筛选客户。','P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。','P-TEAM':'团队成员、账号分配和客户交接由主站管理。','P-ASSIST':'接收译文展示和快捷话术填入；本轮是示例交互。','P-WALLET':'识别聊天中的加密货币钱包地址，用白名单及记录/拦截/提醒策略管控。它不是钱包余额或收款账本。','P-GUARD':'监控敏感词或删除、编辑等操作。哪些行为需要记录与提醒尚未确定。','P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与审核。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。','P-ATTRIBUTION':'已有Facebook转WhatsApp背景；现有来源只是示例，真实广告关联和回传待确认。','P-ORDERS':'需要对接哪些订单信息、由谁查看或操作，后续再明确。','P-NETWORK':'代理与会话环境依赖最终接入路线，不先把配置入口塞进工作台。','P-LEGACY':'出海猫的工单、底库、分流和号池，逐项对照你的业务再决定。','P-COMMERCIAL':'套餐售卖、充值、推广返利、字符售卖和端口授权不出现在内部工作台。'};
-  function scopeCard(m) {
-    const choices=['首轮原型','保留','魔改','待定','本轮不展示'];
-    return '<article class="scope-card"><h3>'+esc(m.name)+'<span class="tag '+(m.decision==='待定'?'gold':m.decision==='本轮不展示'?'slate':'jade')+'">'+esc(m.decision)+'</span></h3><p>'+esc(scopeDescriptions[m.id]||m.explanation||m.notes)+(m.id==='P-WALLET'?'<br>原站解析时标注客户端检测仍在开发。':'')+'</p><div class="scope-form"><select data-scope-decision="'+m.id+'" aria-label="'+esc(m.name)+'范围选择">'+choices.map(x=>option(x,x,m.decision)).join('')+'</select></div><textarea class="scope-notes" data-scope-notes="'+m.id+'" aria-label="'+esc(m.name)+'修改意见" placeholder="写下需要保留、去掉或魔改的细节…">'+esc(m.notes)+'</textarea><div class="scope-source">原清单关联：'+esc(m.originalIds.join('、')||'新增业务需求')+'</div></article>';
-  }
-  function renderScope() {
-    return '<section class="section-page">'+pageHeader('','本轮功能范围','确定保留、魔改与暂不需要的模块，记录下一轮修改方向。','<button class="button" data-action="review">'+icon('MessageSquareText')+'布局评审</button><button class="button primary" data-action="export">'+icon('Download')+'导出需求 JSON</button>')+'<div class="scope-intro">'+icon('Info')+'<div><strong>已明确：WhatsApp 聚合、多聊手各自管理账号、客户和标签，内部自用。</strong><br>当前为聊手子站。客户归属规则仍待评审。此处记录你的判断，原始325项模块清单保持不变。</div></div>'+[['本轮呈现的工作流',req.modules.filter(m=>m.screens.length&&m.id!=='P-ATTRIBUTION')],['等待判断的模块',req.modules.filter(m=>!m.screens.length&&!["P-COMMERCIAL","P-TEAM","P-AUTO","P-REPLY-MANAGEMENT","P-BROADCAST","P-LIFECYCLE","P-PIPELINES","P-DEALS"].includes(m.id)||m.id==='P-ATTRIBUTION')],['内部使用的范围调整',req.modules.filter(m=>["P-COMMERCIAL","P-TEAM","P-AUTO","P-REPLY-MANAGEMENT","P-BROADCAST","P-LIFECYCLE","P-PIPELINES","P-DEALS"].includes(m.id))]].map(([name,list])=>'<div class="scope-section"><h2>'+name+'</h2><span>'+list.length+' 项</span></div><div class="scope-grid">'+list.map(scopeCard).join('')+'</div>').join('')+'<div class="reset-note"><span>演示操作和评审意见保存在当前浏览器。导出 JSON 后可交给下一轮迭代。</span><button class="link" data-action="resetDemo">恢复演示数据</button></div></section>';
-  }
   function modal(title,body,footer='',options={}) {
     const dlg=$('#dialog');if(dlg.open)dlg.close();dlg.className=options.drawer?'drawer':options.wide?'wide':'';dlg.setAttribute('aria-label',title);
     $('#dialog-content').innerHTML='<div class="modal-head"><h2>'+esc(title)+'</h2><button class="icon-button" data-action="close" aria-label="关闭弹窗">'+icon('X')+'</button></div>'+body+(footer?'<div class="modal-footer">'+footer+'</div>':'');paintIcons(dlg);dlg.showModal();
@@ -4820,7 +4403,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
   function openTransfer(ids){if(!manager())return;const list=ids.map(customer).filter(Boolean);if(!list.length)return toast('请先选择客户。');formModal('转交客户','transfer-form','<input name="ids" type="hidden" value="'+list.map(c=>c.id).join(',')+'"><p class="modal-description">把 '+list.map(c=>esc(c.name)).join('、')+' 转给新的负责人。这个演示只改变客户与未完成跟进的负责人，不移动账号。</p><label class="field">接收成员<select name="owner">'+data.members.filter(m=>m.role==='agent').map(m=>option(m.id,m.name+(m.id===list[0].owner?'（当前负责人）':''),'')).join('')+'</select></label><label class="field" style="margin-top:18px">交接说明<textarea name="reason" placeholder="写明客户现状与下一步事项"></textarea></label><p class="transfer-note">转交后的消息访问、历史档案、个人标签和账号授权之间的关系，需要进一步确定。</p>','确认演示转交')}
   function openDuplicate(id){const c=customer(id);modal('跨账号接触记录','<div class="modal-body"><p class="modal-description">'+esc(c.name)+' 在多个账号下有接触记录。原型只做提示，没有自动合并、抢单或改归属。</p>'+c.contactRefs.map(r=>{const mine=manager()||r.owner===ui.persona;return '<div class="duplicate-item">'+icon(mine?'MessageCircle':'LockKeyhole')+'<div><strong>'+esc(mine?account(r.account)?.name:'其他成员负责的账号')+'</strong><small>'+esc(mine?member(r.owner)?.name:'当前视角不展示对方客户资料')+'</small></div></div>'}).join('')+'<p class="review-hint">要统一客户还是各聊手独立维护、重复进线由谁跟进，等你评审后确定。</p></div>','<button class="button primary" data-action="close">知道了</button>')}
   function openQuick(){modal('快捷回复','<div class="modal-body"><p class="modal-description">选择一条填入输入框，可修改后再发送。此处使用演示话术。</p><div class="quick-list">'+data.quickReplies.filter(q=>!q.owner||q.owner===ui.persona||manager()).map(q=>'<button class="quick-card" data-action="quick" data-id="'+q.id+'"><strong>'+esc(q.title)+'<small>'+esc(q.scope)+'</small></strong><p>'+esc(q.zh)+'</p></button>').join('')+'</div></div>','',{eyebrow:'QUICK REPLIES'})}
-  function openReview(){modal('原型评审','<div class="modal-body"><div class="review-summary"><div><strong>你的初步需求 · SCRM 跟进闭环原型</strong>只评审布局与功能，尚未进入正式开发。</div>'+icon('PanelsTopLeft')+'</div>'+"<div class=\"element-review-launch\"><button class=\"button small\" type=\"button\" data-element-review-start>点选界面备注</button><span>也可按 Alt + 左键</span></div>"+req.review.items.map(i=>'<section class="review-section"><h3>'+esc(i.title)+'</h3><small>'+esc(i.question)+'</small><select data-review-status="'+i.id+'" aria-label="'+esc(i.title)+'评审状态">'+['待评审','方向认可','需要调整'].map(s=>option(s,s,i.status)).join('')+'</select><textarea data-review-note="'+i.id+'" aria-label="'+esc(i.title)+'评审备注" placeholder="写下你的具体想法…">'+esc(i.notes)+'</textarea></section>').join('')+'<p class="review-hint">备注会保存在当前浏览器。导出 JSON 后可用于下一轮迭代；导出不会表示你已批准正式开发。</p></div>','<button class="button" data-action="export">'+icon('Download')+'导出需求与评审</button><button class="button primary" data-action="reviewDone">保存评审备注</button>',{drawer:true,eyebrow:'REVIEW & ITERATE'})}
   function fillQuick(id){const q=data.quickReplies.find(q=>q.id===id),c=selectedCustomer();if(!q||!c)return;ui.drafts[c.id]={text:q.zh,translated:c.language==='西班牙语'?q.es:q.en,source:q.zh};persist();if($('#dialog').open)close();if(ui.view!=='inbox')navigate('inbox');else{const box=$('.chat-pane');box.outerHTML=chatHTML(c);paintIcons();scrollMessages()}$('#composer-text')?.focus()}
   function send() {
     const c=selectedCustomer(),el=$('#composer-text');if(!c||!el)return;
@@ -4830,7 +4412,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
     (data.messages[c.id]??=c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]).push({id:nextId('m'),side:'out',text:outgoing,attachment:ui.attachment,time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}),local:true});
     c.preview=outgoing||'[附件]';c.last='刚刚';c.unread=0;ui.drafts[c.id]={text:'',translated:'',source:''};ui.attachment=null;persist();render();toast('演示消息已保存到本地。');
   }
-  function exportReq(){const obj={...clone(req),exportedAt:new Date().toISOString(),prototypeReview:{activeView:ui.view,persona:me().role,layout:'reference-aligned-scrm-lifecycle',receiveTranslation:ui.receiveTranslation,note:'本文件仅包含需求和评审，不包含演示聊天或真实客户数据。'}};const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='whatsapp-scrm-lifecycle-reviewed.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已导出需求与评审 JSON。')}
   function refreshInboxProfiles(c) {
     const profile=$('#dialog .customer-profile');if($('#dialog').open&&profile){profile.outerHTML=profileHTML(c,true);paintIcons($('#dialog'));if($('#conversation-list')){$('#conversation-list').innerHTML=conversationRows();paintIcons($('#conversation-list'))}return}render();
   }
@@ -4877,9 +4458,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
       case 'accountScope':{ui.account=id;ui.query='';ui.conversationFilter='all';const c=myCustomers().find(c=>id==='all'||c.account===id);ui.customer=c?.id||null;ui.mobileChat=false;ui.profileTab='details';if($('#dialog').open)close();render();break}
       case 'switchAccount':openAccountSwitcher();break;
       case 'toggleProfile':ui.profileOpen=!ui.profileOpen;persist();render();break;
-      case 'review':openReview();break;
-      case 'reviewDone':persist();renderNav();paintIcons();close();toast('评审备注已保存在本机，可导出后继续迭代。');break;
-      case 'export':exportReq();break;
       case 'openConversation':{const c=customer(id);if(!c||!myCustomers().includes(c))return;ui.customer=id;if(ui.view==='dashboard'){ui.query='';ui.conversationFilter='all'}if(ui.view!=='inbox'||(ui.account!=='all'&&c.account!==ui.account))ui.account='all';ui.mobileChat=true;c.unread=0;ui.profileTab='details';if($('#dialog').open)close();persist();navigate('inbox');break}
       case 'backList':ui.mobileChat=false;render();break;
       case 'conversationFilter':ui.conversationFilter=id;render();break;
@@ -4926,8 +4504,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
     if(t.id==='customer-search'&&!t.closest('.fid-customer-filter')){ui.customerQuery=t.value;ui.selected.clear();updateCustomerRows()}
     if(t.id==='composer-text'){const c=selectedCustomer();const old=draft(c);ui.drafts[c.id]={text:t.value,translated:old.source===t.value?old.translated:'',source:old.source};$('#translation-preview').innerHTML=previewHTML(c);paintIcons($('#translation-preview'));persist();updateSendState(c);const hint=$('.language-hint');if(hint){hint.innerHTML=icon('Languages')+esc(c.language)+' · '+(ui.drafts[c.id].translated?'发送译文':'发送原文');paintIcons(hint)}}
     if(t.dataset.noteCustomer){ui.noteDrafts[t.dataset.noteCustomer]=t.value;persist();t.closest('.customer-profile').querySelector('.note-save span').textContent='未保存的修改'}
-    if(t.dataset.reviewNote){const i=req.review.items.find(i=>i.id===t.dataset.reviewNote);i.notes=t.value;persist();renderNav();paintIcons()}
-    if(t.dataset.scopeNotes){req.modules.find(m=>m.id===t.dataset.scopeNotes).notes=t.value;persist()}
   });
   function updateCustomerRows() {
     if(!$('#customer-rows'))return;ui.pages.customers=0;$('#customer-rows').innerHTML=customerRows();$('#customer-total').textContent='当前 '+filteredCustomers().length+' 位客户';$('#selected-count').textContent=ui.selected.size;$('#batchbar').hidden=!ui.selected.size;$('#select-all-customers').checked=filteredCustomers().length>0&&filteredCustomers().every(c=>ui.selected.has(c.id));$('#customers-pager').outerHTML=pagerHTML(filteredCustomers().length,'customers');paintIcons($('#view'));
@@ -4942,8 +4518,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
     if(t.dataset.selectCustomer){if(t.checked)ui.selected.add(t.dataset.selectCustomer);else ui.selected.delete(t.dataset.selectCustomer);$('#selected-count').textContent=ui.selected.size;$('#batchbar').hidden=!ui.selected.size}
     if(t.id==='select-all-customers'){filteredCustomers().forEach(c=>t.checked?ui.selected.add(c.id):ui.selected.delete(c.id));updateCustomerRows()}
     if(t.id==='receive-translation'){ui.receiveTranslation=t.checked;persist();if(ui.view==='inbox'&&$('#messages')){const c=selectedCustomer();$('#messages').innerHTML=messagesHTML(c);paintIcons($('#messages'))}toast(t.checked?'已展开示例中文译文。':'已收起中文译文。')}
-    if(t.dataset.reviewStatus){req.review.items.find(i=>i.id===t.dataset.reviewStatus).status=t.value;persist();renderNav();paintIcons()}
-    if(t.dataset.scopeDecision){req.modules.find(m=>m.id===t.dataset.scopeDecision).decision=t.value;persist();renderNav();const badge=t.closest('.scope-card').querySelector('h3 .tag');badge.textContent=t.value;badge.className='tag '+(t.value==='待定'?'gold':t.value==='本轮不展示'?'slate':'jade');paintIcons()}
   });
   document.addEventListener('keydown',e=>{if(e.key==='/'&&!$('#dialog').open&&!e.target.closest('input,textarea,select,[contenteditable]')){const search=$('#conversation-search')||$('#customer-search');if(search){e.preventDefault();search.focus()}}if(e.target.id==='composer-text'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
   document.addEventListener('submit',e=>{
@@ -5091,13 +4665,13 @@ dialog>#toast,dialog>#toast.show{transform:none}
     fidDialog(title,`<div class="modal-body"><p>${esc(message)}</p></div>`,fidButton('确 定',action,'',style,fidActionID(id))+fidButton('取 消','close'));
   }
 
-  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound',scope:'SlidersHorizontal'}[id]||'FileText');
+  viewIcon = id => ({dashboard:'LayoutDashboard',inbox:'MessageCircle',accounts:'Smartphone',customers:'ContactRound','chat-records':'MessagesSquare',tags:'Tags','tag-stats':'ChartColumn',followups:'ClipboardList',materials:'Images',team:'Network',members:'UsersRound'}[id]||'FileText');
   menuLink = function(id,label,child=false,mobile=false) {
-    return `<a class="nav-item ${ui.view===id?'active':''} ${id==='scope'?'scope-link':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${id==='scope'&&!mobile?'<span class="nav-count" id="pending-count"></span>':''}</a>`;
+    return `<a class="nav-item ${ui.view===id?'active':''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view===id?'aria-current="page"':''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span></a>`;
   };
   menuHTML = function(mobile=false) {
     const navGroup=(title,glyph,action,opened,ids)=>`<button class="nav-group-button ${ids.includes(ui.view)?'group-active':''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened?'ChevronUp':'ChevronDown')}</button><div class="submenu" ${opened?'':'hidden'}>${ids.map(id=>menuLink(id,views[id],true)).join('')}</div>`;
-    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'')+'<div class="nav-caption">工作台设置</div>'+menuLink('scope',views.scope,false,mobile);
+    return menuLink('dashboard',views.dashboard)+menuLink('accounts',views.accounts)+menuLink('inbox',views.inbox)+'<div class="nav-caption">客户运营</div>'+navGroup('客户管理','ContactRound','fidNavCustomers',ui.customerNavOpen,customerMenu)+navGroup('运营管理','ChartColumn','fidNavOperations',fid.operationsOpen,operationsMenu)+(manager()?'<div class="nav-caption">账户与组织</div>'+navGroup('组织管理','Network','fidNavOrg',fid.orgOpen,['team','members']):'');
   };
 
   const fidTagCount = (id, customers=myCustomers()) => customers.filter(c=>c.tags.includes(id)).length;
@@ -7012,7 +6586,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
     team: 'Network',
     members: 'UsersRound',
     ai: 'Sparkles',
-    scope: 'SlidersHorizontal',
   }[id] || 'FileText');
 
   menuHTML = function(mobile = false) {
@@ -7020,10 +6593,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
     const renderItem = (id, label) => {
       const badge = id === 'followups' && attention && !mobile
         ? `<span class="nav-count" title="待处理信号">${attention}</span>`
-        : id === 'scope' && !mobile
-          ? '<span class="nav-count" id="pending-count"></span>'
-          : '';
-      return `<a class="nav-item ${ui.view === id ? 'active' : ''} ${id === 'scope' ? 'scope-link' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
+        : '';
+      return `<a class="nav-item ${ui.view === id ? 'active' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
     };
     const navGroup = (title, glyph, action, opened, ids) =>
       `<button class="nav-group-button ${ids.includes(ui.view) ? 'group-active' : ''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened ? 'ChevronUp' : 'ChevronDown')}</button><div class="submenu" ${opened ? '' : 'hidden'}>${ids.map(id => renderItem(id, views[id])).join('')}</div>`;
@@ -7036,8 +6607,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
-      renderItem('ai', views.ai) +
-      renderItem('scope', views.scope)
+      renderItem('ai', views.ai)
     );
   };
 
@@ -8427,13 +7997,11 @@ dialog>#toast,dialog>#toast.show{transform:none}
     shell.hidden = signedOut;
     login.hidden = !signedOut;
     $('.skip-link').hidden = signedOut;
-    $('.fid-float-review').hidden = signedOut;
     if (!signedOut) return true;
 
     if (location.hash!=='#login') history.replaceState(null,'','#login');
     if (enteringLogin) {
       if ($('#dialog').open) close();
-      if ($('#element-review-dialog').open) $('#element-review-dialog').close();
       $('#view').replaceChildren();
       $('#toast').classList.remove('show');
       paintIcons(login);
@@ -8468,7 +8036,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
   });
 
   render();
-  window.initWAElementReview(toast);
 })();
 </script>
 </body>

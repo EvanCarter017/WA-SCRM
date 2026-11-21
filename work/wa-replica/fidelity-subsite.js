@@ -12,13 +12,11 @@
     shell.hidden = signedOut;
     login.hidden = !signedOut;
     $('.skip-link').hidden = signedOut;
-    $('.fid-float-review').hidden = signedOut;
     if (!signedOut) return true;
 
     if (location.hash!=='#login') history.replaceState(null,'','#login');
     if (enteringLogin) {
       if ($('#dialog').open) close();
-      if ($('#element-review-dialog').open) $('#element-review-dialog').close();
       $('#view').replaceChildren();
       $('#toast').classList.remove('show');
       paintIcons(login);

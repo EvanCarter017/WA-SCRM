@@ -479,7 +479,6 @@
     team: 'Network',
     members: 'UsersRound',
     ai: 'Sparkles',
-    scope: 'SlidersHorizontal',
   }[id] || 'FileText');
 
   menuHTML = function(mobile = false) {
@@ -487,10 +486,8 @@
     const renderItem = (id, label) => {
       const badge = id === 'followups' && attention && !mobile
         ? `<span class="nav-count" title="待处理信号">${attention}</span>`
-        : id === 'scope' && !mobile
-          ? '<span class="nav-count" id="pending-count"></span>'
-          : '';
-      return `<a class="nav-item ${ui.view === id ? 'active' : ''} ${id === 'scope' ? 'scope-link' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
+        : '';
+      return `<a class="nav-item ${ui.view === id ? 'active' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
     };
     const navGroup = (title, glyph, action, opened, ids) =>
       `<button class="nav-group-button ${ids.includes(ui.view) ? 'group-active' : ''}" data-action="${action}" aria-expanded="${opened}">${icon(glyph)}<span class="nav-label">${title}</span>${icon(opened ? 'ChevronUp' : 'ChevronDown')}</button><div class="submenu" ${opened ? '' : 'hidden'}>${ids.map(id => renderItem(id, views[id])).join('')}</div>`;
@@ -503,8 +500,7 @@
       navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
-      renderItem('ai', views.ai) +
-      renderItem('scope', views.scope)
+      renderItem('ai', views.ai)
     );
   };
 

@@ -16,7 +16,7 @@
     <div class="main-shell">
       <header class="topbar">
         <div class="header-left"><button class="icon-button" type="button" data-action="toggleSidebar" aria-label="切换导航"><span data-icon="Menu"></span></button><span class="fid-edition"><b>内部版</b><span>当前工作台： <strong>WhatsApp</strong></span></span></div>
-        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="icon-button fid-header-review" data-action="review" aria-label="评审原型"><span data-icon="MessageSquareText"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
+        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
       </header>
       <nav class="workspace-tabs" id="workspace-tabs" aria-label="已打开的页面"></nav>
       <main id="view" tabindex="-1"></main>
@@ -29,29 +29,8 @@
       <button class="fid-btn gradient" data-action="subsiteEnterDemo" type="button">进入演示工作台<span data-icon="ChevronRight"></span></button>
     </div>
   </main>
-  <button class="fid-float-review" data-action="review" aria-label="打开原型评审"><span data-icon="MessageSquare"></span><span>原型评审</span><i id="review-count" hidden></i><span data-icon="ChevronRight"></span></button>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
-  <dialog id="element-review-dialog" aria-labelledby="element-review-title">
-    <form id="element-review-entry" novalidate>
-      <div class="modal-head">
-        <h2 id="element-review-title">界面备注</h2>
-        <button class="icon-button" type="button" data-element-review-dismiss aria-label="关闭界面备注"><span data-icon="X"></span></button>
-      </div>
-      <div class="modal-body">
-        <p id="element-review-context"></p>
-        <label class="field" for="element-review-note">希望怎么改</label>
-        <textarea id="element-review-note" name="review-note" rows="5" placeholder="写下你希望如何调整这个控件…" required></textarea>
-        <p id="element-review-error" role="alert" hidden></p>
-      </div>
-      <div class="modal-footer">
-        <small id="element-review-destination"></small>
-        <button type="button" class="button" data-element-review-download hidden>下载 .md</button>
-        <button type="button" class="button" data-element-review-dismiss>取消</button>
-        <button type="submit" class="button primary">提交备注</button>
-      </div>
-    </form>
-  </dialog>
-  <script src="icons.js"></script><script src="requirements-data.js"></script><script src="demo-data.js"></script><script src="element-review.js"></script><script src="app.js"></script>
+  <script src="icons.js"></script><script src="demo-data.js"></script><script src="app.js"></script>
 </body>
 </html>
