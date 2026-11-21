@@ -2,7 +2,8 @@
 //   GET  /api/site/status    is the sub-site's server side switched on?
 //   POST /api/auth/login     { username, password } → session cookie
 //   POST /api/auth/logout
-//   GET  /api/auth/me        the signed-in user
+//   GET  /api/auth/me        the signed-in user (401 when nobody is signed in)
+//   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
 //   POST /api/auth/password  { current, next }
 //   GET  /api/data           the sub-site's data document
 //   PUT  /api/data           { baseVersion, set, remove }
@@ -63,6 +64,8 @@ function cookieHeader(req, token, maxAgeSeconds) {
 
 function create({ dir, siteId = 'default', now }) {
   if (!SITE_ID.test(siteId)) throw new Error('WA_SCRM_SITE_ID must be lower-case letters, digits and hyphens');
+  // The databases hold password hashes and customer data: every file this process creates from now on is private.
+  process.umask(0o077);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const auth = openAuth(path.join(dir, 'auth.db'), { now });
   const data = openData(path.join(dir, `site-${siteId}.db`), { now });
@@ -99,6 +102,7 @@ function create({ dir, siteId = 'default', now }) {
       return { body: { ok: true }, headers: { 'Set-Cookie': cookieHeader(req, '', 0) } };
     },
     'GET /api/auth/me': req => ({ body: { user: signedIn(req, { allowPendingPassword: true }), site: siteId } }),
+    'GET /api/auth/session': req => ({ body: { user: authenticate(req), site: siteId } }),
     'POST /api/auth/password': async req => {
       const user = signedIn(req, { allowPendingPassword: true });
       const body = await readJson(req);

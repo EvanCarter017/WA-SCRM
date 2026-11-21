@@ -34,16 +34,28 @@ function openData(file, { now = () => Date.now() } = {}) {
 
   function apply(set, remove, by) {
     const current = version();
+    const put = db.prepare('INSERT INTO doc (key, json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET json = excluded.json');
+    // A field is stored either whole or split into parts. Before a part is saved or removed, a field that is
+    // still stored whole is split; it must be a map whose entry names can be keys.
+    const split = field => {
+      const whole = db.prepare('SELECT json FROM doc WHERE key = ?').get(field);
+      if (!whole) return;
+      const value = JSON.parse(whole.json);
+      if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(id => !KEY.test(field + '/' + id))) throw problem('key-conflict');
+      db.prepare('DELETE FROM doc WHERE key = ?').run(field);
+      for (const [id, part] of Object.entries(value)) put.run(field + '/' + id, JSON.stringify(part));
+    };
     for (const [key, json] of set) {
       const [field, id] = key.split('/');
-      // A field is stored either whole or split: a whole value replaces its parts, a part needs a split field.
       if (id === undefined) db.prepare('DELETE FROM doc WHERE key LIKE ?').run(field + '/%');
-      else if (db.prepare('SELECT 1 FROM doc WHERE key = ?').get(field)) throw problem('key-conflict');
-      db.prepare('INSERT INTO doc (key, json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET json = excluded.json').run(key, json);
+      else split(field);
+      put.run(key, json);
     }
     for (const key of remove) {
+      const [field, id] = key.split('/');
+      if (id !== undefined) split(field);
       db.prepare('DELETE FROM doc WHERE key = ?').run(key);
-      if (!key.includes('/')) db.prepare('DELETE FROM doc WHERE key LIKE ?').run(key + '/%');
+      if (id === undefined) db.prepare('DELETE FROM doc WHERE key LIKE ?').run(key + '/%');
     }
     const keys = [...set.map(([key]) => key), ...remove];
     db.prepare('INSERT INTO saves (version, at, by, keys) VALUES (?, ?, ?, ?)').run(current + 1, new Date(now()).toISOString(), String(by), keys.join(' '));

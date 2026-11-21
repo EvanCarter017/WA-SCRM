@@ -1,51 +1,14 @@
-  const subsiteSignOutKey = KEY+'-subsite-signed-out';
-  function subsiteExitWasSaved() {
-    try { return localStorage.getItem(subsiteSignOutKey)==='1'; } catch { return false; }
-  }
-  let subsiteSignedOut = location.hash==='#login'||subsiteExitWasSaved();
-
+  // Signing in happens before the app starts (fidelity-boot.js). The app shows itself and offers signing out,
+  // which saves what is pending, ends the session on the server and returns to the sign-in screen.
+  // The earlier layers ask this before they follow the address bar; the app only runs while someone is signed in.
+  const subsiteSignedOut = false;
   function renderSignInState() {
-    const signedOut = subsiteSignedOut||location.hash==='#login';
-    const shell = $('#app-shell');
-    const login = $('#subsite-login');
-    const enteringLogin = signedOut&&login.hidden;
-    shell.hidden = signedOut;
-    login.hidden = !signedOut;
-    $('.skip-link').hidden = signedOut;
-    if (!signedOut) return true;
-
-    if (location.hash!=='#login') history.replaceState(null,'','#login');
-    if (enteringLogin) {
-      if ($('#dialog').open) close();
-      $('#view').replaceChildren();
-      $('#toast').classList.remove('show');
-      paintIcons(login);
-      $('#subsite-login-title').focus();
-    }
-    return false;
+    $('#app-shell').hidden = false;
+    $('#subsite-login').hidden = true;
+    $('.skip-link').hidden = false;
+    return true;
   }
 
   Object.assign(fidActions, {
-    subsiteLogout:()=>{
-      subsiteSignedOut = true;
-      try { localStorage.setItem(subsiteSignOutKey,'1'); } catch {}
-      render();
-    },
-    subsiteEnterDemo:()=>{
-      subsiteSignedOut = false;
-      try { localStorage.removeItem(subsiteSignOutKey); } catch {}
-      navigate('dashboard','replace');
-      $('#view').focus({preventScroll:true});
-    },
-  });
-
-  window.addEventListener('storage',event=>{
-    if (event.key!==subsiteSignOutKey||event.newValue!=='1') return;
-    subsiteSignedOut = true;
-    render();
-  });
-  window.addEventListener('pageshow',event=>{
-    if (!event.persisted||subsiteSignedOut||!subsiteExitWasSaved()) return;
-    subsiteSignedOut = true;
-    render();
+    subsiteLogout:()=>window.WA_SITE.signOut(),
   });

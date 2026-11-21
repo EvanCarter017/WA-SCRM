@@ -228,7 +228,26 @@ for (const [name, source] of Object.entries(siteSources)) {
   assert(!/console\.(log|error)\([^\n]*\$\{[^}]*(password|token|body|json)\b/i.test(source.replace(/temporary password: \$\{password\}/g, '')), `${name} must not log a password, a token or data`);
 }
 assert(serveSource.includes("if (site && !site.allows(req)) {") && serveSource.includes('process.env.WA_SCRM_DATA_DIR'), 'the preview server must put the relay behind sign-in when it keeps accounts');
-assert(!/\b(localhost|127\.0\.0\.1):\d+\/api\/(auth|data)/.test(appJs), 'the page does not use the account and data routes yet');
+// The page's start-up script talks to the account and data routes only (the app itself to the AI relay only, section 3).
+const bootSource = read(path.join(__dirname, 'fidelity-boot.js'));
+for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/status|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
+assert(!/\bfetch\s*\(\s*['"`]/.test(bootSource), 'fidelity-boot.js must send every request through its request helper');
+
+// 20. The page signs in and keeps its data on the server; no fictional data set is shipped or loaded
+for (const required of ['window.WA_START = () => {', 'let data=window.WA_SITE.data;', 'window.WA_SITE.save(data)', "const UI_KEY=KEY+':'+window.WA_SITE.user.username;"]) {
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert(!/clone\(window\.WA_DEMO\)|case 'resetDemo'|case 'confirmReset'|subsiteEnterDemo/.test(appJs), 'the app must not start from, or reset to, sample data');
+for (const required of ['id="site-sign-in"', 'id="site-password"', '<script src="boot.js"></script>']) {
+  assert(indexHtml.includes(required), `index.html is missing ${required}`);
+}
+assert(!indexHtml.includes('demo-data.js') && !indexHtml.includes('进入演示工作台') && !fs.existsSync(path.join(out, 'demo-data.js')), 'the page must not ship the fictional data set');
+assert.equal(read(path.join(out, 'boot.js')), bootSource, 'boot.js must be the built copy of fidelity-boot.js');
+for (const required of ['lcSeededV06: true', 'presetTagsRemoved: true', "request('/api/data', { method: 'PUT'", 'window.WA_START();']) {
+  assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
+}
+assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');
 
 const summary = {
   version: req.version,
@@ -253,7 +272,8 @@ const summary = {
   orderTracking: 'profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer',
   translationSettings: 'removed from the chat screen (tool rail, top bar, narrow-screen menu, dialog); sample translations stay and are always shown, switched per capability on the AI page',
   reviewerTools: 'removed: review panel and its two buttons, requirements page and export, element notes tool and its server endpoint; requirements.json stays as a build-time record',
-  serverSide: 'optional, behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only; the page still keeps its data in the browser',
+  serverSide: 'behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only',
+  signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

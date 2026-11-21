@@ -1,13 +1,14 @@
-(() => {
+window.WA_START = () => {
   'use strict';
   const KEY='wa-desk-scrm-lifecycle-v06';
   const clone=x=>JSON.parse(JSON.stringify(x));
-  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}
-  let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
+  const UI_KEY=KEY+':'+window.WA_SITE.user.username;
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(UI_KEY)||'null')}catch(e){}
+  let data=window.WA_SITE.data;
   const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
-  const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');
-  const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:'c1',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
+  const subsiteMember=data.members.find(m=>m.id===window.WA_SITE.user.username);
+  const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:data.customers[0]?.id||'',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
   Object.assign(ui,{openTabs:saved?.openTabs||['inbox','accounts','customers','tags','followups'],navCollapsed:saved?.navCollapsed||false,customerNavOpen:true,accountQuery:'',accountStatus:'all',tagGroup:'all',tagQuery:'',pages:{},pageSizes:{}});
   Object.defineProperty(ui,'attachment',{get(){return ui.customer?ui.attachments[ui.customer]||null:null},set(value){if(ui.customer){if(value)ui.attachments[ui.customer]=value;else delete ui.attachments[ui.customer]}}});
   if(!data.members.some(m=>m.id===ui.persona)){
@@ -56,7 +57,7 @@
   const unreadCount=()=>myCustomers().reduce((n,c)=>n+c.unread,0);
   const pendingTasks=()=>myTasks().filter(t=>!t.done);
   const draft=c=>ui.drafts[c.id]||{text:'',translated:'',source:''};
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
+  function persist(){try{localStorage.setItem(UI_KEY,JSON.stringify({version:6,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){}window.WA_SITE.save(data)}
   function toast(message,undo=null) {
     const box=$('#toast'),host=$('#dialog').open?$('#dialog'):document.body;if(box.parentElement!==host)host.append(box);box.dataset.dismissOnClose=undo&&$('#dialog').open?'1':'';box.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.textContent='撤销';button.addEventListener('click',()=>{undo();box.classList.remove('show')},{once:true});box.append(button)}
@@ -265,8 +266,6 @@
       case 'send':send();break;
       case 'attachment':{formModal('添加演示附件','attachment-form','<p class="modal-description">输入一个文件名以评审附件在聊天中的位置。不会读取、上传或发送任何真实文件。</p><label class="field">演示文件名<input name="name" required maxlength="100" placeholder="例如：产品目录.pdf"></label>','加入演示消息');break}
       case 'removeAttachment':ui.attachment=null;persist();updateSendState(selectedCustomer());$('#translation-preview').innerHTML=previewHTML(selectedCustomer());paintIcons();break;
-      case 'resetDemo':modal('恢复初始演示数据','<div class="modal-body"><p class="modal-description">恢复虚构账号、客户、消息、标签和待办。你已经填写的功能范围判断和评审备注会保留。</p></div>',cancel+'<button class="button primary" data-action="confirmReset">恢复演示数据</button>');break;
-      case 'confirmReset':data=clone(window.WA_DEMO);fidResetExtras();ui.persona='lin';ui.customer='c1';ui.account='all';ui.selected.clear();ui.drafts={};ui.noteDrafts={};ui.attachments={};ui.attachment=null;ui.profileOpen=true;ui.pages={};ui.tagGroup='all';ui.tagQuery='';ui.accountQuery='';ui.accountStatus='all';persist();close();render();toast('演示数据已恢复；范围判断与评审备注已保留。');break;
     }
   });
   document.addEventListener('input',e=>{
@@ -3879,57 +3878,20 @@
 
   aiDetectRelay();
 
-  const subsiteSignOutKey = KEY+'-subsite-signed-out';
-  function subsiteExitWasSaved() {
-    try { return localStorage.getItem(subsiteSignOutKey)==='1'; } catch { return false; }
-  }
-  let subsiteSignedOut = location.hash==='#login'||subsiteExitWasSaved();
-
+  // Signing in happens before the app starts (fidelity-boot.js). The app shows itself and offers signing out,
+  // which saves what is pending, ends the session on the server and returns to the sign-in screen.
+  // The earlier layers ask this before they follow the address bar; the app only runs while someone is signed in.
+  const subsiteSignedOut = false;
   function renderSignInState() {
-    const signedOut = subsiteSignedOut||location.hash==='#login';
-    const shell = $('#app-shell');
-    const login = $('#subsite-login');
-    const enteringLogin = signedOut&&login.hidden;
-    shell.hidden = signedOut;
-    login.hidden = !signedOut;
-    $('.skip-link').hidden = signedOut;
-    if (!signedOut) return true;
-
-    if (location.hash!=='#login') history.replaceState(null,'','#login');
-    if (enteringLogin) {
-      if ($('#dialog').open) close();
-      $('#view').replaceChildren();
-      $('#toast').classList.remove('show');
-      paintIcons(login);
-      $('#subsite-login-title').focus();
-    }
-    return false;
+    $('#app-shell').hidden = false;
+    $('#subsite-login').hidden = true;
+    $('.skip-link').hidden = false;
+    return true;
   }
 
   Object.assign(fidActions, {
-    subsiteLogout:()=>{
-      subsiteSignedOut = true;
-      try { localStorage.setItem(subsiteSignOutKey,'1'); } catch {}
-      render();
-    },
-    subsiteEnterDemo:()=>{
-      subsiteSignedOut = false;
-      try { localStorage.removeItem(subsiteSignOutKey); } catch {}
-      navigate('dashboard','replace');
-      $('#view').focus({preventScroll:true});
-    },
-  });
-
-  window.addEventListener('storage',event=>{
-    if (event.key!==subsiteSignOutKey||event.newValue!=='1') return;
-    subsiteSignedOut = true;
-    render();
-  });
-  window.addEventListener('pageshow',event=>{
-    if (!event.persisted||subsiteSignedOut||!subsiteExitWasSaved()) return;
-    subsiteSignedOut = true;
-    render();
+    subsiteLogout:()=>window.WA_SITE.signOut(),
   });
 
   render();
-})();
+};

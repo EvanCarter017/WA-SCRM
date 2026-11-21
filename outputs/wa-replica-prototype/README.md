@@ -4,12 +4,10 @@
 
 ## 快速打开方式
 
-1. **本地服务预览（推荐）**
-   - 直接访问：`http://127.0.0.1:56141/#followups`（或双击项目根目录 `启动SCRM原型预览.cmd`）
-   - 首页总览：`http://127.0.0.1:56141/#dashboard`
-   - 在线聊天：`http://127.0.0.1:56141/#inbox`
-2. **离线单文件直接打开**
-   - 双击 `D:\Projects\wa-scrm\outputs\whatsapp-scrm-lifecycle.html`（或 `whatsapp-replica-ui-fidelity.html`）即可在任意现代浏览器中完整交互。
+1. **通过服务访问（需登录）**
+   - 服务地址：`http://127.0.0.1:56141/`，用管理员创建的账号登录；首次登录需先修改临时密码。
+   - 登录后的常用入口：`#dashboard`（首页）、`#inbox`（在线聊天）、`#followups`（跟进闭环）。
+2. 单文件（`outputs/whatsapp-scrm-lifecycle.html` 等）已不能独立使用，只显示无法连接服务器的提示。
 
 ## 推荐体验的 4 条核心闭环路径
 

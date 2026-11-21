@@ -139,6 +139,26 @@ cut(/^    if\(t\.dataset\.reviewStatus\)[^\n]*\n    if\(t\.dataset\.scopeDecisio
 swap('<br><button class="link" data-action="review">记录评审意见</button>', '');
 swap('  window.initWAElementReview(toast);\n', '');
 assert(!/\breq\b|WA_REQUIREMENTS|openReview|renderScope|scopeCard|exportReq|data-action="review"|data-action="export"|initWAElementReview/.test(js), 'the reviewer tools must be gone from the app');
+// The page signs in and keeps its data on the server (plan 023). The app no longer starts by itself:
+// fidelity-boot.js loads the signed-in user's data into window.WA_SITE and then calls window.WA_START.
+swap("(() => {\n  'use strict';\n  const KEY=", "window.WA_START = () => {\n  'use strict';\n  const KEY=");
+swap("let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}", "const UI_KEY=KEY+':'+window.WA_SITE.user.username;\n  let saved=null;try{saved=JSON.parse(localStorage.getItem(UI_KEY)||'null')}catch(e){}");
+swap('let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);', 'let data=window.WA_SITE.data;');
+swap("const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');", 'const subsiteMember=data.members.find(m=>m.id===window.WA_SITE.user.username);');
+swap("persona:subsiteMember.id,customer:'c1',", "persona:subsiteMember.id,customer:data.customers[0]?.id||'',");
+{
+  // Only what belongs to this browser (drafts, open tabs) stays in its storage; the data goes to the server.
+  const next = js.replace(/^  function persist\(\)\{[^\n]*\}\n/m, "  function persist(){try{localStorage.setItem(UI_KEY,JSON.stringify({version:6,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){}window.WA_SITE.save(data)}\n");
+  assert(next !== js, 'Missing the function that saves');
+  js = next;
+}
+cut(/^      case 'resetDemo':[^\n]*\n      case 'confirmReset':[^\n]*\n/m, 'reset to the sample data');
+{
+  const next = js.replace(/\n  render\(\);\n\}\)\(\);\n$/, '\n  render();\n};\n');
+  assert(next !== js, 'Missing the end of the app');
+  js = next;
+}
+assert(!/clone\(window\.WA_DEMO\)|localStorage\.(setItem|getItem)\(KEY[,)]/.test(js), 'the app must not start from sample data or keep its data in the browser');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
@@ -312,7 +332,7 @@ const tokenCSS = read(base,'tokens.css')+'\n:root {\n'+Object.entries(palette).m
 const assets = {
   'index.html':index,'app.js':js,'app.css':read(base,'app.css')+'\n'+fidelityCSS,
   'tokens.css':tokenCSS,'components.css':read(base,'components.css'),
-  'demo-data.js':read(base,'demo-data.js'),'icons.js':iconJS,
+  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),
   'lucide-license.txt':read(base,'lucide-license.txt'),
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };

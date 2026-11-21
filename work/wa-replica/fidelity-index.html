@@ -22,15 +22,29 @@
       <main id="view" tabindex="-1"></main>
     </div>
   </div>
-  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title" hidden>
+  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title">
     <div class="fid-sign-in-panel">
       <div class="fid-sign-in-brand" translate="no"><span class="brand-symbol" data-icon="MessagesSquare"></span><strong>WA Desk SCRM</strong></div>
-      <h1 id="subsite-login-title" tabindex="-1">已退出登录</h1>
-      <button class="fid-btn gradient" data-action="subsiteEnterDemo" type="button">进入演示工作台<span data-icon="ChevronRight"></span></button>
+      <h1 id="subsite-login-title" tabindex="-1">正在连接…</h1>
+      <p id="site-notice" class="fid-sign-in-note" role="status" hidden></p>
+      <form id="site-sign-in" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">用户名<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field">密码<input name="password" type="password" autocomplete="current-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">登录</button>
+      </form>
+      <form id="site-password" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">当前（临时）密码<input name="current" type="password" autocomplete="current-password"></label>
+        <label class="field">新密码（至少 10 位）<input name="next" type="password" autocomplete="new-password"></label>
+        <label class="field">再输入一次新密码<input name="repeat" type="password" autocomplete="new-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">保存新密码并进入</button>
+      </form>
+      <button id="site-leave" class="link" type="button" hidden>退出登录</button>
     </div>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
-  <script src="icons.js"></script><script src="demo-data.js"></script><script src="app.js"></script>
+  <script src="icons.js"></script><script src="app.js"></script><script src="boot.js"></script>
 </body>
 </html>

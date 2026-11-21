@@ -498,6 +498,13 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-sign-in-brand { display:flex; align-items:center; gap:var(--fid-px-10); font-size:var(--fid-px-16); }
 .fid-sign-in-panel h1 { font-size:var(--fid-px-22); }
 .fid-sign-in-panel .fid-btn { min-height:var(--fid-px-44); padding-inline:var(--fid-px-18); }
+.fid-sign-in-note { margin:0; color:var(--fid-quiet); font-size:var(--fid-px-13); line-height:var(--fid-px-20); text-align:center; }
+.fid-sign-in-form { display:grid; gap:var(--fid-px-14); width:100%; }
+.fid-sign-in-form[hidden] { display:none; }
+.fid-sign-in-form .field { display:grid; gap:var(--fid-px-6); font-size:var(--fid-px-13); }
+.fid-sign-in-form .field input { height:var(--fid-px-40); padding:0 var(--fid-px-12); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface); color:var(--color-text); font:inherit; }
+.fid-sign-in-form .field input:focus { border-color:var(--color-accent); outline:var(--fid-px-1) solid var(--color-accent); outline-offset:0; }
+.fid-sign-in-error { margin:0; color:var(--color-danger); font-size:var(--fid-px-13); line-height:var(--fid-px-20); }
 .fid-btn:hover:not(:disabled) { border-color:var(--color-accent); color:var(--color-accent); }
 .fid-btn.blue,.fid-btn.gradient,.fid-btn.green { color:var(--color-surface); border-color:transparent; font-weight:550; }
 .fid-btn.blue { background:var(--color-accent); }

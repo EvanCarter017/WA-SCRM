@@ -4,32 +4,24 @@
 
 ## 1. 快速运行与预览
 
-本项目前端原型采用**零外部依赖、零网络外呼**的原生 HTML / CSS / JS 架构，克隆仓库后无需 `npm install` 即可直接预览或重新构建：
+本项目采用**零外部依赖**的原生 HTML / CSS / JS 页面和一个 Node 服务，克隆仓库后无需 `npm install`。页面需要通过服务登录后使用，数据保存在服务器上。
 
-### 方式 A：双击单文件离线运行（最快）
-直接在浏览器中打开以下独立构建文件即可体验完整交互：
-- [`outputs/whatsapp-scrm-lifecycle.html`](outputs/whatsapp-scrm-lifecycle.html)（同构同步输出至 `outputs/whatsapp-replica-ui-fidelity.html`）
-
-### 方式 B：启动本地预览服务
+### 启动服务
+需要 Node 22.13 或更新版本（使用内置 SQLite）。数据目录与 AI 设置文件都放在**仓库以外**的私有位置：
 ```bash
-# 启动本地预览服务（默认监听 http://127.0.0.1:56141）
-node work/wa-replica/serve.cjs
+# 账号与数据保存在 WA_SCRM_DATA_DIR；默认监听 http://127.0.0.1:56141
+WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/serve.cjs
 ```
-*(Windows 下也可直接双击根目录 `启动SCRM原型预览.cmd` 一键打开 `http://127.0.0.1:56141/#followups`。)*
-
-#### 接入真实的 AI 翻译（可选）
-预览服务带有 AI 中转接口（`/api/ai/*`）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到**仓库以外**的私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动：
-```bash
-WA_SCRM_AI_ENV=/path/to/private/ai.env node work/wa-replica/serve.cjs
-```
-未设置该变量、文件不完整，或以方式 A 打开单文件时，没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
-
-#### 服务器端账号与数据（可选；页面尚未接入）
-预览服务可以保存账号和一个子站的数据。把环境变量 `WA_SCRM_DATA_DIR` 指向**仓库以外**的私有目录后，服务提供登录接口（`/api/auth/*`）与数据接口（`/api/data`），AI 中转接口同时改为只对已登录用户开放。这部分需要 Node 22.13 或更新版本（使用内置 SQLite）。账号用管理工具创建：
+首次使用先创建账号（每位员工一个账号；`agent` 属于一个子站，子站编号由 `WA_SCRM_SITE_ID` 指定，默认 `default`）：
 ```bash
 WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
 ```
-工具只显示一次临时密码，持有人首次登录后必须修改。子站编号由 `WA_SCRM_SITE_ID` 指定（默认 `default`）。未设置 `WA_SCRM_DATA_DIR` 时以上接口关闭，页面仍把数据保存在浏览器中；页面改为使用这些接口是下一步工作（见 `plans/`）。
+工具只显示一次临时密码，持有人首次登录后必须修改。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
+
+#### 接入 AI 翻译（可选）
+服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
+
+`outputs/whatsapp-scrm-lifecycle.html` 等单文件已不能独立使用（打开后只显示无法连接服务器的提示），将在后续清理中移除。
 
 ### 重新编译与完整性校验
 ```bash
@@ -85,11 +77,11 @@ flowchart LR
 ├── 启动SCRM原型预览.cmd                                # Windows 一键启动本地预览服务脚本
 ├── 重新构建原型.cmd                                    # Windows 一键重编译与自动化校验脚本
 ├── outputs/
-│   ├── whatsapp-scrm-lifecycle.html                   # 独立单文件离线可交互原型（零依赖双击即用）
-│   ├── whatsapp-replica-ui-fidelity.html              # 同构离线构建产物（兼容历史预览路径）
+│   ├── whatsapp-scrm-lifecycle.html                   # 单文件构建产物（已不能独立使用，待清理）
+│   ├── whatsapp-replica-ui-fidelity.html              # 同上（兼容历史路径，待清理）
 │   ├── wa-replica-prototype/                          # 模块化原型运行目录（由 serve.cjs 托管）
 │   │   ├── index.html / app.js / app.css              # 编译后的前端入口、逻辑与令牌样式
-│   │   ├── demo-data.js / icons.js                    # 虚构演示数据集与内联 Lucide 矢量图标集
+│   │   ├── boot.js / icons.js                         # 启动、登录与数据同步脚本；内联 Lucide 矢量图标集
 │   │   ├── requirements.json                          # 结构化需求与模块评审配置
 │   │   └── SCRM_Master_OpenWA_Handoff.md              # Master 控制平面 + 独立 OpenWA 子户架构交接文档
 │   ├── scrm-customization-brief.json                  # SCRM 业务功能定制蓝图
@@ -101,6 +93,7 @@ flowchart LR
 │       ├── fidelity-dashboard.js / .css               # 首页经营概览与跟进闭环概览
 │       ├── fidelity-openwa.js                         # OpenWA 扫码绑定、掉线重连与会话联动
 │       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
+│       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务）及其测试
 │       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
 │       ├── site-auth.cjs / site-data.cjs              # 账号与登录会话；子站数据文档（内置 SQLite）
@@ -116,5 +109,5 @@ flowchart LR
 
 ## 4. 安全与数据边界
 
-- 仓库内所有客户姓名、美区/波多黎各号码、聊天对话与二维码均为**纯本地虚构演示数据**，保存在浏览器 `localStorage`，不连接真实 WhatsApp。唯一的对外调用是 AI 翻译：仅当预览服务配置了模型服务时，待翻译的消息文本经本站服务器发送给该模型服务；密钥只保存在服务器上，仓库内不含任何密钥。
+- 客户、会话、标签与待办等数据保存在服务器的数据目录（`WA_SCRM_DATA_DIR`，SQLite 文件，位于仓库之外）；浏览器只保存草稿、已打开页签等界面状态；账号密码以 scrypt 哈希保存。目前尚未连接真实 WhatsApp，会话仍由「模拟」操作产生。唯一的对外调用是 AI 翻译：仅当预览服务配置了模型服务时，待翻译的消息文本经本站服务器发送给该模型服务；密钥只保存在服务器上，仓库内不含任何密钥。
 - 本地勘察期产生的浏览器配置目录、网络抓包（`.har`）、原始采集大文件及第三方参考截图均已通过 `.gitignore` 严格排除，不进入代码仓库。

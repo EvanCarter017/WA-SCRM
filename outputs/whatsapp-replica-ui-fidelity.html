@@ -1753,6 +1753,13 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-sign-in-brand { display:flex; align-items:center; gap:var(--fid-px-10); font-size:var(--fid-px-16); }
 .fid-sign-in-panel h1 { font-size:var(--fid-px-22); }
 .fid-sign-in-panel .fid-btn { min-height:var(--fid-px-44); padding-inline:var(--fid-px-18); }
+.fid-sign-in-note { margin:0; color:var(--fid-quiet); font-size:var(--fid-px-13); line-height:var(--fid-px-20); text-align:center; }
+.fid-sign-in-form { display:grid; gap:var(--fid-px-14); width:100%; }
+.fid-sign-in-form[hidden] { display:none; }
+.fid-sign-in-form .field { display:grid; gap:var(--fid-px-6); font-size:var(--fid-px-13); }
+.fid-sign-in-form .field input { height:var(--fid-px-40); padding:0 var(--fid-px-12); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface); color:var(--color-text); font:inherit; }
+.fid-sign-in-form .field input:focus { border-color:var(--color-accent); outline:var(--fid-px-1) solid var(--color-accent); outline-offset:0; }
+.fid-sign-in-error { margin:0; color:var(--color-danger); font-size:var(--fid-px-13); line-height:var(--fid-px-20); }
 .fid-btn:hover:not(:disabled) { border-color:var(--color-accent); color:var(--color-accent); }
 .fid-btn.blue,.fid-btn.gradient,.fid-btn.green { color:var(--color-surface); border-color:transparent; font-weight:550; }
 .fid-btn.blue { background:var(--color-accent); }
@@ -4147,103 +4154,41 @@ dialog>#toast,dialog>#toast.show{transform:none}
       <main id="view" tabindex="-1"></main>
     </div>
   </div>
-  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title" hidden>
+  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title">
     <div class="fid-sign-in-panel">
       <div class="fid-sign-in-brand" translate="no"><span class="brand-symbol" data-icon="MessagesSquare"></span><strong>WA Desk SCRM</strong></div>
-      <h1 id="subsite-login-title" tabindex="-1">已退出登录</h1>
-      <button class="fid-btn gradient" data-action="subsiteEnterDemo" type="button">进入演示工作台<span data-icon="ChevronRight"></span></button>
+      <h1 id="subsite-login-title" tabindex="-1">正在连接…</h1>
+      <p id="site-notice" class="fid-sign-in-note" role="status" hidden></p>
+      <form id="site-sign-in" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">用户名<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field">密码<input name="password" type="password" autocomplete="current-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">登录</button>
+      </form>
+      <form id="site-password" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">当前（临时）密码<input name="current" type="password" autocomplete="current-password"></label>
+        <label class="field">新密码（至少 10 位）<input name="next" type="password" autocomplete="new-password"></label>
+        <label class="field">再输入一次新密码<input name="repeat" type="password" autocomplete="new-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">保存新密码并进入</button>
+      </form>
+      <button id="site-leave" class="link" type="button" hidden>退出登录</button>
     </div>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
-  <script>window.WA_ICONS={"MessagesSquare":[["path",{"d":"M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"}],["path",{"d":"M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"}]],"PanelLeftClose":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m16 15-3-3 3-3"}]],"Menu":[["path",{"d":"M4 5h16"}],["path",{"d":"M4 12h16"}],["path",{"d":"M4 19h16"}]],"Bell":[["path",{"d":"M10.268 21a2 2 0 0 0 3.464 0"}],["path",{"d":"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}]],"LogOut":[["path",{"d":"m16 17 5-5-5-5"}],["path",{"d":"M21 12H9"}],["path",{"d":"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]],"ChevronRight":[["path",{"d":"m9 18 6-6-6-6"}]],"X":[["path",{"d":"M18 6 6 18"}],["path",{"d":"m6 6 12 12"}]],"PanelLeftOpen":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m14 9 3 3-3 3"}]],"Inbox":[["polyline",{"points":"22 12 16 12 14 15 10 15 8 12 2 12"}],["path",{"d":"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"}]],"Star":[["path",{"d":"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"}]],"PanelsTopLeft":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M3 9h18"}],["path",{"d":"M9 21V9"}]],"SquarePen":[["path",{"d":"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}],["path",{"d":"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"}]],"MessageCircle":[["path",{"d":"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"}]],"ChevronDown":[["path",{"d":"m6 9 6 6 6-6"}]],"Search":[["path",{"d":"m21 21-4.34-4.34"}],["circle",{"cx":"11","cy":"11","r":"8"}]],"ShieldCheck":[["path",{"d":"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"}],["path",{"d":"m9 12 2 2 4-4"}]],"ArrowLeft":[["path",{"d":"m12 19-7-7 7-7"}],["path",{"d":"M19 12H5"}]],"CalendarPlus":[["path",{"d":"M16 19h6"}],["path",{"d":"M16 2v4"}],["path",{"d":"M19 16v6"}],["path",{"d":"M21 12.598V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8.5"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 2v4"}]],"ContactRound":[["path",{"d":"M16 2v2"}],["path",{"d":"M17.915 22a6 6 0 0 0-12 0"}],["path",{"d":"M8 2v2"}],["circle",{"cx":"12","cy":"12","r":"4"}],["rect",{"x":"3","y":"4","width":"18","height":"18","rx":"2"}]],"EllipsisVertical":[["circle",{"cx":"12","cy":"12","r":"1"}],["circle",{"cx":"12","cy":"5","r":"1"}],["circle",{"cx":"12","cy":"19","r":"1"}]],"Target":[["circle",{"cx":"12","cy":"12","r":"10"}],["circle",{"cx":"12","cy":"12","r":"6"}],["circle",{"cx":"12","cy":"12","r":"2"}]],"Link":[["path",{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["path",{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]],"WifiOff":[["path",{"d":"M12 20h.01"}],["path",{"d":"M8.5 16.429a5 5 0 0 1 7 0"}],["path",{"d":"M5 12.859a10 10 0 0 1 5.17-2.69"}],["path",{"d":"M19 12.859a10 10 0 0 0-2.007-1.523"}],["path",{"d":"M2 8.82a15 15 0 0 1 4.177-2.643"}],["path",{"d":"M22 8.82a15 15 0 0 0-11.288-3.764"}],["path",{"d":"m2 2 20 20"}]],"File":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}]],"Languages":[["path",{"d":"m5 8 6 6"}],["path",{"d":"m4 14 6-6 2-3"}],["path",{"d":"M2 5h12"}],["path",{"d":"M7 2h1"}],["path",{"d":"m22 22-5-10-5 10"}],["path",{"d":"M14 18h6"}]],"Check":[["path",{"d":"M20 6 9 17l-5-5"}]],"CheckCheck":[["path",{"d":"M18 6 7 17l-5-5"}],["path",{"d":"m22 10-7.5 7.5L13 16"}]],"Paperclip":[["path",{"d":"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"}]],"MessageSquareText":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"M7 11h10"}],["path",{"d":"M7 15h6"}],["path",{"d":"M7 7h8"}]],"Send":[["path",{"d":"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"}],["path",{"d":"m21.854 2.147-10.94 10.939"}]],"Keyboard":[["path",{"d":"M10 8h.01"}],["path",{"d":"M12 12h.01"}],["path",{"d":"M14 8h.01"}],["path",{"d":"M16 12h.01"}],["path",{"d":"M18 8h.01"}],["path",{"d":"M6 8h.01"}],["path",{"d":"M7 16h10"}],["path",{"d":"M8 12h.01"}],["rect",{"width":"20","height":"16","x":"2","y":"4","rx":"2"}]],"Plus":[["path",{"d":"M5 12h14"}],["path",{"d":"M12 5v14"}]],"Copy":[["rect",{"width":"14","height":"14","x":"8","y":"8","rx":"2","ry":"2"}],["path",{"d":"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"}]],"Clock3":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 6v6h4"}]],"CircleCheck":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"RotateCcw":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}]],"RefreshCw":[["path",{"d":"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}],["path",{"d":"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"}],["path",{"d":"M8 16H3v5"}]],"Pencil":[["path",{"d":"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"}],["path",{"d":"m15 5 4 4"}]],"Info":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 16v-4"}],["path",{"d":"M12 8h.01"}]],"Tags":[["path",{"d":"M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"}],["path",{"d":"M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193"}],["circle",{"cx":"10.5","cy":"6.5","r":".5","fill":"currentColor"}]],"ArrowRightLeft":[["path",{"d":"m16 3 4 4-4 4"}],["path",{"d":"M20 7H4"}],["path",{"d":"m8 21-4-4 4-4"}],["path",{"d":"M4 17h16"}]],"UserRoundPlus":[["path",{"d":"M2 21a8 8 0 0 1 13.292-6"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M19 16v6"}],["path",{"d":"M22 19h-6"}]],"ClipboardList":[["rect",{"width":"8","height":"4","x":"8","y":"2","rx":"1","ry":"1"}],["path",{"d":"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"}],["path",{"d":"M12 11h4"}],["path",{"d":"M12 16h4"}],["path",{"d":"M8 11h.01"}],["path",{"d":"M8 16h.01"}]],"UserRound":[["circle",{"cx":"12","cy":"8","r":"5"}],["path",{"d":"M20 21a8 8 0 0 0-16 0"}]],"LockKeyhole":[["circle",{"cx":"12","cy":"16","r":"1"}],["rect",{"x":"3","y":"10","width":"18","height":"12","rx":"2"}],["path",{"d":"M7 10V7a5 5 0 0 1 10 0v3"}]],"Settings2":[["path",{"d":"M14 17H5"}],["path",{"d":"M19 7h-9"}],["circle",{"cx":"17","cy":"17","r":"3"}],["circle",{"cx":"7","cy":"7","r":"3"}]],"UsersRound":[["path",{"d":"M18 21a8 8 0 0 0-16 0"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"}]],"SlidersHorizontal":[["path",{"d":"M10 5H3"}],["path",{"d":"M12 19H3"}],["path",{"d":"M14 3v4"}],["path",{"d":"M16 17v4"}],["path",{"d":"M21 12h-9"}],["path",{"d":"M21 19h-5"}],["path",{"d":"M21 5h-7"}],["path",{"d":"M8 10v4"}],["path",{"d":"M8 12H3"}]],"FileText":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M10 9H8"}],["path",{"d":"M16 13H8"}],["path",{"d":"M16 17H8"}]],"ChevronUp":[["path",{"d":"m18 15-6-6-6 6"}]],"NotebookPen":[["path",{"d":"M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"}],["path",{"d":"M2 6h4"}],["path",{"d":"M2 10h4"}],["path",{"d":"M2 14h4"}],["path",{"d":"M2 18h4"}],["path",{"d":"M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"}]],"ChevronLeft":[["path",{"d":"m15 18-6-6 6-6"}]],"LayoutDashboard":[["rect",{"width":"7","height":"9","x":"3","y":"3","rx":"1"}],["rect",{"width":"7","height":"5","x":"14","y":"3","rx":"1"}],["rect",{"width":"7","height":"9","x":"14","y":"12","rx":"1"}],["rect",{"width":"7","height":"5","x":"3","y":"16","rx":"1"}]],"Smartphone":[["rect",{"width":"14","height":"20","x":"5","y":"2","rx":"2","ry":"2"}],["path",{"d":"M12 18h.01"}]],"ChartColumn":[["path",{"d":"M3 3v16a2 2 0 0 0 2 2h16"}],["path",{"d":"M18 17V9"}],["path",{"d":"M13 17V5"}],["path",{"d":"M8 17v-3"}]],"Images":[["path",{"d":"m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"}],["path",{"d":"M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"}],["circle",{"cx":"13","cy":"7","r":"1","fill":"currentColor"}],["rect",{"x":"8","y":"2","width":"14","height":"14","rx":"2"}]],"Network":[["rect",{"x":"16","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"2","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"9","y":"2","width":"6","height":"6","rx":"1"}],["path",{"d":"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"}],["path",{"d":"M12 12V8"}]],"Trash2":[["path",{"d":"M10 11v6"}],["path",{"d":"M14 11v6"}],["path",{"d":"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}],["path",{"d":"M3 6h18"}],["path",{"d":"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}]],"RotateCw":[["path",{"d":"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}]],"Tag":[["path",{"d":"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"}],["circle",{"cx":"7.5","cy":"7.5","r":".5","fill":"currentColor"}]],"Eraser":[["path",{"d":"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"}],["path",{"d":"m5.082 11.09 8.828 8.828"}]],"FileDown":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M12 18v-6"}],["path",{"d":"m9 15 3 3 3-3"}]],"Bot":[["path",{"d":"M12 8V4H8"}],["rect",{"width":"16","height":"12","x":"4","y":"8","rx":"2"}],["path",{"d":"M2 14h2"}],["path",{"d":"M20 14h2"}],["path",{"d":"M15 13v2"}],["path",{"d":"M9 13v2"}]],"ListOrdered":[["path",{"d":"M11 5h10"}],["path",{"d":"M11 12h10"}],["path",{"d":"M11 19h10"}],["path",{"d":"M4 4h1v5"}],["path",{"d":"M4 9h2"}],["path",{"d":"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"}]],"StickyNote":[["path",{"d":"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"}],["path",{"d":"M15 3v5a1 1 0 0 0 1 1h5"}]],"QrCode":[["rect",{"width":"5","height":"5","x":"3","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"16","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"3","y":"16","rx":"1"}],["path",{"d":"M21 16h-3a2 2 0 0 0-2 2v3"}],["path",{"d":"M21 21v.01"}],["path",{"d":"M12 7v3a2 2 0 0 1-2 2H7"}],["path",{"d":"M3 12h.01"}],["path",{"d":"M12 3h.01"}],["path",{"d":"M12 16v.01"}],["path",{"d":"M16 12h1"}],["path",{"d":"M21 12v.01"}],["path",{"d":"M12 21v-1"}]],"LoaderCircle":[["path",{"d":"M21 12a9 9 0 1 1-6.219-8.56"}]],"ScanQrCode":[["path",{"d":"M17 12v4a1 1 0 0 1-1 1h-4"}],["path",{"d":"M17 3h2a2 2 0 0 1 2 2v2"}],["path",{"d":"M17 8V7"}],["path",{"d":"M21 17v2a2 2 0 0 1-2 2h-2"}],["path",{"d":"M3 7V5a2 2 0 0 1 2-2h2"}],["path",{"d":"M7 17h.01"}],["path",{"d":"M7 21H5a2 2 0 0 1-2-2v-2"}],["rect",{"x":"7","y":"7","width":"5","height":"5","rx":"1"}]],"ArrowRight":[["path",{"d":"M5 12h14"}],["path",{"d":"m12 5 7 7-7 7"}]],"ClockAlert":[["path",{"d":"M12 6v6l4 2"}],["path",{"d":"M20 12v5"}],["path",{"d":"M20 21h.01"}],["path",{"d":"M21.25 8.2A10 10 0 1 0 16 21.16"}]],"CalendarDays":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 14h.01"}],["path",{"d":"M12 14h.01"}],["path",{"d":"M16 14h.01"}],["path",{"d":"M8 18h.01"}],["path",{"d":"M12 18h.01"}],["path",{"d":"M16 18h.01"}]],"CalendarCheck":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"m9 16 2 2 4-4"}]],"MessageSquareCheck":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.7.7 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m9 11 2 2 4-4"}]],"MessageSquare":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}]],"BadgeCheck":[["path",{"d":"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"}],["path",{"d":"m9 12 2 2 4-4"}]],"Flame":[["path",{"d":"M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"}]],"Zap":[["path",{"d":"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"}]],"TriangleAlert":[["path",{"d":"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"}],["path",{"d":"M12 9v4"}],["path",{"d":"M12 17h.01"}]],"Archive":[["rect",{"width":"20","height":"5","x":"2","y":"3","rx":"1"}],["path",{"d":"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}],["path",{"d":"M10 12h4"}]],"Sparkles":[["path",{"d":"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"}],["path",{"d":"M20 2v4"}],["path",{"d":"M22 4h-4"}],["circle",{"cx":"4","cy":"20","r":"2"}]],"CalendarClock":[["path",{"d":"M16 14v2.2l1.6 1"}],["path",{"d":"M16 2v4"}],["path",{"d":"M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"}],["path",{"d":"M3 10h5"}],["path",{"d":"M8 2v4"}],["circle",{"cx":"16","cy":"16","r":"6"}]],"CheckCircle2":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"Compass":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"}]],"Layers":[["path",{"d":"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"}],["path",{"d":"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"}],["path",{"d":"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"}]],"History":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}],["path",{"d":"M12 7v5l4 2"}]],"MessageSquareReply":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m10 8-3 3 3 3"}],["path",{"d":"M17 14v-1a2 2 0 0 0-2-2H7"}]],"Filter":[["path",{"d":"M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"}]]};
-</script><script>window.WA_DEMO = (() => {
-  const day = new Date(); day.setHours(10,0,0,0);
-  const at = (days,hour=10) => { const d=new Date(day);d.setDate(d.getDate()+days);d.setHours(hour,0,0,0);return d.toISOString(); };
-  return {
-    version: 1,
-    members: [
-      {id:'lin',name:'林予',initial:'予',role:'agent',team:'北美一组',color:'jade'},
-      {id:'chen',name:'陈珂',initial:'珂',role:'agent',team:'北美一组',color:'blue'},
-      {id:'su',name:'苏晓',initial:'晓',role:'agent',team:'西语组',color:'peach'},
-      {id:'admin',name:'周宁',initial:'宁',role:'manager',team:'运营管理',color:'purple'}
-    ],
-    accounts: [
-      {id:'a1',name:'美国 · 咨询 01',number:'+1 (202) 555-0141',owner:'lin',country:'US',state:'online',color:'jade',note:'Facebook 美国广告咨询',lastSync:'刚刚'},
-      {id:'a2',name:'美国 · 老客 02',number:'+1 (202) 555-0142',owner:'lin',country:'US',state:'online',color:'blue',note:'老客户维护与复购',lastSync:'1 分钟前'},
-      {id:'a3',name:'波多黎各 · 西语',number:'+1 (787) 555-0143',owner:'lin',country:'PR',state:'reconnect',color:'peach',note:'西语咨询 · 需要重新连接',lastSync:'24 分钟前'},
-      {id:'a4',name:'美国 · 咨询 03',number:'+1 (202) 555-0144',owner:'chen',country:'US',state:'online',color:'purple',note:'北美一组',lastSync:'刚刚'},
-      {id:'a5',name:'波多黎各 · 咨询 02',number:'+1 (787) 555-0145',owner:'su',country:'PR',state:'online',color:'gold',note:'西语组',lastSync:'2 分钟前'}
-    ],
-    tagGroups: [
-      {id:'interest',name:'客户意向',scope:'team',owner:null},
-      {id:'source',name:'来源渠道',scope:'team',owner:null},
-      {id:'preference',name:'服务偏好',scope:'team',owner:null},
-      {id:'personal',name:'我的工作标记',scope:'private',owner:'lin'}
-    ],
-    tags: [
-      {id:'high',name:'高意向',group:'interest',color:'jade'},
-      {id:'quote',name:'待报价',group:'interest',color:'gold'},
-      {id:'return',name:'复购客户',group:'interest',color:'purple'},
-      {id:'facebook',name:'Facebook 广告',group:'source',color:'blue'},
-      {id:'referral',name:'客户转介绍',group:'source',color:'peach'},
-      {id:'es',name:'西语沟通',group:'preference',color:'peach'},
-      {id:'en',name:'英语沟通',group:'preference',color:'blue'},
-      {id:'important',name:'重点跟进',group:'personal',color:'purple'},
-      {id:'catalog',name:'已发目录',group:'personal',color:'slate'}
-    ],
-    customers: [
-      {id:'c1',name:'Ava Thompson',initials:'AT',color:'peach',phone:'+1 (512) 555-0140',country:'US',city:'Austin',timezone:'America/Chicago',language:'英语',owner:'lin',account:'a1',tags:['high','quote','facebook'],stage:'跟进中',source:'Facebook 广告',campaign:'US · 咨询广告 A',ad:'目录介绍 · 素材 02',unread:2,star:true,last:'09:42',preview:'Hi! Could you send me the latest catalog?',translation:'你好！可以发我最新的产品目录吗？',followup:at(0,15),notes:'偏好通过文字沟通，询问目录后希望了解交付安排。',contactRefs:[{account:'a1',owner:'lin'},{account:'a4',owner:'chen'}]},
-      {id:'c2',name:'Mateo Rivera',initials:'MR',color:'blue',phone:'+1 (787) 555-0151',country:'PR',city:'San Juan',timezone:'America/Puerto_Rico',language:'西班牙语',owner:'lin',account:'a3',tags:['es','facebook','important'],stage:'新客户',source:'Facebook 广告',campaign:'PR · 西语广告 B',ad:'品牌介绍 · 素材 01',unread:1,star:false,last:'09:28',preview:'¿Hacen envíos a Puerto Rico?',translation:'你们可以发货到波多黎各吗？',followup:at(-1,16),notes:'优先用西语回复，确认收件地区。',contactRefs:[{account:'a3',owner:'lin'}]},
-      {id:'c3',name:'Olivia Bennett',initials:'OB',color:'purple',phone:'+1 (305) 555-0152',country:'US',city:'Miami',timezone:'America/New_York',language:'英语',owner:'lin',account:'a2',tags:['return','en'],stage:'已成交',source:'老客户复购',campaign:'',ad:'',unread:0,star:true,last:'08:56',preview:'Thanks, I received the details. I’ll check them today.',translation:'谢谢，我收到资料了，今天会查看。',followup:at(1,11),notes:'老客户，倾向于邮件同步资料。',contactRefs:[{account:'a2',owner:'lin'}]},
-      {id:'c4',name:'Ethan Brooks',initials:'EB',color:'jade',phone:'+1 (415) 555-0153',country:'US',city:'San Francisco',timezone:'America/Los_Angeles',language:'英语',owner:'lin',account:'a1',tags:['quote','facebook'],stage:'已报价',source:'Facebook 广告',campaign:'US · 咨询广告 A',ad:'目录介绍 · 素材 01',unread:0,star:false,last:'08:35',preview:'Could you confirm the delivery timeframe?',translation:'可以确认一下交付时效吗？',followup:at(0,17),notes:'已发送初步报价，下一次沟通确认交付需求。',contactRefs:[{account:'a1',owner:'lin'}]},
-      {id:'c5',name:'Sofia Morales',initials:'SM',color:'gold',phone:'+1 (787) 555-0154',country:'PR',city:'Ponce',timezone:'America/Puerto_Rico',language:'西班牙语',owner:'lin',account:'a3',tags:['es','high'],stage:'跟进中',source:'网站咨询',campaign:'',ad:'',unread:0,star:false,last:'昨天',preview:'Perfecto, gracias por la información.',translation:'好的，谢谢你的信息。',followup:at(2,14),notes:'需要一份西语版本的说明。',contactRefs:[{account:'a3',owner:'lin'}]},
-      {id:'c6',name:'Noah Wilson',initials:'NW',color:'slate',phone:'+1 (212) 555-0155',country:'US',city:'New York',timezone:'America/New_York',language:'英语',owner:'lin',account:'a2',tags:['referral','catalog'],stage:'培育中',source:'客户转介绍',campaign:'',ad:'',unread:0,star:false,last:'昨天',preview:'I’ll get back to you once I review the catalog.',translation:'我看完目录后会再联系你。',followup:at(3,10),notes:'来自现有客户转介绍，暂时了解为主。',contactRefs:[{account:'a2',owner:'lin'}]},
-      {id:'c7',name:'Mia Carter',initials:'MC',color:'blue',phone:'+1 (713) 555-0156',country:'US',city:'Houston',timezone:'America/Chicago',language:'英语',owner:'chen',account:'a4',tags:['facebook','high'],stage:'跟进中',source:'Facebook 广告',campaign:'US · 咨询广告 C',ad:'品牌介绍 · 素材 03',unread:3,star:false,last:'09:39',preview:'Hello, I’d like to learn more.',translation:'你好，我想了解更多。',followup:at(0,14),notes:'等待补充具体需求。',contactRefs:[{account:'a4',owner:'chen'}]},
-      {id:'c8',name:'Lucas Torres',initials:'LT',color:'peach',phone:'+1 (787) 555-0157',country:'PR',city:'Carolina',timezone:'America/Puerto_Rico',language:'西班牙语',owner:'su',account:'a5',tags:['es','quote'],stage:'已报价',source:'Facebook 广告',campaign:'PR · 西语广告 B',ad:'服务介绍 · 素材 02',unread:1,star:false,last:'09:10',preview:'¿Me puede enviar una cotización?',translation:'能发一份报价给我吗？',followup:at(-1,10),notes:'已收到报价请求。',contactRefs:[{account:'a5',owner:'su'}]}
-    ],
-    messages: {
-      c1:[
-        {id:'m1',side:'in',text:'Hi, I saw your ad on Facebook and would like to know more.',translated:'你好，我在 Facebook 看到了你们的广告，想进一步了解。',time:'昨天 16:32'},
-        {id:'m2',side:'out',text:'Hi Ava, happy to help! What information would be most useful for you?',time:'昨天 16:34',read:true},
-        {id:'m3',side:'in',text:'I’m comparing a few options. The product details and delivery arrangements would help.',translated:'我正在比较几个选择，想了解产品详情和交付安排。',time:'昨天 16:38'},
-        {id:'m4',side:'in',text:'Hi! Could you send me the latest catalog?',translated:'你好！可以发我最新的产品目录吗？',time:'09:42'}
-      ],
-      c2:[{id:'m5',side:'in',text:'Hola, vi su anuncio y quisiera más información.',translated:'你好，我看到了广告，希望了解更多信息。',time:'09:25'},{id:'m6',side:'in',text:'¿Hacen envíos a Puerto Rico?',translated:'你们可以发货到波多黎各吗？',time:'09:28'}],
-      c3:[{id:'m7',side:'out',text:'I’ve put the information together for you. Let me know if you have any questions.',time:'08:50',read:true},{id:'m8',side:'in',text:'Thanks, I received the details. I’ll check them today.',translated:'谢谢，我收到资料了，今天会查看。',time:'08:56'}],
-      c4:[{id:'m9',side:'out',text:'Here is the initial quote. We can adjust it once you confirm your requirements.',time:'昨天 14:05',read:true},{id:'m10',side:'in',text:'Could you confirm the delivery timeframe?',translated:'可以确认一下交付时效吗？',time:'08:35'}]
-    },
-    activities: {
-      c1:[{text:'加入标签「高意向」「待报价」',by:'林予',time:'今天 09:45'},{text:'通过 Facebook 广告首次咨询',by:'系统',time:'昨天 16:32'}],
-      c2:[{text:'创建西语咨询跟进提醒',by:'林予',time:'昨天 15:20'}]
-    },
-    tasks:[
-      {id:'t1',customer:'c2',owner:'lin',title:'确认波多黎各交付需求',due:at(-1,16),priority:'high',done:false},
-      {id:'t2',customer:'c1',owner:'lin',title:'发送目录，了解具体需求',due:at(0,15),priority:'high',done:false},
-      {id:'t3',customer:'c4',owner:'lin',title:'补充报价与交付说明',due:at(0,17),priority:'normal',done:false},
-      {id:'t4',customer:'c3',owner:'lin',title:'老客户资料回访',due:at(1,11),priority:'normal',done:false},
-      {id:'t5',customer:'c5',owner:'lin',title:'确认客户是否需要西语资料',due:at(2,14),priority:'normal',done:false},
-      {id:'t6',customer:'c6',owner:'lin',title:'目录发送后回访',due:at(3,10),priority:'normal',done:false},
-      {id:'t7',customer:'c7',owner:'chen',title:'梳理客户需求',due:at(0,14),priority:'normal',done:false},
-      {id:'t8',customer:'c8',owner:'su',title:'发送报价资料',due:at(-1,10),priority:'high',done:false}
-    ],
-    quickReplies:[
-      {id:'q1',title:'目录介绍',scope:'公共话术',zh:'你好，很高兴为你介绍。我会整理最新的目录，请问你想先了解哪一部分？',en:'Hi, happy to help. I can put together the latest catalog for you. Which details would you like to start with?',es:'Hola, con gusto. Puedo prepararte el catálogo más reciente. ¿Qué información te gustaría conocer primero?'},
-      {id:'q2',title:'交付说明',scope:'公共话术',zh:'请告诉我你的收件城市，我会确认对应的交付安排，再把详情发给你。',en:'Please let me know your delivery city. I’ll confirm the delivery arrangements and send you the details.',es:'Dime tu ciudad de entrega, por favor. Confirmaré las opciones y te enviaré los detalles.'},
-      {id:'q3',title:'询价跟进',scope:'我的话术',owner:'lin',zh:'你好，想跟进一下之前发给你的资料。你还有哪些希望进一步了解的地方？',en:'Hi, just following up on the information I sent. Is there anything you’d like me to clarify?',es:'Hola, quería dar seguimiento a la información que te envié. ¿Hay algo que te gustaría aclarar?'}
-    ]
-  };
-})();
-</script><script>(() => {
+  <script>window.WA_ICONS={"MessagesSquare":[["path",{"d":"M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"}],["path",{"d":"M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"}]],"PanelLeftClose":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m16 15-3-3 3-3"}]],"Menu":[["path",{"d":"M4 5h16"}],["path",{"d":"M4 12h16"}],["path",{"d":"M4 19h16"}]],"Bell":[["path",{"d":"M10.268 21a2 2 0 0 0 3.464 0"}],["path",{"d":"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"}]],"LogOut":[["path",{"d":"m16 17 5-5-5-5"}],["path",{"d":"M21 12H9"}],["path",{"d":"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"}]],"X":[["path",{"d":"M18 6 6 18"}],["path",{"d":"m6 6 12 12"}]],"PanelLeftOpen":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M9 3v18"}],["path",{"d":"m14 9 3 3-3 3"}]],"Inbox":[["polyline",{"points":"22 12 16 12 14 15 10 15 8 12 2 12"}],["path",{"d":"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"}]],"Star":[["path",{"d":"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"}]],"PanelsTopLeft":[["rect",{"width":"18","height":"18","x":"3","y":"3","rx":"2"}],["path",{"d":"M3 9h18"}],["path",{"d":"M9 21V9"}]],"SquarePen":[["path",{"d":"M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"}],["path",{"d":"M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"}]],"MessageCircle":[["path",{"d":"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"}]],"ChevronDown":[["path",{"d":"m6 9 6 6 6-6"}]],"Search":[["path",{"d":"m21 21-4.34-4.34"}],["circle",{"cx":"11","cy":"11","r":"8"}]],"ShieldCheck":[["path",{"d":"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"}],["path",{"d":"m9 12 2 2 4-4"}]],"ArrowLeft":[["path",{"d":"m12 19-7-7 7-7"}],["path",{"d":"M19 12H5"}]],"CalendarPlus":[["path",{"d":"M16 19h6"}],["path",{"d":"M16 2v4"}],["path",{"d":"M19 16v6"}],["path",{"d":"M21 12.598V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8.5"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 2v4"}]],"ContactRound":[["path",{"d":"M16 2v2"}],["path",{"d":"M17.915 22a6 6 0 0 0-12 0"}],["path",{"d":"M8 2v2"}],["circle",{"cx":"12","cy":"12","r":"4"}],["rect",{"x":"3","y":"4","width":"18","height":"18","rx":"2"}]],"EllipsisVertical":[["circle",{"cx":"12","cy":"12","r":"1"}],["circle",{"cx":"12","cy":"5","r":"1"}],["circle",{"cx":"12","cy":"19","r":"1"}]],"Target":[["circle",{"cx":"12","cy":"12","r":"10"}],["circle",{"cx":"12","cy":"12","r":"6"}],["circle",{"cx":"12","cy":"12","r":"2"}]],"Link":[["path",{"d":"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"}],["path",{"d":"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"}]],"WifiOff":[["path",{"d":"M12 20h.01"}],["path",{"d":"M8.5 16.429a5 5 0 0 1 7 0"}],["path",{"d":"M5 12.859a10 10 0 0 1 5.17-2.69"}],["path",{"d":"M19 12.859a10 10 0 0 0-2.007-1.523"}],["path",{"d":"M2 8.82a15 15 0 0 1 4.177-2.643"}],["path",{"d":"M22 8.82a15 15 0 0 0-11.288-3.764"}],["path",{"d":"m2 2 20 20"}]],"File":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}]],"Languages":[["path",{"d":"m5 8 6 6"}],["path",{"d":"m4 14 6-6 2-3"}],["path",{"d":"M2 5h12"}],["path",{"d":"M7 2h1"}],["path",{"d":"m22 22-5-10-5 10"}],["path",{"d":"M14 18h6"}]],"Check":[["path",{"d":"M20 6 9 17l-5-5"}]],"CheckCheck":[["path",{"d":"M18 6 7 17l-5-5"}],["path",{"d":"m22 10-7.5 7.5L13 16"}]],"Paperclip":[["path",{"d":"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"}]],"MessageSquareText":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"M7 11h10"}],["path",{"d":"M7 15h6"}],["path",{"d":"M7 7h8"}]],"Send":[["path",{"d":"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"}],["path",{"d":"m21.854 2.147-10.94 10.939"}]],"Keyboard":[["path",{"d":"M10 8h.01"}],["path",{"d":"M12 12h.01"}],["path",{"d":"M14 8h.01"}],["path",{"d":"M16 12h.01"}],["path",{"d":"M18 8h.01"}],["path",{"d":"M6 8h.01"}],["path",{"d":"M7 16h10"}],["path",{"d":"M8 12h.01"}],["rect",{"width":"20","height":"16","x":"2","y":"4","rx":"2"}]],"Plus":[["path",{"d":"M5 12h14"}],["path",{"d":"M12 5v14"}]],"Copy":[["rect",{"width":"14","height":"14","x":"8","y":"8","rx":"2","ry":"2"}],["path",{"d":"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"}]],"ChevronRight":[["path",{"d":"m9 18 6-6-6-6"}]],"Clock3":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 6v6h4"}]],"CircleCheck":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"RotateCcw":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}]],"RefreshCw":[["path",{"d":"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}],["path",{"d":"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"}],["path",{"d":"M8 16H3v5"}]],"Pencil":[["path",{"d":"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"}],["path",{"d":"m15 5 4 4"}]],"Info":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"M12 16v-4"}],["path",{"d":"M12 8h.01"}]],"Tags":[["path",{"d":"M13.172 2a2 2 0 0 1 1.414.586l6.71 6.71a2.4 2.4 0 0 1 0 3.408l-4.592 4.592a2.4 2.4 0 0 1-3.408 0l-6.71-6.71A2 2 0 0 1 6 9.172V3a1 1 0 0 1 1-1z"}],["path",{"d":"M2 7v6.172a2 2 0 0 0 .586 1.414l6.71 6.71a2.4 2.4 0 0 0 3.191.193"}],["circle",{"cx":"10.5","cy":"6.5","r":".5","fill":"currentColor"}]],"ArrowRightLeft":[["path",{"d":"m16 3 4 4-4 4"}],["path",{"d":"M20 7H4"}],["path",{"d":"m8 21-4-4 4-4"}],["path",{"d":"M4 17h16"}]],"UserRoundPlus":[["path",{"d":"M2 21a8 8 0 0 1 13.292-6"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M19 16v6"}],["path",{"d":"M22 19h-6"}]],"ClipboardList":[["rect",{"width":"8","height":"4","x":"8","y":"2","rx":"1","ry":"1"}],["path",{"d":"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"}],["path",{"d":"M12 11h4"}],["path",{"d":"M12 16h4"}],["path",{"d":"M8 11h.01"}],["path",{"d":"M8 16h.01"}]],"UserRound":[["circle",{"cx":"12","cy":"8","r":"5"}],["path",{"d":"M20 21a8 8 0 0 0-16 0"}]],"LockKeyhole":[["circle",{"cx":"12","cy":"16","r":"1"}],["rect",{"x":"3","y":"10","width":"18","height":"12","rx":"2"}],["path",{"d":"M7 10V7a5 5 0 0 1 10 0v3"}]],"Settings2":[["path",{"d":"M14 17H5"}],["path",{"d":"M19 7h-9"}],["circle",{"cx":"17","cy":"17","r":"3"}],["circle",{"cx":"7","cy":"7","r":"3"}]],"UsersRound":[["path",{"d":"M18 21a8 8 0 0 0-16 0"}],["circle",{"cx":"10","cy":"8","r":"5"}],["path",{"d":"M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"}]],"SlidersHorizontal":[["path",{"d":"M10 5H3"}],["path",{"d":"M12 19H3"}],["path",{"d":"M14 3v4"}],["path",{"d":"M16 17v4"}],["path",{"d":"M21 12h-9"}],["path",{"d":"M21 19h-5"}],["path",{"d":"M21 5h-7"}],["path",{"d":"M8 10v4"}],["path",{"d":"M8 12H3"}]],"FileText":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M10 9H8"}],["path",{"d":"M16 13H8"}],["path",{"d":"M16 17H8"}]],"ChevronUp":[["path",{"d":"m18 15-6-6-6 6"}]],"NotebookPen":[["path",{"d":"M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"}],["path",{"d":"M2 6h4"}],["path",{"d":"M2 10h4"}],["path",{"d":"M2 14h4"}],["path",{"d":"M2 18h4"}],["path",{"d":"M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"}]],"ChevronLeft":[["path",{"d":"m15 18-6-6 6-6"}]],"LayoutDashboard":[["rect",{"width":"7","height":"9","x":"3","y":"3","rx":"1"}],["rect",{"width":"7","height":"5","x":"14","y":"3","rx":"1"}],["rect",{"width":"7","height":"9","x":"14","y":"12","rx":"1"}],["rect",{"width":"7","height":"5","x":"3","y":"16","rx":"1"}]],"Smartphone":[["rect",{"width":"14","height":"20","x":"5","y":"2","rx":"2","ry":"2"}],["path",{"d":"M12 18h.01"}]],"ChartColumn":[["path",{"d":"M3 3v16a2 2 0 0 0 2 2h16"}],["path",{"d":"M18 17V9"}],["path",{"d":"M13 17V5"}],["path",{"d":"M8 17v-3"}]],"Images":[["path",{"d":"m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16"}],["path",{"d":"M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2"}],["circle",{"cx":"13","cy":"7","r":"1","fill":"currentColor"}],["rect",{"x":"8","y":"2","width":"14","height":"14","rx":"2"}]],"Network":[["rect",{"x":"16","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"2","y":"16","width":"6","height":"6","rx":"1"}],["rect",{"x":"9","y":"2","width":"6","height":"6","rx":"1"}],["path",{"d":"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"}],["path",{"d":"M12 12V8"}]],"Trash2":[["path",{"d":"M10 11v6"}],["path",{"d":"M14 11v6"}],["path",{"d":"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}],["path",{"d":"M3 6h18"}],["path",{"d":"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}]],"RotateCw":[["path",{"d":"M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"}],["path",{"d":"M21 3v5h-5"}]],"Tag":[["path",{"d":"M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"}],["circle",{"cx":"7.5","cy":"7.5","r":".5","fill":"currentColor"}]],"Eraser":[["path",{"d":"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21"}],["path",{"d":"m5.082 11.09 8.828 8.828"}]],"FileDown":[["path",{"d":"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"}],["path",{"d":"M14 2v5a1 1 0 0 0 1 1h5"}],["path",{"d":"M12 18v-6"}],["path",{"d":"m9 15 3 3 3-3"}]],"Bot":[["path",{"d":"M12 8V4H8"}],["rect",{"width":"16","height":"12","x":"4","y":"8","rx":"2"}],["path",{"d":"M2 14h2"}],["path",{"d":"M20 14h2"}],["path",{"d":"M15 13v2"}],["path",{"d":"M9 13v2"}]],"ListOrdered":[["path",{"d":"M11 5h10"}],["path",{"d":"M11 12h10"}],["path",{"d":"M11 19h10"}],["path",{"d":"M4 4h1v5"}],["path",{"d":"M4 9h2"}],["path",{"d":"M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"}]],"StickyNote":[["path",{"d":"M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"}],["path",{"d":"M15 3v5a1 1 0 0 0 1 1h5"}]],"QrCode":[["rect",{"width":"5","height":"5","x":"3","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"16","y":"3","rx":"1"}],["rect",{"width":"5","height":"5","x":"3","y":"16","rx":"1"}],["path",{"d":"M21 16h-3a2 2 0 0 0-2 2v3"}],["path",{"d":"M21 21v.01"}],["path",{"d":"M12 7v3a2 2 0 0 1-2 2H7"}],["path",{"d":"M3 12h.01"}],["path",{"d":"M12 3h.01"}],["path",{"d":"M12 16v.01"}],["path",{"d":"M16 12h1"}],["path",{"d":"M21 12v.01"}],["path",{"d":"M12 21v-1"}]],"LoaderCircle":[["path",{"d":"M21 12a9 9 0 1 1-6.219-8.56"}]],"ScanQrCode":[["path",{"d":"M17 12v4a1 1 0 0 1-1 1h-4"}],["path",{"d":"M17 3h2a2 2 0 0 1 2 2v2"}],["path",{"d":"M17 8V7"}],["path",{"d":"M21 17v2a2 2 0 0 1-2 2h-2"}],["path",{"d":"M3 7V5a2 2 0 0 1 2-2h2"}],["path",{"d":"M7 17h.01"}],["path",{"d":"M7 21H5a2 2 0 0 1-2-2v-2"}],["rect",{"x":"7","y":"7","width":"5","height":"5","rx":"1"}]],"ArrowRight":[["path",{"d":"M5 12h14"}],["path",{"d":"m12 5 7 7-7 7"}]],"ClockAlert":[["path",{"d":"M12 6v6l4 2"}],["path",{"d":"M20 12v5"}],["path",{"d":"M20 21h.01"}],["path",{"d":"M21.25 8.2A10 10 0 1 0 16 21.16"}]],"CalendarDays":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"M8 14h.01"}],["path",{"d":"M12 14h.01"}],["path",{"d":"M16 14h.01"}],["path",{"d":"M8 18h.01"}],["path",{"d":"M12 18h.01"}],["path",{"d":"M16 18h.01"}]],"CalendarCheck":[["path",{"d":"M8 2v4"}],["path",{"d":"M16 2v4"}],["rect",{"width":"18","height":"18","x":"3","y":"4","rx":"2"}],["path",{"d":"M3 10h18"}],["path",{"d":"m9 16 2 2 4-4"}]],"MessageSquareCheck":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.7.7 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m9 11 2 2 4-4"}]],"MessageSquare":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}]],"BadgeCheck":[["path",{"d":"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"}],["path",{"d":"m9 12 2 2 4-4"}]],"Flame":[["path",{"d":"M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"}]],"Zap":[["path",{"d":"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"}]],"TriangleAlert":[["path",{"d":"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"}],["path",{"d":"M12 9v4"}],["path",{"d":"M12 17h.01"}]],"Archive":[["rect",{"width":"20","height":"5","x":"2","y":"3","rx":"1"}],["path",{"d":"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}],["path",{"d":"M10 12h4"}]],"Sparkles":[["path",{"d":"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"}],["path",{"d":"M20 2v4"}],["path",{"d":"M22 4h-4"}],["circle",{"cx":"4","cy":"20","r":"2"}]],"CalendarClock":[["path",{"d":"M16 14v2.2l1.6 1"}],["path",{"d":"M16 2v4"}],["path",{"d":"M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"}],["path",{"d":"M3 10h5"}],["path",{"d":"M8 2v4"}],["circle",{"cx":"16","cy":"16","r":"6"}]],"CheckCircle2":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]],"Compass":[["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"}]],"Layers":[["path",{"d":"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"}],["path",{"d":"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"}],["path",{"d":"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"}]],"History":[["path",{"d":"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"}],["path",{"d":"M3 3v5h5"}],["path",{"d":"M12 7v5l4 2"}]],"MessageSquareReply":[["path",{"d":"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}],["path",{"d":"m10 8-3 3 3 3"}],["path",{"d":"M17 14v-1a2 2 0 0 0-2-2H7"}]],"Filter":[["path",{"d":"M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"}]]};
+</script><script>window.WA_START = () => {
   'use strict';
   const KEY='wa-desk-scrm-lifecycle-v06';
   const clone=x=>JSON.parse(JSON.stringify(x));
-  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}
-  let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
+  const UI_KEY=KEY+':'+window.WA_SITE.user.username;
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(UI_KEY)||'null')}catch(e){}
+  let data=window.WA_SITE.data;
   const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力'};
   const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
-  const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');
-  const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:'c1',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
+  const subsiteMember=data.members.find(m=>m.id===window.WA_SITE.user.username);
+  const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:data.customers[0]?.id||'',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
   Object.assign(ui,{openTabs:saved?.openTabs||['inbox','accounts','customers','tags','followups'],navCollapsed:saved?.navCollapsed||false,customerNavOpen:true,accountQuery:'',accountStatus:'all',tagGroup:'all',tagQuery:'',pages:{},pageSizes:{}});
   Object.defineProperty(ui,'attachment',{get(){return ui.customer?ui.attachments[ui.customer]||null:null},set(value){if(ui.customer){if(value)ui.attachments[ui.customer]=value;else delete ui.attachments[ui.customer]}}});
   if(!data.members.some(m=>m.id===ui.persona)){
@@ -4292,7 +4237,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   const unreadCount=()=>myCustomers().reduce((n,c)=>n+c.unread,0);
   const pendingTasks=()=>myTasks().filter(t=>!t.done);
   const draft=c=>ui.drafts[c.id]||{text:'',translated:'',source:''};
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify({version:6,data,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){toast('浏览器未允许本机保存，请导出需求与评审留档。')}}
+  function persist(){try{localStorage.setItem(UI_KEY,JSON.stringify({version:6,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){}window.WA_SITE.save(data)}
   function toast(message,undo=null) {
     const box=$('#toast'),host=$('#dialog').open?$('#dialog'):document.body;if(box.parentElement!==host)host.append(box);box.dataset.dismissOnClose=undo&&$('#dialog').open?'1':'';box.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.textContent='撤销';button.addEventListener('click',()=>{undo();box.classList.remove('show')},{once:true});box.append(button)}
@@ -4501,8 +4446,6 @@ dialog>#toast,dialog>#toast.show{transform:none}
       case 'send':send();break;
       case 'attachment':{formModal('添加演示附件','attachment-form','<p class="modal-description">输入一个文件名以评审附件在聊天中的位置。不会读取、上传或发送任何真实文件。</p><label class="field">演示文件名<input name="name" required maxlength="100" placeholder="例如：产品目录.pdf"></label>','加入演示消息');break}
       case 'removeAttachment':ui.attachment=null;persist();updateSendState(selectedCustomer());$('#translation-preview').innerHTML=previewHTML(selectedCustomer());paintIcons();break;
-      case 'resetDemo':modal('恢复初始演示数据','<div class="modal-body"><p class="modal-description">恢复虚构账号、客户、消息、标签和待办。你已经填写的功能范围判断和评审备注会保留。</p></div>',cancel+'<button class="button primary" data-action="confirmReset">恢复演示数据</button>');break;
-      case 'confirmReset':data=clone(window.WA_DEMO);fidResetExtras();ui.persona='lin';ui.customer='c1';ui.account='all';ui.selected.clear();ui.drafts={};ui.noteDrafts={};ui.attachments={};ui.attachment=null;ui.profileOpen=true;ui.pages={};ui.tagGroup='all';ui.tagQuery='';ui.accountQuery='';ui.accountStatus='all';persist();close();render();toast('演示数据已恢复；范围判断与评审备注已保留。');break;
     }
   });
   document.addEventListener('input',e=>{
@@ -8115,59 +8058,251 @@ dialog>#toast,dialog>#toast.show{transform:none}
 
   aiDetectRelay();
 
-  const subsiteSignOutKey = KEY+'-subsite-signed-out';
-  function subsiteExitWasSaved() {
-    try { return localStorage.getItem(subsiteSignOutKey)==='1'; } catch { return false; }
-  }
-  let subsiteSignedOut = location.hash==='#login'||subsiteExitWasSaved();
-
+  // Signing in happens before the app starts (fidelity-boot.js). The app shows itself and offers signing out,
+  // which saves what is pending, ends the session on the server and returns to the sign-in screen.
+  // The earlier layers ask this before they follow the address bar; the app only runs while someone is signed in.
+  const subsiteSignedOut = false;
   function renderSignInState() {
-    const signedOut = subsiteSignedOut||location.hash==='#login';
-    const shell = $('#app-shell');
-    const login = $('#subsite-login');
-    const enteringLogin = signedOut&&login.hidden;
-    shell.hidden = signedOut;
-    login.hidden = !signedOut;
-    $('.skip-link').hidden = signedOut;
-    if (!signedOut) return true;
-
-    if (location.hash!=='#login') history.replaceState(null,'','#login');
-    if (enteringLogin) {
-      if ($('#dialog').open) close();
-      $('#view').replaceChildren();
-      $('#toast').classList.remove('show');
-      paintIcons(login);
-      $('#subsite-login-title').focus();
-    }
-    return false;
+    $('#app-shell').hidden = false;
+    $('#subsite-login').hidden = true;
+    $('.skip-link').hidden = false;
+    return true;
   }
 
   Object.assign(fidActions, {
-    subsiteLogout:()=>{
-      subsiteSignedOut = true;
-      try { localStorage.setItem(subsiteSignOutKey,'1'); } catch {}
-      render();
-    },
-    subsiteEnterDemo:()=>{
-      subsiteSignedOut = false;
-      try { localStorage.removeItem(subsiteSignOutKey); } catch {}
-      navigate('dashboard','replace');
-      $('#view').focus({preventScroll:true});
-    },
-  });
-
-  window.addEventListener('storage',event=>{
-    if (event.key!==subsiteSignOutKey||event.newValue!=='1') return;
-    subsiteSignedOut = true;
-    render();
-  });
-  window.addEventListener('pageshow',event=>{
-    if (!event.persisted||subsiteSignedOut||!subsiteExitWasSaved()) return;
-    subsiteSignedOut = true;
-    render();
+    subsiteLogout:()=>window.WA_SITE.signOut(),
   });
 
   render();
+};
+</script><script>// Start-up of the page. It asks the server who is signed in, shows the sign-in screen when nobody is, loads
+// the sub-site's data, and only then starts the app (window.WA_START, defined by app.js). It also keeps the
+// data saved on the server: after every change the app calls WA_SITE.save(data) and the changed parts are sent.
+(() => {
+  'use strict';
+  const $ = selector => document.querySelector(selector);
+  // Fields that are maps by customer id; each entry is saved on its own.
+  const SPLIT = ['messages', 'activities'];
+  const SAVE_DELAY = 400;
+  const screen = { title: $('#subsite-login-title'), notice: $('#site-notice'), signIn: $('#site-sign-in'), password: $('#site-password'), leave: $('#site-leave') };
+
+  const request = (path, { method = 'GET', body, keepalive = false } = {}) =>
+    fetch(path, { method, keepalive, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+      .then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }));
+
+  function paintIcons(root) {
+    for (const el of root.querySelectorAll('[data-icon]:empty')) {
+      const nodes = window.WA_ICONS?.[el.dataset.icon];
+      if (!nodes) continue;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value);
+      for (const [tag, attributes] of nodes) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+        svg.append(node);
+      }
+      el.replaceChildren(svg);
+    }
+  }
+
+  // Shows the screen before the app: a title, an optional notice, and one of the two forms or none.
+  function show(title, notice = '', form = null, { leave = false } = {}) {
+    $('#app-shell').hidden = true;
+    $('.skip-link').hidden = true;
+    $('#subsite-login').hidden = false;
+    screen.title.textContent = title;
+    screen.notice.textContent = notice;
+    screen.notice.hidden = !notice;
+    screen.signIn.hidden = form !== 'signIn';
+    screen.password.hidden = form !== 'password';
+    screen.leave.hidden = !leave;
+    for (const line of document.querySelectorAll('.fid-sign-in-error')) line.hidden = true;
+    for (const input of document.querySelectorAll('#subsite-login input[type="password"]')) input.value = '';
+    paintIcons($('#subsite-login'));
+    (form ? (form === 'signIn' ? screen.signIn : screen.password).querySelector('input') : screen.title).focus();
+  }
+  function fail(form, text) {
+    const line = form.querySelector('.fid-sign-in-error');
+    line.textContent = text;
+    line.hidden = false;
+  }
+  const busy = (form, on) => { form.querySelector('button[type="submit"]').disabled = on; };
+
+  async function begin() {
+    let status, me;
+    try {
+      status = await request('/api/site/status');
+      if (status.status !== 200 || !status.body.enabled) return show('服务器尚未启用账号', '服务器没有开启账号与数据存储，请联系管理员。');
+      me = await request('/api/auth/session');
+    } catch {
+      return show('无法连接服务器', '请通过工作台的服务器地址打开本页面；如果服务器正在重启，请稍后刷新。');
+    }
+    if (me.status !== 200) return show('无法连接服务器', '请稍后刷新重试。');
+    if (!me.body.user) return show('登录', '', 'signIn');
+    return enter(me.body.user, me.body.site);
+  }
+
+  async function enter(user, site) {
+    if (user.mustChangePassword) return show('请先修改临时密码', `${user.name}，你正在使用管理员发放的临时密码。设置自己的密码后才能进入工作台。`, 'password', { leave: true });
+    if (user.role !== 'agent') return show('主管与管理员入口尚未开放', '查看各员工子站的入口将随主站一起提供。请使用员工账号登录。', null, { leave: true });
+    let loaded;
+    try {
+      loaded = await request('/api/data');
+    } catch {
+      return show('无法连接服务器', '请稍后刷新重试。');
+    }
+    if (loaded.status === 403) return show('无法进入这个子站', '当前账号不属于这个子站，请联系管理员。', null, { leave: true });
+    if (loaded.status !== 200) return show('无法读取数据', '请稍后刷新重试。', null, { leave: true });
+    return start(user, site, loaded.body);
+  }
+
+  // One [key, value] per saved part: a whole top-level field, or one entry of a split field.
+  function parts(data) {
+    const list = [];
+    for (const [field, value] of Object.entries(data)) {
+      if (SPLIT.includes(field) && value && typeof value === 'object' && !Array.isArray(value)) for (const [id, part] of Object.entries(value)) list.push([field + '/' + id, part]);
+      else list.push([field, value]);
+    }
+    return list;
+  }
+
+  function start(user, site, { version, data }) {
+    // What the server holds, as text per key; a save sends what differs from it.
+    const synced = new Map(parts(data).map(([key, value]) => [key, JSON.stringify(value)]));
+    // A new sub-site starts empty. The flags mark the sample content of earlier builds as "already handled",
+    // so that nothing fictional is ever added to it.
+    if (!Object.keys(data).length) {
+      Object.assign(data, {
+        presetTagsRemoved: true, lcSeededV06: true, lcSeededOrders: true, lcSeededOrderHistory: true, chatArchiveSeeded: true,
+        operations: { assetGroups: [{ id: 'ops-text', type: 'text', name: '常用文本', note: '' }], assets: [] },
+      });
+    }
+    for (const [field, empty] of Object.entries({ version: 1, members: [], accounts: [], tagGroups: [], tags: [], customers: [], messages: {}, activities: {}, tasks: [], quickReplies: [] })) data[field] ??= empty;
+    if (!data.members.some(member => member.id === user.username)) data.members.push({ id: user.username, name: user.name, initial: [...user.name].at(-1) || '', role: 'agent', team: '', color: 'jade' });
+
+    let timer = 0, saving = false, pending = null, failures = 0, stopped = false;
+    const note = text => {
+      const toast = $('#toast');
+      toast.textContent = text;
+      toast.classList.toggle('show', Boolean(text));
+    };
+    function stop(title, notice) {
+      stopped = true;
+      clearTimeout(timer);
+      show(title, notice, null, { leave: true });
+      screen.leave.textContent = '刷新页面';
+      screen.leave.dataset.reload = '1';
+    }
+    async function flush({ keepalive = false } = {}) {
+      clearTimeout(timer);
+      timer = 0;
+      if (saving || stopped || !pending) return;
+      const current = new Map(parts(pending).map(([key, value]) => [key, JSON.stringify(value)]));
+      const set = {}, remove = [...synced.keys()].filter(key => !current.has(key));
+      for (const [key, json] of current) if (synced.get(key) !== json) set[key] = JSON.parse(json);
+      pending = null;
+      if (!Object.keys(set).length && !remove.length) return;
+      saving = true;
+      let answer;
+      try {
+        answer = await request('/api/data', { method: 'PUT', keepalive, body: { baseVersion: version, set, remove } });
+      } catch {
+        answer = { status: 0, body: {} };
+      }
+      saving = false;
+      if (answer.status === 200) {
+        version = answer.body.version;
+        for (const key of Object.keys(set)) synced.set(key, current.get(key));
+        for (const key of remove) synced.delete(key);
+        if (failures) note('');
+        failures = 0;
+        if (pending) timer = setTimeout(flush, SAVE_DELAY);
+      } else if (answer.status === 409) {
+        stop('数据已在别处更新', '这个子站的数据刚刚在另一个页面或设备上被修改。请刷新后继续；本页最近一次修改没有保存。');
+      } else if (answer.status === 401) {
+        stop('登录已失效', '请刷新页面后重新登录；本页最近一次修改没有保存。');
+      } else {
+        // The server could not be reached or had trouble: keep the changes and try again, more slowly each time.
+        pending ??= window.WA_SITE.data;
+        failures += 1;
+        note('修改暂未保存到服务器，正在重试…');
+        timer = setTimeout(flush, Math.min(30000, 1000 * 2 ** failures));
+      }
+    }
+    function save(data) {
+      if (stopped) return;
+      pending = data;
+      clearTimeout(timer);
+      timer = setTimeout(flush, SAVE_DELAY);
+    }
+    // Resolves when everything is saved (used before signing out, and by tests).
+    const idle = () => new Promise(resolve => {
+      const check = () => (stopped || (!timer && !saving && !pending) ? resolve() : setTimeout(check, 50));
+      check();
+    });
+    async function signOut() {
+      await flush();
+      await idle();
+      await request('/api/auth/logout', { method: 'POST', body: {} }).catch(() => {});
+      location.reload();
+    }
+    addEventListener('pagehide', () => { flush({ keepalive: true }); });
+
+    window.WA_SITE = { user, site, data, save, idle, signOut };
+    $('#subsite-login').hidden = true;
+    $('#app-shell').hidden = false;
+    $('.skip-link').hidden = false;
+    $('.fid-sign-out').title = `已登录：${user.name}（${user.username}）`;
+    window.WA_START();
+    // A new sub-site, or one with a new member entry, is saved right away.
+    save(data);
+  }
+
+  screen.signIn.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = screen.signIn, username = form.elements.username.value.trim(), password = form.elements.password.value;
+    if (!username || !password) return fail(form, '请输入用户名和密码。');
+    busy(form, true);
+    let answer;
+    try {
+      answer = await request('/api/auth/login', { method: 'POST', body: { username, password } });
+    } catch {
+      answer = { status: 0, body: {} };
+    }
+    busy(form, false);
+    if (answer.status === 200) return begin();
+    form.elements.password.value = '';
+    form.elements.password.focus();
+    if (answer.status === 429) return fail(form, `尝试次数过多，请 ${Math.max(1, Math.ceil((answer.body.retryAfter || 60) / 60))} 分钟后再试。`);
+    if (answer.status === 401) return fail(form, '用户名或密码不正确。');
+    return fail(form, '暂时无法登录，请稍后再试。');
+  });
+
+  screen.password.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = screen.password, current = form.elements.current.value, next = form.elements.next.value;
+    if (next.length < 10) return fail(form, '新密码至少 10 位。');
+    if (next !== form.elements.repeat.value) return fail(form, '两次输入的新密码不一致。');
+    busy(form, true);
+    let answer;
+    try {
+      answer = await request('/api/auth/password', { method: 'POST', body: { current, next } });
+    } catch {
+      answer = { status: 0, body: {} };
+    }
+    busy(form, false);
+    if (answer.status === 200) return begin();
+    if (answer.status === 401) return fail(form, '当前密码不正确。');
+    if (answer.status === 400) return fail(form, '新密码至少 10 位，且不能与当前密码相同。');
+    return fail(form, '暂时无法修改密码，请稍后再试。');
+  });
+
+  screen.leave.addEventListener('click', async () => {
+    if (!screen.leave.dataset.reload) await request('/api/auth/logout', { method: 'POST', body: {} }).catch(() => {});
+    location.reload();
+  });
+
+  begin();
 })();
 </script>
 </body>

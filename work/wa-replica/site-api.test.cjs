@@ -85,6 +85,9 @@ test('sign-in: a wrong password and an unknown account get the same answer; the 
   const me = await call('/api/auth/me', { cookie: cookieOf(ok) });
   assert.deepEqual([me.status, me.json.user.username, me.json.site], [200, 'ana', 's1']);
   assert.deepEqual((await call('/api/auth/me')).json, { error: 'not-signed-in' });
+  assert.deepEqual([(await call('/api/auth/session')).status, (await call('/api/auth/session')).json], [200, { user: null, site: 's1' }], 'the page can ask without an error');
+  assert.equal((await call('/api/auth/session', { cookie: cookieOf(ok) })).json.user.username, 'ana');
+  assert.equal((await call('/api/auth/session', { cookie: 'scrm_sid=forged' })).json.user, null);
   assert.equal((await call('/api/auth/me', { cookie: 'scrm_sid=forged' })).status, 401);
   assert.equal((await call('/api/auth/login', { method: 'POST', body: 'username=ana', headers: { 'Content-Type': 'text/plain' } })).status, 400);
 });
@@ -156,12 +159,20 @@ test('data: saved by key with a version; a save based on an old version is refus
   assert.equal((await call('/api/data', { cookie })).json.data.customers.length, 1, 'a refused save changes nothing');
   assert.deepEqual((await put({ baseVersion: 1, set: { 'messages/c1': [{ id: 'm1', text: 'Hola' }, { id: 'm2', text: 'Gracias' }] }, remove: ['messages/c2', 'settings'] })).json, { version: 2 });
   assert.deepEqual((await call('/api/data', { cookie })).json.data, { customers: [{ id: 'c1', name: '张伟' }], messages: { c1: [{ id: 'm1', text: 'Hola' }, { id: 'm2', text: 'Gracias' }] } });
-  assert.deepEqual((await put({ baseVersion: 2, set: { 'customers/c9': {} } })).json, { error: 'key-conflict' });
+  assert.deepEqual((await put({ baseVersion: 2, set: { 'customers/c9': {} } })).json, { error: 'key-conflict' }, 'a list cannot be saved in parts');
   assert.deepEqual((await put({ baseVersion: 2, set: { messages: {} } })).json, { version: 3 }, 'a whole value replaces the parts');
   assert.deepEqual((await call('/api/data', { cookie })).json.data.messages, {});
   assert.deepEqual((await put({ baseVersion: 3, remove: ['messages'] })).json, { version: 4 });
   assert.equal('messages' in (await call('/api/data', { cookie })).json.data, false);
-  assert.deepEqual(site.data.lastSaves(2).map(save => [save.version, save.by, save.keys]), [[4, 'eli', 'messages'], [3, 'eli', 'messages']]);
+  // a map that was saved whole is split when one of its parts is saved or removed
+  assert.deepEqual((await put({ baseVersion: 4, set: { activities: { c1: ['a'], c2: ['b'], c3: ['c'] } } })).json, { version: 5 });
+  assert.deepEqual((await put({ baseVersion: 5, set: { 'activities/c2': ['b', 'b2'] } })).json, { version: 6 });
+  assert.deepEqual((await put({ baseVersion: 6, remove: ['activities/c3'] })).json, { version: 7 });
+  assert.deepEqual((await call('/api/data', { cookie })).json.data.activities, { c1: ['a'], c2: ['b', 'b2'] });
+  assert.deepEqual((await put({ baseVersion: 7, set: { odd: { 'not a key': 1 } } })).json, { version: 8 });
+  assert.deepEqual((await put({ baseVersion: 8, set: { 'odd/x': 1 } })).json, { error: 'key-conflict' }, 'entry names that cannot be keys keep the field whole');
+  assert.deepEqual((await put({ baseVersion: 8, remove: ['odd', 'activities'] })).json, { version: 9 });
+  assert.deepEqual(site.data.lastSaves(2).map(save => [save.version, save.by, save.keys]), [[9, 'eli', 'odd activities'], [8, 'eli', 'odd']]);
 });
 
 test('data: malformed saves are refused and change nothing', async () => {
@@ -248,6 +259,8 @@ test('administration tool: creates an account with a temporary password, lists, 
   } finally {
     again.close();
   }
+  for (const name of fs.readdirSync(dir)) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
+  assert.equal(fs.statSync(file).mode & 0o077, 0, 'an exported copy is private');
   assert.equal(run('nonsense').status, 1);
   assert.equal(spawnSync(process.execPath, [path.join(__dirname, 'site-admin.cjs'), 'user', 'list'], { env: { ...process.env, WA_SCRM_DATA_DIR: '' }, encoding: 'utf8' }).stderr.trim(), 'site-admin: WA_SCRM_DATA_DIR is not set');
 });
@@ -284,6 +297,7 @@ test('the preview server: without a data folder the routes are off; with one, th
     assert.equal((await call('/api/auth/password', { base: on.base, method: 'POST', cookie: cookieOf(first), body: { current: password, next: PASSWORD } })).status, 200);
     assert.deepEqual((await call('/api/ai/status', { base: on.base, cookie: cookieOf(first) })).json, { configured: false, reason: 'no-settings-file' });
     assert.deepEqual((await call('/api/data', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
+    for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
     assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
   } finally {
     on.child.kill();

@@ -15,6 +15,7 @@ async function main([area, action, ...rest]) {
   const dir = process.env.WA_SCRM_DATA_DIR;
   const siteId = process.env.WA_SCRM_SITE_ID || 'default';
   if (!dir) throw new Error('WA_SCRM_DATA_DIR is not set');
+  process.umask(0o077); // databases and exported copies are private files
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   if (area === 'user') {
     const auth = require('./site-auth.cjs').openAuth(path.join(dir, 'auth.db'));
