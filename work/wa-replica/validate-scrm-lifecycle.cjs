@@ -35,21 +35,13 @@ assert(!req.review.items.some(i => i.id === 'LIFECYCLE'));
 assert.equal(req.modules.find(m => m.id === 'P-BROADCAST')?.decision, '本轮不展示');
 assert.equal(req.modules.find(m => m.id === 'P-MATERIALS')?.decision, '保留');
 
-// 3. Verify app.js & standalone HTML bundles have zero external network dependencies and valid JS syntax
+// 3. Verify app.js has zero external network dependencies and valid JS syntax
 const appJs = read(path.join(out, 'app.js'));
 // The page may call only the AI relay of its own server (/api/ai/*); the relay, not the page, talks to the model service.
 assert(!/\b(WebSocket|XMLHttpRequest)\s*\(/.test(appJs), 'app.js must not open sockets or use XMLHttpRequest');
 for (const call of appJs.match(/\bfetch\s*\([^)]{0,40}/g) || []) assert(/^fetch\('\/api\/ai\//.test(call), `app.js may only call the AI relay of its own server, found: ${call}`);
 assert(!/S1\s*·\s*undefined/.test(appJs));
 new vm.Script(appJs, { filename: 'app.js' });
-
-for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-fidelity.html']) {
-  const standalone = read(path.join(root, 'outputs', bundleName));
-  assert(!/<script\b[^>]*\bsrc=|<link\b[^>]*\brel="stylesheet"|chm123\.com/i.test(standalone), `External asset found in ${bundleName}`);
-  const scripts = [...standalone.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 3, `Expected 3 inline script blocks in ${bundleName}`);
-  for (const s of scripts) new vm.Script(s[1]);
-}
 
 // 4. The stage-based modules are gone and nothing in the engagement module still refers to them
 for (const removed of ['fidelity-pipelines.js', 'fidelity-pipeline-settings.js']) {
@@ -83,9 +75,6 @@ for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboa
   });
 }
 assert(!invitationCode.test(appJs), 'app.js still refers to invitation codes');
-for (const bundleName of ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-fidelity.html']) {
-  assert(!read(path.join(root, 'outputs', bundleName)).includes('邀请码'), `${bundleName} still mentions invitation codes`);
-}
 
 // 8. Customer tier and status are manual fields, editable from the chat screen and shown in the customer list
 for (const required of ["const LC_TIERS = ['S', 'A', 'B', 'C', 'D'];", "['converted', '已成交'", "['abandoned', '弃单'", "['organic', '自然线索'", 'data-lc-tier=', 'data-lc-status=', 'lcCustomerTier:', 'lcCustomerStatusFilter:', 'fidActions.fidExportCustomers =']) {
@@ -143,7 +132,7 @@ assert(read(path.join(__dirname, 'fidelity-lifecycle.css')).includes('tr.lc-row-
 assert(req.modules.find(m => m.id === 'P-INBOX').features.includes('协同条的跟进状态与下次跟进可跳转到跟进闭环并定位该客户'));
 
 // 13. Order tracking is a tab of the customer profile: first contact; one block per order with one entry per shipping step; shipping moves by two step buttons along fixed paths
-for (const required of ["const LC_SHIPPING = [['pending', '待发货'", "['shipped', '已发货'", "['delivered', '已签收'", "['problem', '异常（退回/丢件）'", "const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };", "['orders', '订单追踪', lcOrders(c).length]", '<form id="lc-order-form"', "${tabFoot ? `<div class=\"lc-dossier-foot\">${tabFoot}</div>` : ''}", 'function lcSyncDossierFoot() {', "if (scrollTop) $('#dialog .lc-dossier-body').scrollTop = scrollTop;", '?.focus({ preventScroll: true });', "'lc-order-form': (f, v) =>", "shipping: 'pending', history: [{ shipping: 'pending', at: placedAt }] }, ...lcOrders(c)];", 'function lcOrderHistory(o) {', "class=\"lc-card-block lc-order${open ? ' is-open' : ''}\"", "const LC_SHIPPING_PATH = ['pending', 'shipped', 'delivered'];", 'const open = lcState.orderOpen.includes(o.id);', 'lcOrderToggle: (id, btn) =>', 'class="lc-order-toggle" data-action="lcOrderToggle"', '<span class="lc-order-progress ${statusTone}" role="img"', 'o.history = entries;', "'时间未记录'", 'lcOrderShipping: (id, btn) =>', 'data-shipping="problem"', 'lcOrderUndo: (id, btn) =>', 'class="icon-button lc-step-next" data-action="lcOrderShipping"', 'class="icon-button lc-step-problem" data-action="lcOrderShipping"', "title=\"${history.length > 1 ? '撤销上一步' : '暂无可撤销的步骤'}\"", 'if (history.length < 2) return;', '<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span>', 'lcOrderRemove: (id, btn) =>', '首次联系时间', "order: '订单记录'", 'data.lcSeededOrders = true;', 'data.lcSeededOrderHistory = true;']) {
+for (const required of ["const LC_SHIPPING = [['pending', '待发货'", "['shipped', '已发货'", "['delivered', '已签收'", "['problem', '异常（退回/丢件）'", "const LC_SHIPPING_NEXT = { pending: 'shipped', shipped: 'delivered' };", "['orders', '订单追踪', lcOrders(c).length]", '<form id="lc-order-form"', "${tabFoot ? `<div class=\"lc-dossier-foot\">${tabFoot}</div>` : ''}", 'function lcSyncDossierFoot() {', "if (scrollTop) $('#dialog .lc-dossier-body').scrollTop = scrollTop;", '?.focus({ preventScroll: true });', "'lc-order-form': (f, v) =>", "shipping: 'pending', history: [{ shipping: 'pending', at: placedAt }] }, ...lcOrders(c)];", 'function lcOrderHistory(o) {', "class=\"lc-card-block lc-order${open ? ' is-open' : ''}\"", "const LC_SHIPPING_PATH = ['pending', 'shipped', 'delivered'];", 'const open = lcState.orderOpen.includes(o.id);', 'lcOrderToggle: (id, btn) =>', 'class="lc-order-toggle" data-action="lcOrderToggle"', '<span class="lc-order-progress ${statusTone}" role="img"', 'o.history = entries;', "'时间未记录'", 'lcOrderShipping: (id, btn) =>', 'data-shipping="problem"', 'lcOrderUndo: (id, btn) =>', 'class="icon-button lc-step-next" data-action="lcOrderShipping"', 'class="icon-button lc-step-problem" data-action="lcOrderShipping"', "title=\"${history.length > 1 ? '撤销上一步' : '暂无可撤销的步骤'}\"", 'if (history.length < 2) return;', '<span class="lc-order-time">下单时间 ${esc(fidDate(o.placedAt))}</span>', 'lcOrderRemove: (id, btn) =>', '首次联系时间', "order: '订单记录'"]) {
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 assert(!/orderOpen[^\n]*persist\(|\.open\s*=|\.collapsed\s*=/.test(moduleSource), 'whether an order block is open is view state only and is never stored on an order');
@@ -243,11 +232,21 @@ for (const required of ['id="site-sign-in"', 'id="site-password"', '<script src=
 }
 assert(!indexHtml.includes('demo-data.js') && !indexHtml.includes('进入演示工作台') && !fs.existsSync(path.join(out, 'demo-data.js')), 'the page must not ship the fictional data set');
 assert.equal(read(path.join(out, 'boot.js')), bootSource, 'boot.js must be the built copy of fidelity-boot.js');
-for (const required of ['lcSeededV06: true', 'presetTagsRemoved: true', "request('/api/data', { method: 'PUT'", 'window.WA_START();']) {
+for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START();']) {
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
 assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');
+
+// 21. Leftovers of the prototype are gone: sample-content code, single-file bundles, the Windows launcher
+for (const [name, gone] of [['fidelity-lifecycle.js', 'lcSeededV06'], ['fidelity-lifecycle.js', 'lcSeededOrders'], ['fidelity-ui.js', 'fidRemovePresetTags'], ['fidelity-ui.js', 'WA_DEMO'], ['fidelity-customer-pages.js', 'seedChatArchives'], ['fidelity-operations.js', 'ops-material-1'], ['fidelity-boot.js', 'lcSeededV06']]) {
+  assert(!read(path.join(__dirname, name)).includes(gone), `${name} still contains ${gone}`);
+}
+assert(!appJs.includes('WA_DEMO'), 'the app must not refer to the fictional data set');
+for (const file of [path.join(root, 'outputs', 'whatsapp-scrm-lifecycle.html'), path.join(root, 'outputs', 'whatsapp-replica-ui-fidelity.html'), path.join(root, '启动SCRM原型预览.cmd')]) {
+  assert(!fs.existsSync(file), `${path.basename(file)} must not exist`);
+}
+assert(!/standalone/.test(read(path.join(__dirname, 'build-fidelity.cjs'))), 'the build must not write single-file bundles');
 
 const summary = {
   version: req.version,
@@ -255,7 +254,6 @@ const summary = {
   checkedAt: new Date().toISOString(),
   projectRoot: path.basename(root),
   historicalBaselineVerified: verifiedBaseline,
-  standaloneBundlesVerified: ['whatsapp-scrm-lifecycle.html', 'whatsapp-replica-ui-fidelity.html'],
   engagementStates: ['open', 'closed'],
   attentionSignals: ['reply', 'overdue', 'noplan', 'recontact'],
   deferredModules: ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS'],
@@ -274,6 +272,7 @@ const summary = {
   reviewerTools: 'removed: review panel and its two buttons, requirements page and export, element notes tool and its server endpoint; requirements.json stays as a build-time record',
   serverSide: 'behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only',
   signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
+  leftovers: 'removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

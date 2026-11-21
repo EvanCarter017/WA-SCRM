@@ -4,7 +4,6 @@
 
 - 项目根目录：`D:\Projects\wa-scrm`
 - 在线预览目录：`outputs/wa-replica-prototype/index.html`（本地预览默认端口 `http://127.0.0.1:56141/#followups` 或 `#dashboard`）
-- 单文件构建产物：`outputs/whatsapp-scrm-lifecycle.html`（及 `outputs/whatsapp-replica-ui-fidelity.html`）。自 2026-11-21 起页面需登录并从服务器读取数据，单文件已不能独立使用，待清理。
 - 登录界面：居中的单栏卡片（品牌、标题、说明、表单）。三种状态共用同一卡片——登录（用户名、密码）、修改临时密码（当前密码、新密码两次）、说明（服务器未启用、无法连接、主管入口尚未开放、数据已在别处更新、登录已失效），说明状态下提供「退出登录」或「刷新页面」。
 - 原 v0.5 快照备份：`work/wa-replica/archive-v05-fidelity.html`
 

@@ -1,13 +1,9 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-21T17:19:13.393Z",
+  "checkedAt": "2026-11-21T17:37:29.961Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
-  "standaloneBundlesVerified": [
-    "whatsapp-scrm-lifecycle.html",
-    "whatsapp-replica-ui-fidelity.html"
-  ],
   "engagementStates": [
     "open",
     "closed"
@@ -51,5 +47,6 @@
   "reviewerTools": "removed: review panel and its two buttons, requirements page and export, element notes tool and its server endpoint; requirements.json stays as a build-time record",
   "serverSide": "behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only",
   "signIn": "the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty",
+  "leftovers": "removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview",
   "externalNetworkCalls": false
 }

@@ -31,17 +31,6 @@
     return record;
   }
 
-  // Two demo snapshots, written once per browser so the page is not empty on first visit.
-  function seedChatArchives() {
-    if (data.chatArchiveSeeded) return;
-    data.chatArchiveSeeded = true;
-    if (chatArchives().length) return;
-    const olivia = customer('c3');
-    const mateo = customer('c2');
-    if (olivia) Object.assign(archiveConversation(olivia, '老客户回访话术示例，供新人参考'), { movedAt: fidDay(-3) });
-    if (mateo) Object.assign(archiveConversation(mateo, '波多黎各交付咨询，申请复盘首响时效'), { movedAt: fidDay(-1) });
-  }
-
   function recordListItem(label, detail, search, action, id, selected) {
     return `<button type="button" class="fid-record-item" data-record-search="${esc(search)}" data-action="${action}" ${fidActionID(id)} aria-label="${esc(label)}" aria-pressed="${selected}">
       <strong>${esc(label)}</strong><small>${esc(detail)}</small>
@@ -264,7 +253,6 @@
 
   const renderCustomerPages = render;
   render = function() {
-    seedChatArchives();
     renderCustomerPages();
     if (ui.view !== 'chat-records') return;
     filterRecordList('archive', recordView.listQuery);

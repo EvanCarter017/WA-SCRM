@@ -92,14 +92,6 @@
   function start(user, site, { version, data }) {
     // What the server holds, as text per key; a save sends what differs from it.
     const synced = new Map(parts(data).map(([key, value]) => [key, JSON.stringify(value)]));
-    // A new sub-site starts empty. The flags mark the sample content of earlier builds as "already handled",
-    // so that nothing fictional is ever added to it.
-    if (!Object.keys(data).length) {
-      Object.assign(data, {
-        presetTagsRemoved: true, lcSeededV06: true, lcSeededOrders: true, lcSeededOrderHistory: true, chatArchiveSeeded: true,
-        operations: { assetGroups: [{ id: 'ops-text', type: 'text', name: '常用文本', note: '' }], assets: [] },
-      });
-    }
     for (const [field, empty] of Object.entries({ version: 1, members: [], accounts: [], tagGroups: [], tags: [], customers: [], messages: {}, activities: {}, tasks: [], quickReplies: [] })) data[field] ??= empty;
     if (!data.members.some(member => member.id === user.username)) data.members.push({ id: user.username, name: user.name, initial: [...user.name].at(-1) || '', role: 'agent', team: '', color: 'jade' });
 

@@ -17,41 +17,7 @@
   const fidGroupList = () => data.tagGroups.filter(g=>g.scope==='team'||g.owner===ui.persona||manager());
   const fidBaseTags=tagsHTML;
   tagsHTML=function(c,max=99,remove=false){const allowed=new Set(myTags().map(t=>t.id));return fidBaseTags({...c,tags:c.tags.filter(id=>allowed.has(id))},max,remove);};
-  const fidLegacyTagLabels = {interest:['意向标记','multi'],source:['来源渠道','single'],preference:['沟通语言','single'],personal:['工作标记','multi']};
-  function fidRemovePresetTags() {
-    if (data.presetTagsRemoved) return;
-    const seed = window.WA_DEMO;
-    const legacyTags = new Map(seed.tags.map(t=>[t.id,t]));
-    const legacyGroups = new Map(seed.tagGroups.map(g=>[g.id,g]));
-    const legacyAssignments = new Map(seed.customers.map(c=>[c.id,new Set(c.tags)]));
-    const presetGroups = new Set(data.tagGroups.filter(g=>{
-      const original = legacyGroups.get(g.id);
-      return original && g.name===original.name && g.scope===original.scope && g.owner===original.owner;
-    }).map(g=>g.id));
-    const retained = new Set(data.customers.flatMap(c=>c.tags.filter(id=>!legacyAssignments.get(c.id)?.has(id))));
-    for (const d of data.tagDefs || []) {
-      const label = fidLegacyTagLabels[d.group];
-      const edited = !label || d.id!=='def-'+d.group || d.name!==label[0] || d.mode!==label[1] || d.values.some(id=>legacyTags.get(id)?.group!==d.group);
-      if (edited) d.values.forEach(id=>retained.add(id));
-    }
-    const removed = new Set();
-    for (const t of data.tags) {
-      const original = legacyTags.get(t.id);
-      const untouched = original && presetGroups.has(t.group) && t.name===original.name && t.group===original.group && t.color===original.color;
-      if (untouched && !retained.has(t.id)) removed.add(t.id);
-    }
-    data.tags = data.tags.filter(t=>!removed.has(t.id));
-    for (const c of data.customers) c.tags = c.tags.filter(id=>!removed.has(id));
-    const groupsInUse = new Set(data.tags.map(t=>t.group));
-    data.tagGroups = data.tagGroups.filter(g=>!presetGroups.has(g.id) || groupsInUse.has(g.id));
-    const exampleHistory = seed.activities.c1.find(entry=>entry.text.startsWith('加入标签'));
-    if ((removed.has('high') || removed.has('quote')) && exampleHistory && data.activities.c1) {
-      data.activities.c1 = data.activities.c1.filter(item=>item.by!==exampleHistory.by || item.time!==exampleHistory.time || ![exampleHistory.text,'加入标签「待报价」'].includes(item.text));
-    }
-    data.presetTagsRemoved = true;
-  }
   function fidMigrateTags() {
-    fidRemovePresetTags();
     if (!Array.isArray(data.tagDefs)) return;
 
     // Older definitions already stored each value as a tag and assigned its ID to customers.

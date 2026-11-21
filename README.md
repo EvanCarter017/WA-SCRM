@@ -21,8 +21,6 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 #### 接入 AI 翻译（可选）
 服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
-`outputs/whatsapp-scrm-lifecycle.html` 等单文件已不能独立使用（打开后只显示无法连接服务器的提示），将在后续清理中移除。
-
 ### 重新编译与完整性校验
 ```bash
 node work/wa-replica/build-fidelity.cjs
@@ -74,11 +72,8 @@ flowchart LR
 ```text
 ├── PRODUCT.md                                         # 产品定位、跟进闭环业务边界与范围说明
 ├── DESIGN.md                                          # 桌面/窄屏布局规范与跟进闭环交互架构
-├── 启动SCRM原型预览.cmd                                # Windows 一键启动本地预览服务脚本
 ├── 重新构建原型.cmd                                    # Windows 一键重编译与自动化校验脚本
 ├── outputs/
-│   ├── whatsapp-scrm-lifecycle.html                   # 单文件构建产物（已不能独立使用，待清理）
-│   ├── whatsapp-replica-ui-fidelity.html              # 同上（兼容历史路径，待清理）
 │   ├── wa-replica-prototype/                          # 模块化原型运行目录（由 serve.cjs 托管）
 │   │   ├── index.html / app.js / app.css              # 编译后的前端入口、逻辑与令牌样式
 │   │   ├── boot.js / icons.js                         # 启动、登录与数据同步脚本；内联 Lucide 矢量图标集

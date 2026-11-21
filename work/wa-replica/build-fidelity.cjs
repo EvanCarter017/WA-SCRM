@@ -336,11 +336,5 @@ const assets = {
   'lucide-license.txt':read(base,'lucide-license.txt'),
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };
-let standalone=index.replace('<head>',()=>'<head>\n<!-- Lucide license\n'+assets['lucide-license.txt'].replaceAll('-->','-- >')+'\n-->');
-standalone=standalone.replace(/<link rel="stylesheet" href="([^"]+)">/g,(_,file)=>'<style>'+assets[file]+'</style>').replace(/<script src="([^"]+)"><\/script>/g,(_,file)=>'<script>'+assets[file].replace(/<\/script/gi,'<\\/script')+'</script>');
-assert(!/chm123\.com|reference-accounts\.png|<script\b[^>]*\bsrc=/.test(standalone));
-for(const script of standalone.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
 for(const [file,content] of Object.entries(assets))write(output,file,content);
-write(path.join(root,'outputs'),'whatsapp-replica-ui-fidelity.html',standalone);
-write(path.join(root,'outputs'),'whatsapp-scrm-lifecycle.html',standalone);
-console.log(JSON.stringify({version:requirement.version,base:'0.4-replica-ui',historicalFilesUnchanged:verifiedBaselineCount,icons:names.length,bytes:Buffer.byteLength(standalone),externalNetwork:false},null,2));
+console.log(JSON.stringify({version:requirement.version,base:'0.4-replica-ui',historicalFilesUnchanged:verifiedBaselineCount,icons:names.length,bytes:Buffer.byteLength(js),externalNetwork:false},null,2));

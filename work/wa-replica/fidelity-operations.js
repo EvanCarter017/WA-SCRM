@@ -2,7 +2,7 @@
   function operationsData() {
     return data.operations ??= {
       assetGroups: [{id:'ops-text',type:'text',name:'常用文本',note:''}],
-      assets: [{id:'ops-material-1',type:'text',groupId:'ops-text',title:'资料发送说明',body:'你好，我会整理相关资料后发给你。',file:'',contact:'',nickname:''}],
+      assets: [],
     };
   }
 
