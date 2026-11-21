@@ -37,7 +37,9 @@ assert.equal(req.modules.find(m => m.id === 'P-MATERIALS')?.decision, '保留');
 
 // 3. Verify app.js & standalone HTML bundles have zero external network dependencies and valid JS syntax
 const appJs = read(path.join(out, 'app.js'));
-assert(!/\b(fetch|WebSocket|XMLHttpRequest)\s*\(/.test(appJs), 'app.js must not issue network requests');
+// The page may call only the AI relay of its own server (/api/ai/*); the relay, not the page, talks to the model service.
+assert(!/\b(WebSocket|XMLHttpRequest)\s*\(/.test(appJs), 'app.js must not open sockets or use XMLHttpRequest');
+for (const call of appJs.match(/\bfetch\s*\([^)]{0,40}/g) || []) assert(/^fetch\('\/api\/ai\//.test(call), `app.js may only call the AI relay of its own server, found: ${call}`);
 assert(!/S1\s*·\s*undefined/.test(appJs));
 new vm.Script(appJs, { filename: 'app.js' });
 
@@ -163,6 +165,21 @@ assert(!moduleSource.includes("'translation'") && !read(path.join(__dirname, 'fi
 assert(aiSource.includes('ui.receiveTranslation = true;'), 'translations of incoming messages must always be shown now that their display switch is gone');
 assert(appJs.includes('fid-record-translation'), 'the chat-history page keeps its own translation switch');
 
+// 15. Real translation goes through the server relay; the page falls back to the demo when no relay is configured
+const relaySource = read(path.join(__dirname, 'ai-relay.cjs'));
+const serveSource = read(path.join(__dirname, 'serve.cjs'));
+for (const required of ["server: { name: '服务器中转', run: (capabilityId, input) => aiRelayTranslate(input) },", "fetch('/api/ai/translate', {", "fetch('/api/ai/status')", 'const providerId = aiRuntime.provider;', "to: aiSettings().readLanguage, sample }", 'data-ai-setting="readLanguage"', 'aiDetectRelay();']) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+}
+for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' + config.key", 'module.exports = { handle, loadConfig, parseEnv, translationPrompt };']) {
+  assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
+}
+assert(!/console\.(log|error)\([^\n]*(config\.key|\.text\b(?!\.length)|input\b)/.test(relaySource), 'the relay must not log the key or message text');
+assert(serveSource.includes("else if (pathname.startsWith('/api/ai/')) await aiRelay.handle(req, res, pathname);"), 'the preview server must route /api/ai/* to the relay');
+assert(fs.existsSync(path.join(__dirname, 'ai-relay.test.cjs')) && fs.existsSync(path.join(__dirname, 'ai.env.example')), 'the relay needs its tests and its example settings file');
+assert(!/AI_API_KEY=\S/.test(read(path.join(__dirname, 'ai.env.example'))), 'the example settings file must not contain a key');
+assert(!appJs.includes('中文译文</span>') && !appJs.includes('示例译文'), 'translation labels must not claim a fixed language or a sample');
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -178,7 +195,8 @@ const summary = {
   customerStatuses: ['converted', 'abandoned', 'organic'],
   chatHistory: 'archive of moved-in snapshots, no rating',
   aiCapabilities: ['translate.inbound', 'translate.outbound'],
-  aiProvider: 'local demo (prepared sample results)',
+  aiProvider: 'server relay to an OpenAI-compatible model service when configured (key stays on the server); local demo otherwise',
+  pageNetworkCalls: 'own server only: /api/ai/status, /api/ai/translate',
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
   orderTracking: 'profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer',

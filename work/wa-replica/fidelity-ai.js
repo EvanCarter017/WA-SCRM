@@ -3,15 +3,24 @@
   // needed and apply the result in .then(); 3) teach the provider to answer it.
   // Every provider call leaves one usage record in data.ai.usage and adds to the totals of its capability.
   const AI_CAPABILITIES = [
-    { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为中文，显示在原文下方。' },
+    { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为所选的译文语言，显示在原文下方。' },
     { id: 'translate.outbound', name: '发送前翻译', description: '把快捷回复译为客户的语言，发送前可预览。' },
   ];
   // A provider answers run(capabilityId, input) with { text }, or with a Promise of it.
-  // The demo provider returns the prepared sample that the caller passes along. A real provider would ignore
-  // input.sample and ask a model service through the product's own server, so that keys never reach the browser.
+  // demo: returns the prepared sample that the caller passes along; used when the page has no server behind it.
+  // server: the page's own server relays the request to the model service (ai-relay.cjs), so the service key
+  // never reaches the browser. It ignores input.sample.
   const AI_PROVIDERS = {
     demo: { name: '本地演示', run: (capabilityId, input) => ({ text: input.sample || '' }) },
+    server: { name: '服务器中转', run: (capabilityId, input) => aiRelayTranslate(input) },
   };
+  // Languages offered for the translation shown below incoming messages.
+  const AI_READ_LANGUAGES = ['中文', 'English', 'Español', 'Português', 'Français', 'Deutsch', 'Русский', 'العربية', '日本語', '한국어', 'Tiếng Việt', 'Bahasa Indonesia'];
+  // Which provider this page uses. It starts on the demo and switches to the server relay once the page's own
+  // server reports that a model service is configured. A page opened as a file stays on the demo.
+  const aiRuntime = { provider: 'demo', status: null };
+  // Drafts waiting for their translation: customer id → a token of the newest request.
+  const aiDraftPending = new Map();
   const AI_USAGE_KEPT = 200;
   const AI_USAGE_SHOWN = 20;
 
@@ -21,11 +30,12 @@
   ui.receiveTranslation = true;
 
   function aiSettings() {
-    const settings = (data.ai ??= { provider: 'demo', enabled: {}, totals: {}, usage: [] });
+    const settings = (data.ai ??= { enabled: {}, totals: {}, usage: [] });
     for (const { id } of AI_CAPABILITIES) {
       settings.enabled[id] ??= true;
       settings.totals[id] ??= { calls: 0, inputChars: 0, outputChars: 0 };
     }
+    if (!AI_READ_LANGUAGES.includes(settings.readLanguage)) settings.readLanguage = AI_READ_LANGUAGES[0];
     return settings;
   }
 
@@ -51,7 +61,7 @@
   function aiRun(capabilityId, input, meta = {}) {
     const settings = aiSettings();
     if (!settings.enabled[capabilityId]) return Promise.resolve({ ok: false, text: '', skipped: true });
-    const providerId = Object.hasOwn(AI_PROVIDERS, settings.provider) ? settings.provider : 'demo';
+    const providerId = aiRuntime.provider;
     return Promise.resolve()
       .then(() => AI_PROVIDERS[providerId].run(capabilityId, input))
       .then(output => String(output?.text || ''), () => '')
@@ -62,11 +72,32 @@
       });
   }
 
-  // Translate one incoming message into Chinese. The translation is stored on the message when it arrives,
-  // and the open conversation is refreshed if it is the one on screen.
+  // The server relay: one translation per call. The relay detects the language of the text itself.
+  // Rejects when the relay answers with an error, which aiRun turns into a call without result.
+  function aiRelayTranslate(input) {
+    return fetch('/api/ai/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.text, to: input.to }),
+    }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
+  }
+
+  // Ask the page's own server whether a model service is configured, and use the relay if it is.
+  function aiDetectRelay() {
+    if (!/^https?:$/.test(location.protocol)) return;
+    fetch('/api/ai/status').then(response => response.ok ? response.json() : null).then(status => {
+      aiRuntime.status = status;
+      aiRuntime.provider = status?.configured ? 'server' : 'demo';
+      if (ui.view === 'ai') render();
+    }).catch(() => {});
+  }
+
+  // Translate one incoming message into the reading language chosen on the AI page. The translation is stored
+  // on the message when it arrives, and the open conversation is refreshed if it is the one on screen.
+  // A message that is already in the reading language comes back unchanged and gets no translation.
   function aiTranslateInbound(c, message, sample) {
-    return aiRun('translate.inbound', { text: message.text, from: c.language, to: '中文', sample }, { customerId: c.id }).then(result => {
-      if (!result.ok) return;
+    return aiRun('translate.inbound', { text: message.text, from: c.language, to: aiSettings().readLanguage, sample }, { customerId: c.id }).then(result => {
+      if (!result.ok || result.text.trim() === message.text.trim()) return;
       message.translated = result.text;
       if (c.preview === message.text) c.translation = result.text;
       persist();
@@ -87,7 +118,7 @@
     paintIcons(preview);
     const hint = $('.language-hint');
     if (!hint) return;
-    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + (draft(c).translated ? '示例译文' : '发送原文');
+    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + (aiDraftPending.has(c.id) ? '翻译中…' : draft(c).translated ? '发送译文' : '发送原文');
     paintIcons(hint);
   }
 
@@ -103,12 +134,20 @@
     const sample = filled.translated;
     filled.translated = '';
     persist();
+    // The relay needs a language to translate into; a customer whose language is '其他' (other) gets the original.
+    if (aiRuntime.provider === 'server' && c.language === '其他') return aiRefreshDraftPreview(c);
+    const request = {};
+    aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
     aiRun('translate.outbound', { text: q.zh, from: '中文', to: c.language, sample }, { customerId: c.id }).then(result => {
+      if (aiDraftPending.get(c.id) === request) aiDraftPending.delete(c.id);
       const current = ui.drafts[c.id];
-      if (!result.ok || !current || current.source !== q.zh || current.text !== q.zh) return;
-      current.translated = result.text;
-      persist();
+      if (result.ok && current && current.source === q.zh && current.text === q.zh) {
+        current.translated = result.text;
+        persist();
+      } else if (!result.ok && !result.skipped && aiRuntime.provider === 'server') {
+        toast('未能取得译文，草稿保持原文。');
+      }
       aiRefreshDraftPreview(c);
     });
   };
@@ -116,6 +155,12 @@
   function renderAiPage() {
     const settings = aiSettings();
     const capabilityName = id => AI_CAPABILITIES.find(item => item.id === id)?.name || id;
+    const relay = aiRuntime.provider === 'server';
+    const providerNote = relay
+      ? '由本站服务器中转调用模型服务，密钥只保存在服务器，不进入浏览器。'
+      : aiRuntime.status
+        ? '服务器尚未配置可用的模型服务，暂时返回预置的示例结果。'
+        : '当前页面没有连接服务器，返回预置的示例结果。';
     const capabilityRows = AI_CAPABILITIES.map(({ id, name, description }) => {
       const total = settings.totals[id], on = settings.enabled[id];
       return `<tr>
@@ -132,8 +177,9 @@
         <td><span class="lc-pill ${entry.ok ? 'ok' : 'warn'}">${entry.ok ? '成功' : '无结果'}</span></td>
       </tr>`).join('');
     return `<section class="fid-page"><div class="fid-panel fid-ai">
-      ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。当前为本地演示，不连接任何外部服务。')}
-      <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill info">${esc((AI_PROVIDERS[settings.provider] || AI_PROVIDERS.demo).name)}</span><span>返回预置的示例结果。正式接入时由服务端调用模型服务，密钥不进入浏览器。</span></div>
+      ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。')}
+      <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill ${relay ? 'ok' : 'info'}">${esc(relay ? `${aiRuntime.status.provider} · ${aiRuntime.status.model}` : AI_PROVIDERS.demo.name)}</span><span>${providerNote}</span></div>
+      <div class="fid-ai-provider"><strong>译文语言</strong><select class="fid-select" data-ai-setting="readLanguage" aria-label="译文语言">${AI_READ_LANGUAGES.map(language => option(language, language, settings.readLanguage)).join('')}</select><span>客户发来的消息译为这种语言，显示在原文下方；只对之后收到的消息生效。</span></div>
       <h2>能力清单</h2>
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
       <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
@@ -144,6 +190,13 @@
   }
 
   document.addEventListener('change', event => {
+    if (event.target.dataset?.aiSetting === 'readLanguage') {
+      aiSettings().readLanguage = event.target.value;
+      persist();
+      render();
+      toast(`译文语言已设为 ${aiSettings().readLanguage}。`);
+      return;
+    }
     const id = event.target.dataset?.aiCapability;
     const capability = AI_CAPABILITIES.find(item => item.id === id);
     if (!capability) return;
@@ -153,3 +206,5 @@
     render();
     toast(`${capability.name}已${on ? '启用' : '停用'}。`);
   });
+
+  aiDetectRelay();

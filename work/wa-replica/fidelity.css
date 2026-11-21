@@ -435,6 +435,8 @@
 .fid-ai .fid-heading { margin-bottom:12px; }
 .fid-ai h2 { margin:18px 0 8px; font-size:15px; font-weight:700; line-height:22px; }
 .fid-ai-provider { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 12px; border:1px solid var(--fid-frame); border-radius:8px; background:var(--color-surface-alt); font-size:13px; line-height:20px; }
+.fid-ai-provider + .fid-ai-provider { margin-top:8px; }
+.fid-ai-provider .fid-select { width:180px; }
 .fid-ai-capabilities,.fid-ai-usage { min-width:640px; }
 .fid-ai-capabilities col:nth-child(1) { width:22%; }
 .fid-ai-capabilities col:nth-child(3) { width:112px; }

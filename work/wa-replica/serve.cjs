@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const promptFormat = require('./review-prompt-format.js');
+const aiRelay = require('./ai-relay.cjs');
 
 const workspace = path.resolve(__dirname, '../..');
 const root = path.join(workspace, 'outputs/wa-replica-prototype');
@@ -118,6 +119,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (pathname === '/api/review-prompts') await saveReviewPrompt(req, res);
+    else if (pathname.startsWith('/api/ai/')) await aiRelay.handle(req, res, pathname);
     else await serveFile(req, res, pathname);
   } catch {
     if (!res.headersSent) res.writeHead(404);

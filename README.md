@@ -17,10 +17,18 @@ node work/wa-replica/serve.cjs
 ```
 *(Windows 下也可直接双击根目录 `启动SCRM原型预览.cmd` 一键打开 `http://127.0.0.1:56141/#followups`。)*
 
+#### 接入真实的 AI 翻译（可选）
+预览服务带有 AI 中转接口（`/api/ai/*`）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到**仓库以外**的私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动：
+```bash
+WA_SCRM_AI_ENV=/path/to/private/ai.env node work/wa-replica/serve.cjs
+```
+未设置该变量、文件不完整，或以方式 A 打开单文件时，翻译退回本地演示结果。填好的文件不要提交到仓库。
+
 ### 重新编译与完整性校验
 ```bash
 node work/wa-replica/build-fidelity.cjs
 node work/wa-replica/validate-scrm-lifecycle.cjs
+node --test work/wa-replica/ai-relay.test.cjs   # AI 中转接口的测试（使用本地替身，不调用真实服务）
 ```
 
 ---
@@ -57,7 +65,7 @@ flowchart LR
 | `#chat-records` | **聊天记录（归档）** | 从 WhatsApp 会话移入的快照列表；移入原因、移入人与时间；快照内搜索、译文开关；不设评分或结论分类 |
 | `#tags` / `#tag-stats` | **标签管理与标签统计** | 自建分组维护自定义标签、批量打标与客户穿透查询 |
 | `#materials` | **素材管理** | 运营常用文本、图片、名片、音视频素材分组维护与导入导出 |
-| `#ai` | **AI 能力** | AI 功能的统一接入点：能力清单与逐项启停（接收消息翻译、发送前翻译）、按能力累计的调用次数与字符数、最近调用记录；当前为本地演示，不连接外部服务 |
+| `#ai` | **AI 能力** | AI 功能的统一接入点：能力清单与逐项启停（接收消息翻译、发送前翻译）、译文语言设置、按能力累计的调用次数与字符数、最近调用记录；服务器配置了模型服务时经本站服务器中转调用真实模型，否则为本地演示 |
 | `#scope` | **功能范围与原型评审** | 模块保留/暂缓决策记录（含已暂缓的生命周期看板、流程配置与成交复购中心）、点选界面备注说明与需求评审 JSON 导出 |
 
 ---
@@ -85,16 +93,18 @@ flowchart LR
 │       ├── fidelity-lifecycle.js / .css               # 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）
 │       ├── fidelity-dashboard.js / .css               # 首页经营概览与跟进闭环概览
 │       ├── fidelity-openwa.js                         # OpenWA 扫码绑定、掉线重连与会话联动
-│       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、演示提供方、用量记录与「AI 能力」页
+│       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转与本地演示两种提供方、用量记录与「AI 能力」页
+│       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务）及其测试
+│       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
 │       ├── fidelity-ui.js / fidelity-customer-pages.js# 列表、标签、标签统计与聊天记录归档视图
 │       ├── fidelity-operations.js / fidelity-subsite.js# 素材管理与聊手子站登录态控制
 │       ├── build-fidelity.cjs                         # 零外部依赖构建打包器
-│       ├── serve.cjs                                  # 本地静态预览与评审落盘服务
+│       ├── serve.cjs                                  # 本地静态预览、评审落盘与 AI 中转服务
 │       └── validate-scrm-lifecycle.cjs                # 离线产物无外呼与语法完整性自动校验
 └── replica/                                           # 界面勘察说明、对比验证与测试记录
 ```
 
 ## 4. 安全与数据边界
 
-- 仓库内所有客户姓名、美区/波多黎各号码、聊天对话与二维码均为**纯本地虚构演示数据**，保存在浏览器 `localStorage`，不连接真实 WhatsApp 或任何外部接口。
+- 仓库内所有客户姓名、美区/波多黎各号码、聊天对话与二维码均为**纯本地虚构演示数据**，保存在浏览器 `localStorage`，不连接真实 WhatsApp。唯一的对外调用是 AI 翻译：仅当预览服务配置了模型服务时，待翻译的消息文本经本站服务器发送给该模型服务；密钥只保存在服务器上，仓库内不含任何密钥。
 - 本地勘察期产生的浏览器配置目录、网络抓包（`.har`）、原始采集大文件及第三方参考截图均已通过 `.gitignore` 严格排除，不进入代码仓库。

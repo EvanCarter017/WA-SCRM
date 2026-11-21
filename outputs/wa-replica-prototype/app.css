@@ -876,6 +876,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-ai .fid-heading { margin-bottom:var(--fid-px-12); }
 .fid-ai h2 { margin:var(--fid-px-18) 0 var(--fid-px-8); font-size:var(--fid-px-15); font-weight:700; line-height:var(--fid-px-22); }
 .fid-ai-provider { display:flex; flex-wrap:wrap; align-items:center; gap:var(--fid-px-6) var(--fid-px-12); padding:var(--fid-px-10) var(--fid-px-12); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-8); background:var(--color-surface-alt); font-size:var(--fid-px-13); line-height:var(--fid-px-20); }
+.fid-ai-provider + .fid-ai-provider { margin-top:var(--fid-px-8); }
+.fid-ai-provider .fid-select { width:var(--fid-px-180); }
 .fid-ai-capabilities,.fid-ai-usage { min-width:var(--fid-px-640); }
 .fid-ai-capabilities col:nth-child(1) { width:22%; }
 .fid-ai-capabilities col:nth-child(3) { width:var(--fid-px-112); }

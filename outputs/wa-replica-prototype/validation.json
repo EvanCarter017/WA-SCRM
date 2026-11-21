@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-20T11:25:07.299Z",
+  "checkedAt": "2026-11-21T14:46:47.358Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -41,7 +41,8 @@
     "translate.inbound",
     "translate.outbound"
   ],
-  "aiProvider": "local demo (prepared sample results)",
+  "aiProvider": "server relay to an OpenAI-compatible model service when configured (key stays on the server); local demo otherwise",
+  "pageNetworkCalls": "own server only: /api/ai/status, /api/ai/translate",
   "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
   "chatStripFollowLink": "status and next-follow-up labels open the follow-up centre on the customer row",
   "orderTracking": "profile tab: first contact; one block per order, collapsed by default, head with number, time placed, a three-segment progress bar in the colour of the status and icon buttons (next step, exception, undo, remove); open: one entry per shipping step reached; the order form is pinned to the bottom of the drawer",

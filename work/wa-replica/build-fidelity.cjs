@@ -92,6 +92,11 @@ swap(`<button data-action="translation">'+icon('Languages')+'翻译设置</butto
 swap("      case 'translation':openTranslation();break;\n", '');
 js = js.replace(/^  function openTranslation\(\)\{[^\n]*\}\n/m, '');
 assert(!js.includes('openTranslation') && !js.includes('data-action="translation"'), 'the translation settings must be gone from the baseline');
+// Translations can come from a real model service now (plan 018): the labels name neither a language nor "sample".
+swap("+icon('Languages')+'中文译文</span>", "+icon('Languages')+'译文</span>");
+swap("'+esc(c.language)+'示例译文</small>'", "'+esc(c.language)+'译文</small>'");
+swap("(d.translated?'示例译文':'发送原文')", "(d.translated?'发送译文':'发送原文')");
+swap("(ui.drafts[c.id].translated?'已有示例译文':'发送原文')", "(ui.drafts[c.id].translated?'发送译文':'发送原文')");
 swap('实际接入方式待确认，本轮不会连接 WhatsApp。', '在「号码管理」可体验 OpenWA 扫码绑定。');
 swap("      case 'connect':openConnect(id);break;\n      case 'simulateConnect':{const a=account(id);a.state='online';a.lastSync='刚刚';persist();close();render();toast('已模拟恢复在线；没有连接真实 WhatsApp。');break}\n", '');
 js = js.replace(/^  function openConnect\(id\)\{[^\n]*\}\n/m, '');
@@ -114,7 +119,7 @@ new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
 requirement.version = '0.8-scrm-engagement';
-requirement.updatedOn = '2026-11-20';
+requirement.updatedOn = '2026-11-21';
 const connection = 'OpenWA 桥接';
 Object.assign(requirement.connectionDecision, {
   status: '已确认',
@@ -148,7 +153,7 @@ requirement.review.items.push({
 requirement.review.items.push({
   id: 'AI_HOOKS',
   title: 'AI 能力接入',
-  question: 'AI 功能（目前为接收消息翻译与发送前翻译）统一经由一个接入点调用，可逐项启停，并逐次记录用量。请评审：还需要接入哪些 AI 能力、由谁管理启停、用量按什么口径统计。',
+  question: 'AI 功能（目前为接收消息翻译与发送前翻译）统一经由一个接入点调用，可逐项启停，并逐次记录用量。服务器配置了模型服务时，翻译由本站服务器中转调用真实模型，密钥只保存在服务器；未配置时返回演示结果。请评审：还需要接入哪些 AI 能力、由谁管理启停与译文语言、用量按什么口径统计，以及中转接口是否需要访问限制。',
   status: '待评审',
   notes: '',
 });
@@ -241,12 +246,12 @@ requirement.modelOutline.entities.push('ChatArchive');
 requirement.modelOutline.relationships.push('聊天记录是归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因，用于绩效复盘与审核；不设评分，也不做结论分类。快照与实时会话相互独立，移入不改变实时会话。');
 requirement.modules.push({
   id:'P-AI', name:'AI 能力接入', decision:'首轮原型', basis:'用户要求为后续接入 AI 接口预留接入点（2026-11-17）',
-  originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','本地演示提供方'],
-  notes:'当前不连接外部服务；用量记录仅作计量留存，本轮不含商业化内容。',
+  originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','服务器中转调用模型服务（密钥仅存于服务器）','译文语言设置','本地演示提供方（未配置或离线时）'],
+  notes:'服务器配置了模型服务时，翻译经本站服务器中转调用真实模型，密钥不进入浏览器；未配置或以文件方式打开时退回本地演示。中转接口目前不设访问限制。用量记录仅作计量留存，本轮不含商业化内容。',
 });
-requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译仍为演示文案：经由 AI 接入点调用本地演示提供方，没有调用真实模型或翻译服务。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，是否产生译文在「AI 能力」页启停。';
+requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译经由 AI 接入点调用：服务器配置了模型服务时为真实翻译，否则为演示文案。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，译文语言与是否产生译文在「AI 能力」页设置。';
 requirement.modelOutline.entities.push('AiUsage');
-requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。当前提供方为本地演示，不连接外部服务。');
+requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。提供方有两种：服务器中转（页面只调用本站服务器的 /api/ai 接口，由服务器携带密钥调用模型服务）与本地演示（服务器未配置或页面以文件方式打开时使用）。');
 requirement.modelOutline.entities.push('Order');
 requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后推进按钮只能沿「待发货 → 已发货 → 已签收」逐步前进，或在签收前转为「异常」，已签收与异常之后不再有推进。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录，订单号旁显示下单时间。「撤销上一步」随时移除最新一条物流记录并回到上一个状态，已签收与异常同样可撤回；第一条记录不可撤回，删除订单才会移除。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
 const requirementJS = 'window.WA_REQUIREMENTS='+JSON.stringify(requirement)+';\n';
