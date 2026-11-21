@@ -21,12 +21,16 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 #### 接入 AI 翻译（可选）
 服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
+#### 接入 OpenWA（WhatsApp 连接，可选）
+服务带有子站与其专属 OpenWA 之间的连接接口（`/api/wa/*`，需要已设置 `WA_SCRM_DATA_DIR`）：为号码创建并启动会话、返回扫码二维码、接收 OpenWA 的事件通知并在落库后应答、按顺序提供给页面，以及发送文本消息。把 `work/wa-replica/openwa.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_OPENWA_ENV` 指向它启动服务。OpenWA 的密钥只保存在服务器；OpenWA 的通知必须带有效签名才会被接收。页面上的扫码与收发目前仍是模拟的，改用这些接口是下一步。
+
 ### 重新编译与完整性校验
 ```bash
 node work/wa-replica/build-fidelity.cjs
 node work/wa-replica/validate-scrm-lifecycle.cjs
 node --test work/wa-replica/ai-relay.test.cjs   # AI 中转接口的测试（使用本地替身，不调用真实服务）
 node --test work/wa-replica/site-api.test.cjs   # 账号、会话与数据接口的测试（需要 Node 22.13 或更新版本）
+node --test work/wa-replica/openwa-link.test.cjs   # OpenWA 连接接口的测试（使用本地替身，不连接真实 OpenWA；需要 Node 22.13 或更新版本）
 ```
 
 ---
@@ -91,13 +95,15 @@ flowchart LR
 │       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务）及其测试
 │       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
+│       ├── openwa-link.cjs / openwa-link.test.cjs     # 子站与其专属 OpenWA 的连接接口（会话、二维码、事件通知、发送）及其测试
+│       ├── openwa.env.example                         # OpenWA 连接设置文件示例（填写后的副本放在仓库之外）
 │       ├── site-auth.cjs / site-data.cjs              # 账号与登录会话；子站数据文档（内置 SQLite）
 │       ├── site-api.cjs / site-api.test.cjs           # 登录与数据接口及其测试
 │       ├── site-admin.cjs                             # 账号与数据管理工具（在服务器上运行）
 │       ├── fidelity-ui.js / fidelity-customer-pages.js# 列表、标签、标签统计与聊天记录归档视图
 │       ├── fidelity-operations.js / fidelity-subsite.js# 素材管理与聊手子站登录态控制
 │       ├── build-fidelity.cjs                         # 零外部依赖构建打包器
-│       ├── serve.cjs                                  # 预览服务：页面、AI 中转，以及可选的账号与数据接口
+│       ├── serve.cjs                                  # 预览服务：页面、AI 中转，以及可选的账号与数据接口、OpenWA 连接接口
 │       └── validate-scrm-lifecycle.cjs                # 离线产物无外呼与语法完整性自动校验
 └── replica/                                           # 界面勘察说明、对比验证与测试记录
 ```

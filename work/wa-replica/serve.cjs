@@ -7,11 +7,13 @@ const workspace = path.resolve(__dirname, '../..');
 const root = path.join(workspace, 'outputs/wa-replica-prototype');
 const port = Number(process.argv[2] || 56141);
 // With WA_SCRM_DATA_DIR set, the server keeps the accounts and the data of one sub-site (site-api.cjs; needs
-// Node 22.13 or newer) and the AI relay answers signed-in users only. Without it, the server serves the page
+// Node 22.13 or newer), the AI relay answers signed-in users only, and the sub-site can be linked to its own
+// OpenWA (openwa-link.cjs; settings file named by WA_SCRM_OPENWA_ENV). Without it, the server serves the page
 // and the relay as before.
 const site = process.env.WA_SCRM_DATA_DIR
   ? require('./site-api.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: process.env.WA_SCRM_SITE_ID || 'default' })
   : null;
+const waLink = site ? require('./openwa-link.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: site.siteId, site }) : null;
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -60,6 +62,10 @@ const server = http.createServer(async (req, res) => {
         req.resume();
         sendJson(res, 401, { error: 'not-signed-in' });
       } else await aiRelay.handle(req, res, pathname);
+    } else if (pathname.startsWith('/api/wa/')) {
+      if (waLink) await waLink.handle(req, res, pathname);
+      else if (pathname === '/api/wa/status') sendJson(res, 200, { configured: false, reason: 'not-enabled' });
+      else sendJson(res, 503, { error: 'not-enabled' });
     } else await serveFile(req, res, pathname);
   } catch {
     if (!res.headersSent) res.writeHead(404);
