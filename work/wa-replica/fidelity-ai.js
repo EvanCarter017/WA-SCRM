@@ -4,7 +4,7 @@
   // Every provider call leaves one usage record in data.ai.usage and adds to the totals of its capability.
   const AI_CAPABILITIES = [
     { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为所选的译文语言，显示在原文下方。' },
-    { id: 'translate.outbound', name: '发送前翻译', description: '把快捷回复译为客户的语言，发送前可预览。' },
+    { id: 'translate.outbound', name: '发送前翻译', description: '把你输入的回复和快捷回复译为客户的语言，发送前可预览。' },
   ];
   // A provider answers run(capabilityId, input) with { text }, or with a Promise of it.
   // demo: returns the prepared sample that the caller passes along; used when the page has no server behind it.
@@ -12,10 +12,13 @@
   // never reaches the browser. It ignores input.sample.
   const AI_PROVIDERS = {
     demo: { name: '本地演示', run: (capabilityId, input) => ({ text: input.sample || '' }) },
-    server: { name: '服务器中转', run: (capabilityId, input) => aiRelayTranslate(input) },
+    server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
   // Languages offered for the translation shown below incoming messages.
   const AI_READ_LANGUAGES = ['中文', 'English', 'Español', 'Português', 'Français', 'Deutsch', 'Русский', 'العربية', '日本語', '한국어', 'Tiếng Việt', 'Bahasa Indonesia'];
+  // How a reply should sound when it is translated: [value sent to the relay, label].
+  const AI_TONES = [['casual', '轻松随意'], ['friendly', '亲切专业']];
+  const AI_BUSINESS_MAX = 600;
   // Which provider this page uses. It starts on the demo and switches to the server relay once the page's own
   // server reports that a model service is configured. A page opened as a file stays on the demo.
   const aiRuntime = { provider: 'demo', status: null };
@@ -36,6 +39,9 @@
       settings.totals[id] ??= { calls: 0, inputChars: 0, outputChars: 0 };
     }
     if (!AI_READ_LANGUAGES.includes(settings.readLanguage)) settings.readLanguage = AI_READ_LANGUAGES[0];
+    if (!AI_TONES.some(tone => tone[0] === settings.tone)) settings.tone = AI_TONES[0][0];
+    if (typeof settings.business !== 'string') settings.business = '';
+    if (typeof settings.sendGuard !== 'boolean') settings.sendGuard = true;
     return settings;
   }
 
@@ -82,13 +88,23 @@
     }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
   }
 
+  // The server relay for a reply: the text is put into the customer's language with the chosen tone, with the
+  // business description and the recent chat as context. A text already in that language comes back unchanged.
+  function aiRelayReply(input) {
+    return fetch('/api/ai/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context }),
+    }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
+  }
+
   // Ask the page's own server whether a model service is configured, and use the relay if it is.
   function aiDetectRelay() {
     if (!/^https?:$/.test(location.protocol)) return;
     fetch('/api/ai/status').then(response => response.ok ? response.json() : null).then(status => {
       aiRuntime.status = status;
       aiRuntime.provider = status?.configured ? 'server' : 'demo';
-      if (ui.view === 'ai') render();
+      if (ui.view === 'ai' || ui.view === 'inbox') render();
     }).catch(() => {});
   }
 
@@ -118,8 +134,65 @@
     paintIcons(preview);
     const hint = $('.language-hint');
     if (!hint) return;
-    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + (aiDraftPending.has(c.id) ? '翻译中…' : draft(c).translated ? '发送译文' : '发送原文');
+    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + aiDraftHint(c);
     paintIcons(hint);
+  }
+
+  // What the relay gets for a reply: the text, the customer's language, the tone, the business description
+  // and the last messages of the conversation as context.
+  function aiOutboundInput(c, text, sample) {
+    const settings = aiSettings();
+    const context = (data.messages[c.id] || []).slice(-6)
+      .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
+      .filter(message => message.text.trim());
+    return { text, to: c.language, sample, tone: settings.tone, business: settings.business, context };
+  }
+
+  // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first
+  // and sent only after a second Enter. A customer whose language is '其他' (other) is not guarded.
+  // These helpers run while the page is drawn, so they read the saved settings without creating them.
+  const aiGuardOn = () => data.ai?.sendGuard !== false;
+  function aiGuardActive(c) {
+    return aiRuntime.provider === 'server' && aiGuardOn() && data.ai?.enabled?.['translate.outbound'] !== false && c.language !== '其他';
+  }
+  // Text that needs no translation in any language: no letters at all (numbers, emoji, links), or ok / no.
+  function aiGuardNeutral(text) {
+    const bare = text.replace(/https?:\/\/\S+|\S+@\S+/g, ' ');
+    return !/\p{L}/u.test(bare) || /^(ok|okay|no)[.!?]*$/i.test(bare.trim());
+  }
+  // The same words, whatever the spacing, punctuation and capitals.
+  const aiSameText = (a, b) => a.replace(/[\s\p{P}]/gu, '').toLowerCase() === b.replace(/[\s\p{P}]/gu, '').toLowerCase();
+
+  // The words beside the message box: what Enter will do with the draft.
+  function aiDraftHint(c) {
+    if (aiDraftPending.has(c.id)) return '翻译中…';
+    const d = draft(c), text = d.text.trim();
+    if (d.translated) return '发送译文';
+    return aiGuardActive(c) && text && !aiGuardNeutral(text) ? '待翻译' : '发送原文';
+  }
+  // The line under the message box that explains the Enter key.
+  function aiEnterHint(c) {
+    return aiGuardActive(c) ? 'Enter 先翻译，再按一次发送；Shift + Enter 换行' : 'Enter 发送，Shift + Enter 换行';
+  }
+  // The switch of the send guard, beside the message box. Shown only while the relay is in use.
+  function aiGuardHTML(c) {
+    if (aiRuntime.provider !== 'server' || c.language === '其他') return '';
+    const on = aiGuardOn();
+    return `<button class="ai-guard${on ? ' on' : ''}" type="button" data-ai-guard aria-pressed="${on}" title="${on ? '发送保护已开启：不是客户语言的回复先翻译，确认后再发送' : '发送保护已关闭：回复按原文直接发送'}">${icon('ShieldCheck')}发送保护${on ? '开' : '关'}</button>`;
+  }
+  function aiSetGuard(on) {
+    aiSettings().sendGuard = on;
+    persist();
+    if (ui.view === 'ai') render();
+    const c = selectedCustomer(), button = $('[data-ai-guard]');
+    if (c && button) {
+      button.outerHTML = aiGuardHTML(c);
+      paintIcons($('.composer-tools'));
+      aiRefreshDraftPreview(c);
+      const enter = $('.composer-foot span');
+      if (enter) { enter.innerHTML = icon('Keyboard') + aiEnterHint(c); paintIcons(enter); }
+    }
+    toast(on ? '发送保护已开启。' : '发送保护已关闭，回复按原文直接发送。');
   }
 
   // Quick replies: the earlier layers fill the draft together with its prepared sample translation.
@@ -139,7 +212,7 @@
     const request = {};
     aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
-    aiRun('translate.outbound', { text: q.zh, from: '中文', to: c.language, sample }, { customerId: c.id }).then(result => {
+    aiRun('translate.outbound', aiOutboundInput(c, q.zh, sample), { customerId: c.id }).then(result => {
       if (aiDraftPending.get(c.id) === request) aiDraftPending.delete(c.id);
       const current = ui.drafts[c.id];
       if (result.ok && current && current.source === q.zh && current.text === q.zh) {
@@ -150,6 +223,42 @@
       }
       aiRefreshDraftPreview(c);
     });
+  };
+
+  // A reply typed into the message box. With the send guard active, Enter does not send a text that is not
+  // in the customer's language: it asks for the translation, shows it above the box, and the next Enter sends
+  // it. A text the relay returns unchanged already is in the customer's language and is sent as typed.
+  function aiTranslateDraft(c, text) {
+    const request = {};
+    aiDraftPending.set(c.id, request);
+    aiRefreshDraftPreview(c);
+    aiRun('translate.outbound', aiOutboundInput(c, text), { customerId: c.id }).then(result => {
+      if (aiDraftPending.get(c.id) === request) aiDraftPending.delete(c.id);
+      const current = ui.drafts[c.id];
+      const unchanged = current && current.text.trim() === text;
+      if (!result.ok) {
+        if (!result.skipped) toast('未能取得译文，消息未发送。可再按 Enter 重试，或关闭发送保护后按原文发送。');
+      } else if (unchanged && aiSameText(result.text, text)) {
+        const box = $('#composer-text');
+        if (ui.view === 'inbox' && selectedCustomer() === c && box && box.value.trim() === text) return aiOldSend();
+      } else if (unchanged) {
+        current.translated = result.text;
+        current.source = text;
+        persist();
+        toast(`已译为${c.language}，确认后再按 Enter 发送。`);
+      }
+      aiRefreshDraftPreview(c);
+    });
+  }
+  const aiOldSend = send;
+  send = function() {
+    const c = selectedCustomer(), box = $('#composer-text');
+    const text = box ? box.value.trim() : '';
+    if (!c || !text || account(c.account)?.state !== 'online' || !aiGuardActive(c)) return aiOldSend();
+    const d = draft(c);
+    if ((d.translated && d.source === text) || aiGuardNeutral(text)) return aiOldSend();
+    if (aiDraftPending.has(c.id)) return toast('正在翻译，请稍候。');
+    aiTranslateDraft(c, text);
   };
 
   function renderAiPage() {
@@ -180,6 +289,9 @@
       ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。')}
       <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill ${relay ? 'ok' : 'info'}">${esc(relay ? `${aiRuntime.status.provider} · ${aiRuntime.status.model}` : AI_PROVIDERS.demo.name)}</span><span>${providerNote}</span></div>
       <div class="fid-ai-provider"><strong>译文语言</strong><select class="fid-select" data-ai-setting="readLanguage" aria-label="译文语言">${AI_READ_LANGUAGES.map(language => option(language, language, settings.readLanguage)).join('')}</select><span>客户发来的消息译为这种语言，显示在原文下方；只对之后收到的消息生效。</span></div>
+      <div class="fid-ai-provider"><strong>回复语气</strong><select class="fid-select" data-ai-setting="tone" aria-label="回复语气">${AI_TONES.map(([value, label]) => option(value, label, settings.tone)).join('')}</select><span>把你的回复译给客户时采用的语气。</span></div>
+      <div class="fid-ai-provider fid-ai-business"><strong>业务说明</strong><textarea class="fid-input" data-ai-setting="business" aria-label="业务说明" maxlength="${AI_BUSINESS_MAX}" rows="2" placeholder="选填，例如：我们向美国和波多黎各的小型餐饮企业销售厨房设备。">${esc(settings.business)}</textarea><span>选填。翻译回复时一并提供给模型，让用词贴合你的业务；同时提供的还有该会话最近 6 条消息。</span></div>
+      <div class="fid-ai-provider"><strong>发送保护</strong><label class="fid-ai-switch"><input type="checkbox" role="switch" data-ai-setting="sendGuard" ${settings.sendGuard ? 'checked' : ''} aria-label="发送保护">${settings.sendGuard ? '已开启' : '已关闭'}</label><span>开启后，不是客户语言的回复不会直接发出：第一次按 Enter 先翻译，确认译文后再按一次发送。也可在输入框旁切换。</span></div>
       <h2>能力清单</h2>
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
       <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
@@ -197,6 +309,21 @@
       toast(`译文语言已设为 ${aiSettings().readLanguage}。`);
       return;
     }
+    if (event.target.dataset?.aiSetting === 'tone') {
+      aiSettings().tone = event.target.value;
+      persist();
+      render();
+      toast(`回复语气已设为「${AI_TONES.find(tone => tone[0] === aiSettings().tone)[1]}」。`);
+      return;
+    }
+    if (event.target.dataset?.aiSetting === 'business') {
+      aiSettings().business = event.target.value.trim().slice(0, AI_BUSINESS_MAX);
+      persist();
+      render();
+      toast('业务说明已保存。');
+      return;
+    }
+    if (event.target.dataset?.aiSetting === 'sendGuard') return aiSetGuard(event.target.checked);
     const id = event.target.dataset?.aiCapability;
     const capability = AI_CAPABILITIES.find(item => item.id === id);
     if (!capability) return;
@@ -205,6 +332,10 @@
     persist();
     render();
     toast(`${capability.name}已${on ? '启用' : '停用'}。`);
+  });
+
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-ai-guard]')) aiSetGuard(!aiGuardOn());
   });
 
   aiDetectRelay();

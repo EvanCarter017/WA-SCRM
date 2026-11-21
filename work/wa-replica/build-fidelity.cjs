@@ -97,6 +97,11 @@ swap("+icon('Languages')+'中文译文</span>", "+icon('Languages')+'译文</spa
 swap("'+esc(c.language)+'示例译文</small>'", "'+esc(c.language)+'译文</small>'");
 swap("(d.translated?'示例译文':'发送原文')", "(d.translated?'发送译文':'发送原文')");
 swap("(ui.drafts[c.id].translated?'已有示例译文':'发送原文')", "(ui.drafts[c.id].translated?'发送译文':'发送原文')");
+// Reply translation and the send guard (plan 020): the words beside the message box, the guard's switch after
+// them and the line that explains the Enter key come from the AI module.
+swap("(d.translated?'发送译文':'发送原文')+'</span></div><button class=\"send-button\"", "aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class=\"send-button\"");
+swap("(ui.drafts[c.id].translated?'发送译文':'发送原文')", 'aiDraftHint(c)');
+swap("icon('Keyboard')+'Enter 发送，Shift + Enter 换行</span>", "icon('Keyboard')+aiEnterHint(c)+'</span>");
 swap('实际接入方式待确认，本轮不会连接 WhatsApp。', '在「号码管理」可体验 OpenWA 扫码绑定。');
 swap("      case 'connect':openConnect(id);break;\n      case 'simulateConnect':{const a=account(id);a.state='online';a.lastSync='刚刚';persist();close();render();toast('已模拟恢复在线；没有连接真实 WhatsApp。');break}\n", '');
 js = js.replace(/^  function openConnect\(id\)\{[^\n]*\}\n/m, '');
@@ -265,10 +270,10 @@ requirement.modelOutline.entities.push('ChatArchive');
 requirement.modelOutline.relationships.push('聊天记录是归档：从 WhatsApp 会话移入的快照（ChatArchive）保存移入时的全部消息、移入人、时间与原因，用于绩效复盘与审核；不设评分，也不做结论分类。快照与实时会话相互独立，移入不改变实时会话。');
 requirement.modules.push({
   id:'P-AI', name:'AI 能力接入', decision:'首轮原型', basis:'用户要求为后续接入 AI 接口预留接入点（2026-11-17）',
-  originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','服务器中转调用模型服务（密钥仅存于服务器）','译文语言设置','本地演示提供方（未配置或离线时）'],
+  originalIds:[], screens:['ai','inbox'], features:['统一 AI 接入点','能力清单与逐项启停','逐次用量记录与按能力累计','接收消息翻译与发送前翻译经接入点调用','服务器中转调用模型服务（密钥仅存于服务器）','译文语言设置','回复翻译（语气、业务说明与会话上下文）','发送保护','本地演示提供方（未配置或离线时）'],
   notes:'服务器配置了模型服务时，翻译经本站服务器中转调用真实模型，密钥不进入浏览器；未配置或以文件方式打开时退回本地演示。中转接口目前不设访问限制。用量记录仅作计量留存，本轮不含商业化内容。',
 });
-requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译经由 AI 接入点调用：服务器配置了模型服务时为真实翻译，否则为演示文案。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，译文语言与是否产生译文在「AI 能力」页设置。';
+requirement.modules.find(module => module.id === 'P-ASSIST').notes = '翻译经由 AI 接入点调用：服务器配置了模型服务时为真实翻译，否则为演示文案。聊天界面的翻译设置入口与弹窗已于 2026-11-20 移除；接收消息的译文始终显示，译文语言与是否产生译文在「AI 能力」页设置。输入的回复在第一次按 Enter 时译为客户语言并显示在输入框上方，再按一次发送；发送保护开启时，不是客户语言的回复不会直接发出。';
 requirement.modelOutline.entities.push('AiUsage');
 requirement.modelOutline.relationships.push('所有 AI 调用经由统一接入点：按能力登记，可逐项启停；每次调用留存一条用量记录（AiUsage：时间、能力、提供方、操作人、客户、输入与输出字符数、是否成功），并按能力累计。提供方有两种：服务器中转（页面只调用本站服务器的 /api/ai 接口，由服务器携带密钥调用模型服务）与本地演示（服务器未配置或页面以文件方式打开时使用）。');
 requirement.modelOutline.entities.push('Order');

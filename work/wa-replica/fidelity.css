@@ -437,6 +437,12 @@
 .fid-ai-provider { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; padding:10px 12px; border:1px solid var(--fid-frame); border-radius:8px; background:var(--color-surface-alt); font-size:13px; line-height:20px; }
 .fid-ai-provider + .fid-ai-provider { margin-top:8px; }
 .fid-ai-provider .fid-select { width:180px; }
+.fid-ai-business textarea { flex:1 1 320px; height:auto; min-height:56px; padding:6px 10px; line-height:20px; resize:vertical; }
+.ai-guard { display:inline-flex; align-items:center; gap:4px; margin-left:6px; padding:2px 8px; border:1px solid var(--fid-frame); border-radius:999px; background:var(--color-surface); color:var(--fid-quiet); font:inherit; font-size:12px; line-height:18px; white-space:nowrap; cursor:pointer; }
+.ai-guard .icon { width:14px; height:14px; }
+.ai-guard.on { border-color:var(--fid-mint); background:var(--fid-mint-bg); color:var(--color-text); }
+.ai-guard.on .icon { color:var(--fid-mint); }
+.ai-guard:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }
 .fid-ai-capabilities,.fid-ai-usage { min-width:640px; }
 .fid-ai-capabilities col:nth-child(1) { width:22%; }
 .fid-ai-capabilities col:nth-child(3) { width:112px; }
