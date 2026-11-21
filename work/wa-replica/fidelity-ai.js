@@ -6,12 +6,10 @@
     { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为所选的译文语言，显示在原文下方。' },
     { id: 'translate.outbound', name: '发送前翻译', description: '把你输入的回复和快捷回复译为客户的语言，发送前可预览。' },
   ];
-  // A provider answers run(capabilityId, input) with { text }, or with a Promise of it.
-  // demo: returns the prepared sample that the caller passes along; used when the page has no server behind it.
-  // server: the page's own server relays the request to the model service (ai-relay.cjs), so the service key
-  // never reaches the browser. It ignores input.sample.
+  // The provider answers run(capabilityId, input) with a Promise of { text }: the page's own server relays the
+  // request to the model service (ai-relay.cjs), so the service key never reaches the browser. Without a server
+  // that has a model service configured there is no provider, and no capability runs.
   const AI_PROVIDERS = {
-    demo: { name: '本地演示', run: (capabilityId, input) => ({ text: input.sample || '' }) },
     server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
   // Languages offered for the translation shown below incoming messages.
@@ -19,9 +17,9 @@
   // How a reply should sound when it is translated: [value sent to the relay, label].
   const AI_TONES = [['casual', '轻松随意'], ['friendly', '亲切专业']];
   const AI_BUSINESS_MAX = 600;
-  // Which provider this page uses. It starts on the demo and switches to the server relay once the page's own
-  // server reports that a model service is configured. A page opened as a file stays on the demo.
-  const aiRuntime = { provider: 'demo', status: null };
+  // Which provider this page uses: none until the page's own server reports that a model service is configured,
+  // then the server relay. A page opened as a file has none.
+  const aiRuntime = { provider: null, status: null };
   // Drafts waiting for their translation: customer id → a token of the newest request.
   const aiDraftPending = new Map();
   const AI_USAGE_KEPT = 200;
@@ -63,10 +61,11 @@
   }
 
   // The single entry point for every AI call. Resolves to { ok, text }; it never rejects.
-  // A capability that is switched off is not sent to the provider and leaves no usage record.
+  // A capability that is switched off, and every capability while no model service is connected, is not run
+  // and leaves no usage record.
   function aiRun(capabilityId, input, meta = {}) {
     const settings = aiSettings();
-    if (!settings.enabled[capabilityId]) return Promise.resolve({ ok: false, text: '', skipped: true });
+    if (!settings.enabled[capabilityId] || !aiRuntime.provider) return Promise.resolve({ ok: false, text: '', skipped: true });
     const providerId = aiRuntime.provider;
     return Promise.resolve()
       .then(() => AI_PROVIDERS[providerId].run(capabilityId, input))
@@ -103,7 +102,7 @@
     if (!/^https?:$/.test(location.protocol)) return;
     fetch('/api/ai/status').then(response => response.ok ? response.json() : null).then(status => {
       aiRuntime.status = status;
-      aiRuntime.provider = status?.configured ? 'server' : 'demo';
+      aiRuntime.provider = status?.configured ? 'server' : null;
       if (ui.view === 'ai' || ui.view === 'inbox') render();
     }).catch(() => {});
   }
@@ -111,8 +110,8 @@
   // Translate one incoming message into the reading language chosen on the AI page. The translation is stored
   // on the message when it arrives, and the open conversation is refreshed if it is the one on screen.
   // A message that is already in the reading language comes back unchanged and gets no translation.
-  function aiTranslateInbound(c, message, sample) {
-    return aiRun('translate.inbound', { text: message.text, from: c.language, to: aiSettings().readLanguage, sample }, { customerId: c.id }).then(result => {
+  function aiTranslateInbound(c, message) {
+    return aiRun('translate.inbound', { text: message.text, to: aiSettings().readLanguage }, { customerId: c.id }).then(result => {
       if (!result.ok || result.text.trim() === message.text.trim()) return;
       message.translated = result.text;
       if (c.preview === message.text) c.translation = result.text;
@@ -140,12 +139,12 @@
 
   // What the relay gets for a reply: the text, the customer's language, the tone, the business description
   // and the last messages of the conversation as context.
-  function aiOutboundInput(c, text, sample) {
+  function aiOutboundInput(c, text) {
     const settings = aiSettings();
     const context = (data.messages[c.id] || []).slice(-6)
       .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
       .filter(message => message.text.trim());
-    return { text, to: c.language, sample, tone: settings.tone, business: settings.business, context };
+    return { text, to: c.language, tone: settings.tone, business: settings.business, context };
   }
 
   // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first
@@ -195,30 +194,29 @@
     toast(on ? '发送保护已开启。' : '发送保护已关闭，回复按原文直接发送。');
   }
 
-  // Quick replies: the earlier layers fill the draft together with its prepared sample translation.
-  // Take the sample off the draft and ask the integration point for the translation instead,
-  // so that translating before sending can be switched off and is recorded like every other AI call.
+  // Quick replies: the earlier layers fill the draft together with a prepared translation from the stored
+  // quick-reply data. Take it off the draft and ask the integration point for a real translation instead, so
+  // that translating before sending can be switched off and is recorded like every other AI call.
   const aiOldFillQuick = fillQuick;
   fillQuick = function(id) {
     const q = data.quickReplies.find(item => item.id === id), c = selectedCustomer();
     aiOldFillQuick(id);
     const filled = c && ui.drafts[c.id];
     if (!q || !filled || filled.source !== q.zh) return;
-    const sample = filled.translated;
     filled.translated = '';
     persist();
-    // The relay needs a language to translate into; a customer whose language is '其他' (other) gets the original.
-    if (aiRuntime.provider === 'server' && c.language === '其他') return aiRefreshDraftPreview(c);
+    // Without a model service, or for a customer whose language is '其他' (other), the original is sent.
+    if (!aiRuntime.provider || c.language === '其他') return aiRefreshDraftPreview(c);
     const request = {};
     aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
-    aiRun('translate.outbound', aiOutboundInput(c, q.zh, sample), { customerId: c.id }).then(result => {
+    aiRun('translate.outbound', aiOutboundInput(c, q.zh), { customerId: c.id }).then(result => {
       if (aiDraftPending.get(c.id) === request) aiDraftPending.delete(c.id);
       const current = ui.drafts[c.id];
       if (result.ok && current && current.source === q.zh && current.text === q.zh) {
         current.translated = result.text;
         persist();
-      } else if (!result.ok && !result.skipped && aiRuntime.provider === 'server') {
+      } else if (!result.ok && !result.skipped) {
         toast('未能取得译文，草稿保持原文。');
       }
       aiRefreshDraftPreview(c);
@@ -268,8 +266,8 @@
     const providerNote = relay
       ? '由本站服务器中转调用模型服务，密钥只保存在服务器，不进入浏览器。'
       : aiRuntime.status
-        ? '服务器尚未配置可用的模型服务，暂时返回预置的示例结果。'
-        : '当前页面没有连接服务器，返回预置的示例结果。';
+        ? '服务器尚未配置可用的模型服务，翻译暂不可用。'
+        : '当前页面没有连接服务器，翻译不可用。';
     const capabilityRows = AI_CAPABILITIES.map(({ id, name, description }) => {
       const total = settings.totals[id], on = settings.enabled[id];
       return `<tr>
@@ -287,7 +285,7 @@
       </tr>`).join('');
     return `<section class="fid-page"><div class="fid-panel fid-ai">
       ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。')}
-      <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill ${relay ? 'ok' : 'info'}">${esc(relay ? `${aiRuntime.status.provider} · ${aiRuntime.status.model}` : AI_PROVIDERS.demo.name)}</span><span>${providerNote}</span></div>
+      <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill ${relay ? 'ok' : 'warn'}">${esc(relay ? `${aiRuntime.status.provider} · ${aiRuntime.status.model}` : '未连接')}</span><span>${providerNote}</span></div>
       <div class="fid-ai-provider"><strong>译文语言</strong><select class="fid-select" data-ai-setting="readLanguage" aria-label="译文语言">${AI_READ_LANGUAGES.map(language => option(language, language, settings.readLanguage)).join('')}</select><span>客户发来的消息译为这种语言，显示在原文下方；只对之后收到的消息生效。</span></div>
       <div class="fid-ai-provider"><strong>回复语气</strong><select class="fid-select" data-ai-setting="tone" aria-label="回复语气">${AI_TONES.map(([value, label]) => option(value, label, settings.tone)).join('')}</select><span>把你的回复译给客户时采用的语气。</span></div>
       <div class="fid-ai-provider fid-ai-business"><strong>业务说明</strong><textarea class="fid-input" data-ai-setting="business" aria-label="业务说明" maxlength="${AI_BUSINESS_MAX}" rows="2" placeholder="选填，例如：我们向美国和波多黎各的小型餐饮企业销售厨房设备。">${esc(settings.business)}</textarea><span>选填。翻译回复时一并提供给模型，让用词贴合你的业务；同时提供的还有该会话最近 6 条消息。</span></div>

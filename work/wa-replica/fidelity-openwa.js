@@ -101,7 +101,6 @@
     if (data.customers.some(c => c.account === a.id)) return;
     const id = nextId('c');
     const text = 'Hi! I found you on Facebook. Can you share more details?';
-    const translated = '你好！我是在 Facebook 上看到你们的。能多介绍一下吗？';
     const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit', hour12:false});
     data.customers.unshift({
       id, name:'Taylor Morgan', initials:'TM', color:'peach', phone:'+1 (415) 555-0198',
@@ -112,7 +111,7 @@
       contactRefs:[{account:a.id, owner:a.owner||ui.persona}], createdAt:fidDay(), updatedAt:fidDay(), clientType:'新增线索-实时',
     });
     data.messages[id] = [{id:nextId('m'), side:'in', text, time}];
-    aiTranslateInbound(data.customers[0], data.messages[id][0], translated);
+    aiTranslateInbound(data.customers[0], data.messages[id][0]);
   }
 
   function openwaFinish(pair) {

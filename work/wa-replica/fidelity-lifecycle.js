@@ -1255,19 +1255,19 @@
     if (!c) return;
     const isEs = c.language === '西班牙语';
     const closed = lcIsClosed(c);
-    const pair = closed
+    const incoming = closed
       ? (isEs
-          ? ['Hola, retomamos las compras esta semana. ¿Podemos revisar la cotización actualizada?', '你好，我们这周恢复采购计划了，可以重新核对一下最新报价吗？']
-          : ['Hi! Our budget is ready now—could we revisit the quote and check current lead time?', '你好！我们的采购预算已经批下来了，可以重新确认一下报价和当前发货时效吗？'])
+          ? 'Hola, retomamos las compras esta semana. ¿Podemos revisar la cotización actualizada?'
+          : 'Hi! Our budget is ready now—could we revisit the quote and check current lead time?')
       : (isEs
-          ? ['Gracias por responder rápido, me interesa ver las opciones disponibles.', '谢谢你的快速回复，我想看看目前可选的规格方案。']
-          : ['Thanks for the quick response! Could you share the recommended starter option?', '谢谢快速回复！可以推荐一下适合首批采购的方案吗？']);
+          ? 'Gracias por responder rápido, me interesa ver las opciones disponibles.'
+          : 'Thanks for the quick response! Could you share the recommended starter option?');
 
     const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const message = { id: nextId('m'), side: 'in', text: pair[0], time };
+    const message = { id: nextId('m'), side: 'in', text: incoming, time };
     (data.messages[c.id] ??= []).push(message);
-    aiTranslateInbound(c, message, pair[1]);
-    c.preview = pair[0];
+    aiTranslateInbound(c, message);
+    c.preview = incoming;
     c.translation = '';
     c.last = '刚刚';
     c.unread = (Number(c.unread) || 0) + 1;
@@ -1530,9 +1530,6 @@
       const msg = isEs
         ? 'Hola, vi su anuncio y agregué su WhatsApp. ¿Me comparte el catálogo y tiempos de envío?'
         : 'Hi! Just added your WhatsApp from your ad. Could you share the catalog and shipping details?';
-      const tr = isEs
-        ? '你好，看到你们的广告加了 WhatsApp，能发一下目录和发货时效吗？'
-        : '你好！刚从广告加了你们的 WhatsApp，可以发一下目录和发货说明吗？';
       const id = nextId('c');
       const nowIso = new Date().toISOString();
       const c = {
@@ -1550,7 +1547,7 @@
       };
       data.customers.unshift(c);
       data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, time: '刚刚' }];
-      aiTranslateInbound(c, data.messages[id][0], tr);
+      aiTranslateInbound(c, data.messages[id][0]);
       lcCreateTask({
         customerId: id,
         title: `首响破冰回复 ${name} 并确认具体需求`,

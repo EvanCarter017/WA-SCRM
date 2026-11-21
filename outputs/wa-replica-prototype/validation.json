@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-21T16:09:17.959Z",
+  "checkedAt": "2026-11-21T16:24:17.087Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "standaloneBundlesVerified": [
@@ -41,7 +41,7 @@
     "translate.inbound",
     "translate.outbound"
   ],
-  "aiProvider": "server relay to an OpenAI-compatible model service when configured (key stays on the server); local demo otherwise",
+  "aiProvider": "server relay to an OpenAI-compatible model service (key stays on the server); without it no AI capability runs",
   "pageNetworkCalls": "own server only: /api/ai/status, /api/ai/translate, /api/ai/reply",
   "replyTranslation": "typed replies and quick replies go to /api/ai/reply with tone, business description and the last six messages; send guard on by default: first Enter translates, second Enter sends",
   "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
