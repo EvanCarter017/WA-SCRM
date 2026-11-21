@@ -159,6 +159,31 @@ cut(/^      case 'resetDemo':[^\n]*\n      case 'confirmReset':[^\n]*\n/m, 'rese
   js = next;
 }
 assert(!/clone\(window\.WA_DEMO\)|localStorage\.(setItem|getItem)\(KEY[,)]/.test(js), 'the app must not start from sample data or keep its data in the browser');
+// The page uses the real WhatsApp connection (plan 026). A message carries its time and what became of it,
+// the conversation with the latest message comes first, and what existed only for the demonstration is gone.
+// The functions named here are in fidelity-openwa.js.
+swap("const day=m.time.startsWith('昨天')?'昨天':'今天',separator=", 'const day=openwaDayLabel(m),separator=');
+swap("esc(m.time.replace('昨天 ',''))+(m.side==='out'?icon(m.local?'Check':'CheckCheck')+(m.local?'<span>本地演示</span>':''):'')", "esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')");
+swap("emptyHint='写一条演示消息，或选择快捷回复开始。'", "emptyHint='输入消息，或选择快捷回复开始。'");
+swap("'</strong><time>'+esc(c.last)+'</time>", "'</strong><time>'+esc(openwaLastLabel(c))+'</time>");
+swap('.includes(q));return list}', '.includes(q));return openwaOrder(list)}');
+swap('enabled=online&&(d.text.trim()||ui.attachment);', 'enabled=online&&Boolean(d.text.trim());');
+swap(`<button class="icon-button" data-action="attachment" aria-label="添加演示附件">'+icon('Paperclip')+'</button>`, '');
+swap('aria-label="发送演示消息"', 'aria-label="发送消息"');
+swap("(online?'演示会话 · 草稿自动保存':'账号待连接 · 草稿已保留')", "(online?'草稿自动保存':'号码待连接 · 草稿已保留')");
+swap('<span class="sample-label">演示来源</span>', '');
+swap("toast('演示账号已保存；真实接入尚未执行。')", "toast('账号已保存；在号码管理中扫码绑定后开始收发。')");
+swap("error('演示数据中已有该号码。重复客户归属/合并规则待确认。')", "error('已有使用该号码的客户。')");
+{
+  // Sending goes through the server: fidelity-openwa.js gives send its body.
+  const next = js.replace(/^  function send\(\) \{\n[\s\S]*?^  \}\n/m, '  function send() {}\n');
+  assert(next !== js, 'Missing the send function of the baseline');
+  js = next;
+}
+// The dialog that added a made-up attachment to a message is gone with its button; real files come with the media step.
+cut(/^      case 'attachment':\{[^\n]*\n/m, 'demo attachment dialog');
+cut(/^    if\(formId==='attachment-form'\)[^\n]*\n/m, 'demo attachment form');
+assert(!/<span>本地演示<\/span>|演示消息|添加演示附件|模拟扫码|模拟掉线|模拟重连|lcSimLeadOpen|lcSimReply|openwaDemoQr/.test(js), 'the app must not simulate the WhatsApp connection');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));

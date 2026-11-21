@@ -294,7 +294,7 @@
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
       <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
       <h2>最近调用</h2>
-      ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。在 WhatsApp API 中模拟对方回复或选择快捷回复后，这里会出现记录。')}
+      ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。收到客户消息或翻译回复后，这里会出现记录。')}
       <p class="fid-field-help">显示最近 ${AI_USAGE_SHOWN} 次调用，本机最多保留 ${AI_USAGE_KEPT} 条；累计数见上表。</p>
     </div></section>`;
   }

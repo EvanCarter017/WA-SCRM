@@ -714,6 +714,11 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .openwa-pair-state .icon { width:var(--fid-px-18); height:var(--fid-px-18); animation:openwa-spin 1s linear infinite; }
 .openwa-success-mark { display:grid; place-items:center; width:var(--fid-px-45); height:var(--fid-px-45); background:var(--fid-mint-bg); color:var(--paint-46); border-radius:50%; }
 .openwa-success-mark .icon { width:var(--fid-px-23); height:var(--fid-px-23); }
+.openwa-pair-state.openwa-pair-error { max-width:var(--fid-px-320); line-height:1.5; }
+.openwa-mark { display:inline-flex; align-items:center; gap:var(--fid-px-3); }
+.openwa-mark.warn { color:var(--warning); }
+.openwa-mark.read { color:var(--paint-46); }
+.message-meta .link { margin-left:var(--fid-px-6); font-size:var(--fid-px-12); }
 @keyframes openwa-spin { to { transform:rotate(360deg); } }
 @media(prefers-reduced-motion:reduce) { .openwa-pair-state .icon { animation:none; } }
 

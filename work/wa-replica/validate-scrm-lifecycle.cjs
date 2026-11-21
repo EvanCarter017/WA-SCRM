@@ -37,9 +37,10 @@ assert.equal(req.modules.find(m => m.id === 'P-MATERIALS')?.decision, '保留');
 
 // 3. Verify app.js has zero external network dependencies and valid JS syntax
 const appJs = read(path.join(out, 'app.js'));
-// The page may call only the AI relay of its own server (/api/ai/*); the relay, not the page, talks to the model service.
+// The page may call only its own server: the AI relay (/api/ai/*) and the link to OpenWA (/api/wa/*). The server,
+// not the page, talks to the model service and to OpenWA.
 assert(!/\b(WebSocket|XMLHttpRequest)\s*\(/.test(appJs), 'app.js must not open sockets or use XMLHttpRequest');
-for (const call of appJs.match(/\bfetch\s*\([^)]{0,40}/g) || []) assert(/^fetch\('\/api\/ai\//.test(call), `app.js may only call the AI relay of its own server, found: ${call}`);
+for (const call of appJs.match(/\bfetch\s*\([^)]{0,40}/g) || []) assert(/^fetch\('\/api\/(ai|wa)\//.test(call), `app.js may only call the AI relay and the OpenWA link of its own server, found: ${call}`);
 assert(!/S1\s*·\s*undefined/.test(appJs));
 new vm.Script(appJs, { filename: 'app.js' });
 
@@ -108,8 +109,8 @@ for (const required of ['function aiRun(capabilityId, input, meta = {})', 'funct
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
 }
 assert(!/套餐|升级|付费|购买|订阅|充值|额度|计费|价格|定价|试用|会员|解锁|专业版|高级版|优惠|限时/.test(aiSource), 'the AI module must not contain pricing or sales wording');
-assert.equal((moduleSource.match(/aiTranslateInbound\(/g) || []).length, 2, 'both incoming-message paths in fidelity-lifecycle.js must translate through the integration point');
-assert(openwaSource.includes('aiTranslateInbound('), 'the OpenWA sample chat must translate through the integration point');
+assert.equal((moduleSource.match(/aiTranslateInbound\(/g) || []).length, 0, 'fidelity-lifecycle.js no longer creates incoming messages; the feed in fidelity-openwa.js does');
+assert(openwaSource.includes('aiTranslateInbound(c, message)'), 'incoming messages of the feed must translate through the integration point');
 for (const direct of ['translated: pair[1]', 'translated: tr,', 'translation: tr,']) {
   assert(!moduleSource.includes(direct), `fidelity-lifecycle.js still writes a translation directly (${direct})`);
 }
@@ -248,6 +249,20 @@ for (const file of [path.join(root, 'outputs', 'whatsapp-scrm-lifecycle.html'), 
 }
 assert(!/standalone/.test(read(path.join(__dirname, 'build-fidelity.cjs'))), 'the build must not write single-file bundles');
 
+// 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more
+for (const required of ["fetch('/api/wa/' + path, {", "openwaCall('POST', 'link', { account: pair.accountId })", "openwaCall('POST', 'claim', { client: openwaClient })", 'events?after=${Number(data.waCursor) || 0}&client=${openwaClient}&wait=${caughtUp ? 25 : 0}', "openwaCall('POST', 'send', {", "requestId: message.request", "window.WA_SITE.halt('已在其他页面打开'", 'send = function() {', "document.addEventListener('compositionstart'"]) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
+assert(!/openwaDemoQr|openwaScan|openwaDrop|openwaRestore|openwaAddSampleChat|openwaNextNumber|模拟|演示/.test(openwaSource), 'fidelity-openwa.js must not simulate linking, losing or restoring a connection');
+assert(!/lcSimLeadOpen|lcSimReply|openSimLeadModal|lcSimulateCustomerReply|lc-sim-lead|模拟/.test(moduleSource), 'fidelity-lifecycle.js must not simulate leads or replies');
+assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop };'), 'fidelity-boot.js must let the app stop the page with a notice');
+for (const gone of ['<span>本地演示</span>', '演示消息', '模拟扫码', '模拟掉线', '模拟新客进线', '模拟对方回复', '模拟客户复联', '添加演示附件', '演示来源']) {
+  assert(!appJs.includes(gone), `app.js still contains ${gone}`);
+}
+for (const required of ['const day=openwaDayLabel(m),separator=', "(m.side==='out'?openwaMessageMark(m):'')", 'return openwaOrder(list)}', '  function send() {}\n']) {
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+
 const summary = {
   version: req.version,
   status: 'passed',
@@ -273,6 +288,7 @@ const summary = {
   serverSide: 'behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only',
   signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
   leftovers: 'removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview',
+  whatsappConnection: 'real, through the sub-site\'s own server: QR code, incoming events, sending; no simulation',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

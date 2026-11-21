@@ -163,7 +163,8 @@
     }
     addEventListener('pagehide', () => { flush({ keepalive: true }); });
 
-    window.WA_SITE = { user, site, data, save, idle, signOut };
+    // halt stops this page with a notice; the app uses it when another page takes over the sub-site.
+    window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop };
     $('#subsite-login').hidden = true;
     $('#app-shell').hidden = false;
     $('.skip-link').hidden = false;

@@ -94,27 +94,27 @@ window.WA_START = () => {
   }
   function pageHeader(unused,title,desc,actions=''){return '<div class="page-heading"><div><h1>'+title+'</h1><p>'+desc+'</p></div><div class="heading-actions">'+actions+'</div></div>'}
   function empty(title,description){return '<div class="empty-state">'+icon('Inbox')+'<strong>'+esc(title)+'</strong><p>'+esc(description)+'</p></div>'}
-  function filteredConversations(){let list=myCustomers().filter(c=>ui.account==='all'||c.account===ui.account);if(ui.conversationFilter==='unread')list=list.filter(c=>c.unread>0);if(ui.conversationFilter==='reply')list=list.filter(c=>((data.messages[c.id]||[]).at(-1)?.side||'in')==='in');if(ui.conversationFilter==='star')list=list.filter(c=>c.star);const q=ui.query.trim().toLowerCase();if(q)list=list.filter(c=>[c.name,c.phone,c.notes,account(c.account)?.name].join(' ').toLowerCase().includes(q));return list}
+  function filteredConversations(){let list=myCustomers().filter(c=>ui.account==='all'||c.account===ui.account);if(ui.conversationFilter==='unread')list=list.filter(c=>c.unread>0);if(ui.conversationFilter==='reply')list=list.filter(c=>((data.messages[c.id]||[]).at(-1)?.side||'in')==='in');if(ui.conversationFilter==='star')list=list.filter(c=>c.star);const q=ui.query.trim().toLowerCase();if(q)list=list.filter(c=>[c.name,c.phone,c.notes,account(c.account)?.name].join(' ').toLowerCase().includes(q));return openwaOrder(list)}
   function conversationRows() {
-    return filteredConversations().map(c=>{const a=account(c.account);return '<button class="conversation '+(fid.chatOpen&&c.id===ui.customer?'selected':'')+'" aria-label="打开'+esc(c.name)+'的会话" data-action="openConversation" data-id="'+c.id+'">'+avatar(c)+'<span class="conversation-main"><span class="conversation-line"><strong>'+esc(c.name)+'</strong><time>'+esc(c.last)+'</time></span><span class="conversation-preview"><span>'+esc(c.preview)+'</span>'+(c.unread?'<span class="unread">'+c.unread+'</span>':'')+'</span><span class="conversation-account"><span>'+(ui.account==='all'?'<span class="state-dot '+(a?.state==='online'?'':a?.state==='pending'?'offline':'warning')+'"></span>'+esc(a?.name):esc(c.stage))+'</span>'+(c.star?icon('Star'):'<span class="mini-stage">'+esc(tag(c.tags[0])?.name||c.stage)+'</span>')+'</span></span></button>'}).join('')||empty('没有匹配会话','切换筛选，或清空搜索后再试。');
+    return filteredConversations().map(c=>{const a=account(c.account);return '<button class="conversation '+(fid.chatOpen&&c.id===ui.customer?'selected':'')+'" aria-label="打开'+esc(c.name)+'的会话" data-action="openConversation" data-id="'+c.id+'">'+avatar(c)+'<span class="conversation-main"><span class="conversation-line"><strong>'+esc(c.name)+'</strong><time>'+esc(openwaLastLabel(c))+'</time></span><span class="conversation-preview"><span>'+esc(c.preview)+'</span>'+(c.unread?'<span class="unread">'+c.unread+'</span>':'')+'</span><span class="conversation-account"><span>'+(ui.account==='all'?'<span class="state-dot '+(a?.state==='online'?'':a?.state==='pending'?'offline':'warning')+'"></span>'+esc(a?.name):esc(c.stage))+'</span>'+(c.star?icon('Star'):'<span class="mini-stage">'+esc(tag(c.tags[0])?.name||c.stage)+'</span>')+'</span></span></button>'}).join('')||empty('没有匹配会话','切换筛选，或清空搜索后再试。');
   }
   function renderInbox() {
     const c=selectedCustomer();
     return '<section class="inbox-page"><div class="workspace-switch" aria-label="WhatsApp 工作区"><a class="active" href="#inbox" data-nav="inbox">'+icon('MessagesSquare')+'聚合会话</a><a href="#accounts" data-nav="accounts">'+icon('PanelsTopLeft')+'账号列表</a></div><div class="inbox-layout '+(ui.mobileChat?'mobile-chat':'mobile-list')+'"><section class="conversation-pane" aria-label="会话列表"><div class="conversation-top"><div class="conversation-title"><h1>客户会话 <span>'+myCustomers().filter(c=>ui.account==='all'||c.account===ui.account).length+'</span></h1><button class="icon-button" data-action="addCustomer" aria-label="新增客户">'+icon('SquarePen')+'</button></div><div class="account-select">'+icon('MessageCircle')+'<select id="account-filter" aria-label="按 WhatsApp 账号查看">'+option('all',manager()?'全部团队账号':'我的全部账号',ui.account)+myAccounts().map(a=>option(a.id,a.name+(a.state!=='online'?' · 待连接':''),ui.account)).join('')+'</select>'+icon('ChevronDown')+'</div><label class="search-field">'+icon('Search')+'<input id="conversation-search" aria-label="搜索会话" placeholder="搜索客户或号码…" value="'+esc(ui.query)+'"></label><div class="chips" role="group" aria-label="会话筛选">'+[['all','全部'],['unread','未读'],['reply','待回复'],['star','星标']].map(([id,title])=>'<button class="chip '+(ui.conversationFilter===id?'active':'')+'" data-action="conversationFilter" data-id="'+id+'" aria-pressed="'+(ui.conversationFilter===id)+'">'+title+'</button>').join('')+'</div></div><div class="conversation-list" id="conversation-list">'+conversationRows()+'</div><div class="conversation-footer">'+icon('ShieldCheck')+(manager()?'当前为团队评审视角':'当前为我的工作范围')+'</div></section>'+(c?chatHTML(c):'<section class="chat-pane"><div class="chat-empty">'+empty('选择客户后继续沟通','也可以新增一位演示客户，体验资料、标签和跟进。')+'</div></section>')+toolsRailHTML(c)+'</div></section>';
   }
   function chatHTML(c) {
-    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(c.language)+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span><span class="sample-label">演示来源</span></div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
+    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(c.language)+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span></div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
   }
   function conversationMessages(c) {
     return data.messages[c.id]||(c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]);
   }
-  function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='写一条演示消息，或选择快捷回复开始。'}={}) {
+  function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='输入消息，或选择快捷回复开始。'}={}) {
     if(!list.length)return empty('还没有会话消息',emptyHint);
-    let lastDay='';return list.map(m=>{const day=m.time.startsWith('昨天')?'昨天':'今天',separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div>'+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.side==='in'&&m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(m.time.replace('昨天 ',''))+(m.side==='out'?icon(m.local?'Check':'CheckCheck')+(m.local?'<span>本地演示</span>':''):'')+'</div></div></div>'}).join('');
+    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div>'+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.side==='in'&&m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
   }
   function composerHTML(c) {
-    const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&(d.text.trim()||ui.attachment);
-    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-input"><textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><div class="composer-controls"><div class="composer-tools"><button class="icon-button" data-action="attachment" aria-label="添加演示附件">'+icon('Paperclip')+'</button><button class="icon-button" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'</button><span class="language-hint">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class="send-button" data-action="send" aria-label="发送演示消息"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class="composer-foot"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'演示会话 · 草稿自动保存':'账号待连接 · 草稿已保留')+'</span></div></div>';
+    const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&Boolean(d.text.trim());
+    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-input"><textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><div class="composer-controls"><div class="composer-tools"><button class="icon-button" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'</button><span class="language-hint">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class="composer-foot"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'草稿自动保存':'号码待连接 · 草稿已保留')+'</span></div></div>';
   }
   function previewHTML(c){const d=draft(c);if(!d.translated&&!ui.attachment)return '';return (d.translated?'<div class="translation-preview"><small>发送前预览 · '+esc(c.language)+'译文</small>'+esc(d.translated)+'</div>':'')+(ui.attachment?'<div class="translation-preview"><small>本地演示附件</small>'+esc(ui.attachment)+' <button class="link" data-action="removeAttachment">移除</button></div>':'')}
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
@@ -176,14 +176,7 @@ window.WA_START = () => {
   function openDuplicate(id){const c=customer(id);modal('跨账号接触记录','<div class="modal-body"><p class="modal-description">'+esc(c.name)+' 在多个账号下有接触记录。原型只做提示，没有自动合并、抢单或改归属。</p>'+c.contactRefs.map(r=>{const mine=manager()||r.owner===ui.persona;return '<div class="duplicate-item">'+icon(mine?'MessageCircle':'LockKeyhole')+'<div><strong>'+esc(mine?account(r.account)?.name:'其他成员负责的账号')+'</strong><small>'+esc(mine?member(r.owner)?.name:'当前视角不展示对方客户资料')+'</small></div></div>'}).join('')+'<p class="review-hint">要统一客户还是各聊手独立维护、重复进线由谁跟进，等你评审后确定。</p></div>','<button class="button primary" data-action="close">知道了</button>')}
   function openQuick(){modal('快捷回复','<div class="modal-body"><p class="modal-description">选择一条填入输入框，可修改后再发送。此处使用演示话术。</p><div class="quick-list">'+data.quickReplies.filter(q=>!q.owner||q.owner===ui.persona||manager()).map(q=>'<button class="quick-card" data-action="quick" data-id="'+q.id+'"><strong>'+esc(q.title)+'<small>'+esc(q.scope)+'</small></strong><p>'+esc(q.zh)+'</p></button>').join('')+'</div></div>','',{eyebrow:'QUICK REPLIES'})}
   function fillQuick(id){const q=data.quickReplies.find(q=>q.id===id),c=selectedCustomer();if(!q||!c)return;ui.drafts[c.id]={text:q.zh,translated:c.language==='西班牙语'?q.es:q.en,source:q.zh};persist();if($('#dialog').open)close();if(ui.view!=='inbox')navigate('inbox');else{const box=$('.chat-pane');box.outerHTML=chatHTML(c);paintIcons();scrollMessages()}$('#composer-text')?.focus()}
-  function send() {
-    const c=selectedCustomer(),el=$('#composer-text');if(!c||!el)return;
-    if(account(c.account)?.state!=='online')return toast('账号尚未连接，草稿会保留。');
-    const text=el.value.trim();if(!text&&!ui.attachment)return;
-    const d=draft(c),outgoing=d.translated&&d.source===text?d.translated:text;
-    (data.messages[c.id]??=c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]).push({id:nextId('m'),side:'out',text:outgoing,attachment:ui.attachment,time:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}),local:true});
-    c.preview=outgoing||'[附件]';c.last='刚刚';c.unread=0;ui.drafts[c.id]={text:'',translated:'',source:''};ui.attachment=null;persist();render();toast('演示消息已保存到本地。');
-  }
+  function send() {}
   function refreshInboxProfiles(c) {
     const profile=$('#dialog .customer-profile');if($('#dialog').open&&profile){profile.outerHTML=profileHTML(c,true);paintIcons($('#dialog'));if($('#conversation-list')){$('#conversation-list').innerHTML=conversationRows();paintIcons($('#conversation-list'))}return}render();
   }
@@ -264,7 +257,6 @@ window.WA_START = () => {
       case 'quickAll':openQuick();break;
       case 'quick':fillQuick(id);break;
       case 'send':send();break;
-      case 'attachment':{formModal('添加演示附件','attachment-form','<p class="modal-description">输入一个文件名以评审附件在聊天中的位置。不会读取、上传或发送任何真实文件。</p><label class="field">演示文件名<input name="name" required maxlength="100" placeholder="例如：产品目录.pdf"></label>','加入演示消息');break}
       case 'removeAttachment':ui.attachment=null;persist();updateSendState(selectedCustomer());$('#translation-preview').innerHTML=previewHTML(selectedCustomer());paintIcons();break;
     }
   });
@@ -292,8 +284,8 @@ window.WA_START = () => {
   document.addEventListener('keydown',e=>{if(e.key==='/'&&!$('#dialog').open&&!e.target.closest('input,textarea,select,[contenteditable]')){const search=$('#conversation-search')||$('#customer-search');if(search){e.preventDefault();search.focus()}}if(e.target.id==='composer-text'&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
   document.addEventListener('submit',e=>{
     const form=e.target,formId=form.getAttribute('id')||'';if(!formId.endsWith('-form'))return;e.preventDefault();form.querySelectorAll('[aria-invalid]').forEach(x=>{x.removeAttribute('aria-invalid');x.removeAttribute('aria-describedby')});form.querySelectorAll('.field-error').forEach(x=>x.remove());const f=new FormData(form),val=k=>String(f.get(k)||'').trim();
-    if(formId==='account-form'){const name=val('name');if(!name)return error('请填写账号名称。');let a=account(val('id'));const values={name,number:val('number')||'号码待授权后识别',country:val('country'),note:val('note'),owner:manager()?val('owner'):ui.persona};if(a)Object.assign(a,values);else data.accounts.push({id:nextId('a'),...values,state:'pending',color:['jade','blue','peach','purple','gold'][data.accounts.length%5],lastSync:'尚未连接'});persist();close();render();toast('演示账号已保存；真实接入尚未执行。')}
-    if(formId==='customer-form'){if(!val('name')||!val('phone'))return error('请填写客户称呼和 WhatsApp 号码。');const phone=val('phone').replace(/[^\d]/g,'');if(phone.length<7)return error('请使用包含国家区号的号码。');const duplicate=data.customers.find(c=>c.phone.replace(/[^\d]/g,'')===phone);if(duplicate)return error('演示数据中已有该号码。重复客户归属/合并规则待确认。');const a=account(val('account'));const c={id:nextId('c'),createdAt:new Date().toISOString(),name:val('name'),initials:initial(val('name')),phone:val('phone'),country:val('country'),city:'待补充',timezone:val('country')==='PR'?'America/Puerto_Rico':'America/New_York',language:val('language'),owner:a.owner||ui.persona,account:a.id,tags:[],stage:'新客户',source:val('source'),campaign:'',ad:'',unread:0,star:false,last:'刚刚',preview:'新建客户档案',translation:'',followup:null,notes:val('notes'),color:'jade',contactRefs:[{account:a.id,owner:a.owner||ui.persona}]};data.customers.unshift(c);addActivity(c.id,'手动建立客户档案');persist();close();render();toast('客户档案已创建。')}
+    if(formId==='account-form'){const name=val('name');if(!name)return error('请填写账号名称。');let a=account(val('id'));const values={name,number:val('number')||'号码待授权后识别',country:val('country'),note:val('note'),owner:manager()?val('owner'):ui.persona};if(a)Object.assign(a,values);else data.accounts.push({id:nextId('a'),...values,state:'pending',color:['jade','blue','peach','purple','gold'][data.accounts.length%5],lastSync:'尚未连接'});persist();close();render();toast('账号已保存；在号码管理中扫码绑定后开始收发。')}
+    if(formId==='customer-form'){if(!val('name')||!val('phone'))return error('请填写客户称呼和 WhatsApp 号码。');const phone=val('phone').replace(/[^\d]/g,'');if(phone.length<7)return error('请使用包含国家区号的号码。');const duplicate=data.customers.find(c=>c.phone.replace(/[^\d]/g,'')===phone);if(duplicate)return error('已有使用该号码的客户。');const a=account(val('account'));const c={id:nextId('c'),createdAt:new Date().toISOString(),name:val('name'),initials:initial(val('name')),phone:val('phone'),country:val('country'),city:'待补充',timezone:val('country')==='PR'?'America/Puerto_Rico':'America/New_York',language:val('language'),owner:a.owner||ui.persona,account:a.id,tags:[],stage:'新客户',source:val('source'),campaign:'',ad:'',unread:0,star:false,last:'刚刚',preview:'新建客户档案',translation:'',followup:null,notes:val('notes'),color:'jade',contactRefs:[{account:a.id,owner:a.owner||ui.persona}]};data.customers.unshift(c);addActivity(c.id,'手动建立客户档案');persist();close();render();toast('客户档案已创建。')}
     if(formId==='tag-form'){const name=val('name'),gid=val('group');if(!name)return error('请填写标签名称。');const g=group(gid);if(!g||!canEditGroup(g))return error('没有修改此分组的权限。');const t=tag(val('id'));if(data.tags.some(x=>x.name===name&&x.group===gid&&x.id!==t?.id))return error('同一分组已存在这个标签。');if(t)Object.assign(t,{name,group:gid,color:val('color')});else data.tags.push({id:nextId('tag'),name,group:gid,color:val('color')});ui.tagScope=g.scope;persist();close();render();toast('标签已保存。')}
     if(formId==='group-form'){if(!val('name'))return error('请填写分组名称。');const scope=manager()?val('scope'):'private';data.tagGroups.push({id:nextId('g'),name:val('name'),scope,owner:scope==='private'?ui.persona:null});ui.tagScope=scope;persist();close();navigate('tags');toast('标签分组已创建。')}
     if(formId==='assign-tags-form'){const ids=val('ids').split(','),selected=f.getAll('tags');for(const id of ids){const c=customer(id);if(!c||!myCustomers().includes(c))continue;c.tags=ids.length===1?selected:[...new Set([...c.tags,...selected])];addActivity(c.id,'更新客户标签')}persist();close();render();toast(ids.length===1?'客户标签已更新。':'已为所选客户追加标签。')}
@@ -301,7 +293,6 @@ window.WA_START = () => {
     if(formId==='member-form'){if(!manager())return;if(!val('name')||!val('team'))return error('请填写成员姓名和团队。');data.members.push({id:nextId('u'),name:val('name'),initial:val('name').slice(-1),role:val('role'),team:val('team'),color:'blue'});persist();close();render();toast('演示成员已创建，可继续分配账号。')}
     if(formId==='member-accounts-form'){if(!manager())return;const id=val('member'),chosen=f.getAll('accounts');for(const a of data.accounts){if(chosen.includes(a.id))a.owner=id;else if(a.owner===id)a.owner=null}persist();close();render();toast('演示账号分配已更新，客户归属未改变。')}
     if(formId==='transfer-form'){if(!manager())return;const ids=val('ids').split(','),owner=val('owner');if(!member(owner))return error('请选择接收成员。');for(const id of ids){const c=customer(id);if(!c)continue;const old=member(c.owner)?.name;c.owner=owner;data.tasks.filter(t=>t.customer===id&&!t.done).forEach(t=>t.owner=owner);addActivity(id,'客户由 '+old+' 转交给 '+member(owner).name+(val('reason')?'：'+val('reason'):''))}persist();close();ui.selected.clear();render();toast('客户与未完成待办已演示转交。账号归属未改变。')}
-    if(formId==='attachment-form'){if(!val('name'))return error('请填写演示文件名。');ui.attachment=val('name');persist();close();updateSendState(selectedCustomer());if(ui.view==='inbox'){const c=selectedCustomer();$('#translation-preview').innerHTML=previewHTML(c);paintIcons()}toast('附件仅使用文件名演示，没有上传文件。')}
   });
   $('#dialog').addEventListener('close',()=>{const d=$('#dialog'),t=$('#toast');if(!d.open){if(t.parentElement===d)document.body.append(t);if(t.dataset.dismissOnClose==='1'){t.classList.remove('show');t.dataset.dismissOnClose=''}}});
   $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=$('#dialog').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
@@ -1384,26 +1375,68 @@ window.WA_START = () => {
     }
   },true);
 
-  // Static QR containing only the text "WA Desk demo only".
-  const openwaDemoQr = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACEAAAAhAQAAAAB/n//CAAAAtUlEQVR4nGP8z8DA0MjEAAIo5EepoxwMTOw7Ln5gYPpbL6HAwMTA7ACSZetgYGD4fvfv9wamnxbhAgxM/PeafzCw/Hi0RIyB6ddt0wsMTCzZtyMYmFhFxD8wMP6+Fx38k/Hrl78XTzIxKdZ+YGD88olZrZCJKYv9BwPj/y8qApFMHzXvGTCwsO83YtBk+dskKc7AwvBn4redTAz/5wkwMH5//iXVk+mn8ZYGBhb+dwwMJzFdCwAGiTqc5pPifAAAAABJRU5ErkJggg==';
+  // WhatsApp numbers through the sub-site's own OpenWA. The page talks to its own server only (/api/wa/*):
+  // linking a number by QR code, the feed of what happens on the numbers, and sending.
   const openwaDialog = $('#dialog');
   let openwaPairing = null;
+  // What the server said about the link: null until asked, then { configured, reachable }.
+  let openwaServer = null;
+  const openwaClient = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
-  function openwaNextNumber() {
-    const used = new Set([
-      ...data.accounts.map(a => fidPhoneDigits(a.number)),
-      ...data.customers.map(c => fidPhoneDigits(c.phone)),
-    ]);
-    for (const area of ['202', '787']) {
-      for (let suffix = 199; suffix >= 100; suffix--) {
-        if (!used.has('1'+area+'5550'+suffix)) return `+1 (${area}) 555-0${suffix}`;
-      }
+  async function openwaCall(method, path, body) {
+    try {
+      const response = await fetch('/api/wa/' + path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+      let answer = {};
+      try { answer = await response.json(); } catch (e) {}
+      return { status: response.status, body: answer };
+    } catch (e) {
+      return { status: 0, body: {} };
     }
-    return '';
   }
+  const openwaProblem = answer => answer.status === 0 ? '无法连接服务器，请检查网络后重试。'
+    : answer.status === 503 ? '服务器尚未接入 WhatsApp 连接，请联系管理员。'
+    : answer.status === 502 ? 'WhatsApp 连接服务暂时不可用，请稍后重试。'
+    : answer.status === 401 ? '登录已失效，请刷新页面后重新登录。'
+    : answer.status === 403 ? '当前账号不能管理号码。' : '操作没有成功，请重试。';
 
   const openwaVisibleAccount = id => myAccounts().find(a => a.id === id);
-  const openwaState = a => a.state === 'online' ? '在线' : a.state === 'reconnect' ? '已掉线' : '待绑定';
+  const openwaLinkStates = { scan: '需要重新扫码', attention: '需要在手机上处理', failed: '连接失败', missing: '需要重新绑定' };
+  const openwaState = a => a.state === 'online' ? '在线' : a.state === 'reconnect' ? openwaLinkStates[a.linkState] || '已掉线' : '待绑定';
+  const openwaClock = (at = Date.now()) => new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const openwaDayOf = at => new Date(at).toLocaleDateString('sv-SE');
+  // How a message's day and time are shown. Messages from before the real connection carry a text only.
+  const openwaDayLabel = m => !m.at ? (m.time.startsWith('昨天') ? '昨天' : '今天')
+    : openwaDayOf(m.at) === openwaDayOf(Date.now()) ? '今天' : openwaDayOf(m.at) === openwaDayOf(Date.now() - 86400000) ? '昨天' : openwaDayOf(m.at);
+  const openwaTimeLabel = m => m.at ? openwaClock(m.at) : m.time.replace('昨天 ', '');
+  const openwaLastLabel = c => !c.lastAt ? c.last
+    : openwaDayOf(c.lastAt) === openwaDayOf(Date.now()) ? openwaClock(c.lastAt) : openwaDayOf(c.lastAt) === openwaDayOf(Date.now() - 86400000) ? '昨天' : openwaDayOf(c.lastAt).slice(5);
+  // The conversation with the latest message comes first; conversations without a real message keep their order after them.
+  const openwaOrder = list => list.map((c, i) => [c, i]).sort((x, y) => (y[0].lastAt || 0) - (x[0].lastAt || 0) || x[1] - y[1]).map(x => x[0]);
+  const openwaMediaText = { image: '[图片]', video: '[视频]', audio: '[语音]', voice: '[语音]', document: '[文件]', sticker: '[贴图]', location: '[位置]', contact: '[名片]', poll: '[投票]', call: '[通话]' };
+
+  // The mark after the time of a message the employee sent.
+  function openwaMessageMark(m) {
+    if (m.status === 'sending') return icon('Clock3') + '<span>发送中</span>';
+    if (m.status === 'failed') return `<span class="openwa-mark warn">${icon('TriangleAlert')}未发送</span><button type="button" class="link" data-action="openwaResend" ${fidActionID(m.id)}>重试</button>`;
+    if (m.status === 'unknown') return `<span class="openwa-mark warn">${icon('ClockAlert')}结果待确认</span><button type="button" class="link" data-action="openwaResend" ${fidActionID(m.id)}>重试</button>`;
+    if (m.status === 'read' || m.status === 'played') return `<span class="openwa-mark read">${icon('CheckCheck')}已读</span>`;
+    return icon(m.status === 'delivered' ? 'CheckCheck' : 'Check');
+  }
+
+  // The page's three states of a number: online, reconnect (it was linked and is not connected now), pending.
+  function openwaSetState(a, link) {
+    const before = a.state + '|' + a.linkState + '|' + a.number;
+    if (link.state === 'online') {
+      Object.assign(a, { state: 'online', linked: true, lastSync: '刚刚' });
+      if (link.phone) a.number = '+' + link.phone;
+    } else if (a.linked || a.state === 'reconnect') {
+      Object.assign(a, { state: 'reconnect', linked: true, lastSync: a.state === 'reconnect' ? a.lastSync : '已断开' });
+    } else {
+      a.state = 'pending';
+    }
+    a.linkState = link.state;
+    return before !== a.state + '|' + a.linkState + '|' + a.number;
+  }
 
   function openwaTabs() {
     return `<div class="fid-wa-top">
@@ -1423,9 +1456,8 @@ window.WA_START = () => {
       const actions = a.state === 'pending'
         ? fidButton('扫码绑定','openwaBind','QrCode','tint',fidActionID(a.id))
         : fidButton('进入聊天','openwaOpenChat','MessageCircle',a.state==='online'?'tint':'',fidActionID(a.id)) +
-          (a.state==='online'
-            ? fidButton('模拟掉线','openwaDrop','','slim',fidActionID(a.id))
-            : fidButton('重新连接','connect','RefreshCw','tint',fidActionID(a.id)));
+          (a.state==='online' ? '' : fidButton('重新连接','connect','RefreshCw','tint',fidActionID(a.id))) +
+          fidButton('解除绑定','openwaUnlinkAsk','','slim',fidActionID(a.id));
       return `<tr>
         <td><strong>${esc(a.name)}</strong><span class="openwa-row-meta">${esc(a.number)}</span></td>
         <td><span class="state-text ${a.state==='reconnect'?'warn':''}"><span class="state-dot ${a.state==='reconnect'?'warning':a.state==='pending'?'offline':''}"></span>${openwaState(a)}</span></td>
@@ -1435,10 +1467,12 @@ window.WA_START = () => {
         <td><div class="openwa-row-actions">${actions}</div></td>
       </tr>`;
     }).join('');
+    const notice = !openwaServer ? '' : !openwaServer.configured ? '<span class="tag slate">服务器尚未接入 WhatsApp 连接</span>'
+      : !openwaServer.reachable ? '<span class="tag slate">连接服务暂时不可用</span>' : '';
     return `<section class="fid-page fid-wa fid-wa-numbers">
       ${openwaTabs()}
       <div class="fid-table-card openwa-panel">
-        <div class="openwa-panel-head">${fidHead('号码管理','通过 OpenWA 关联 WhatsApp Business 号码。')}<span class="tag slate">演示模式</span></div>
+        <div class="openwa-panel-head">${fidHead('号码管理','通过 OpenWA 关联 WhatsApp Business 号码。')}${notice}</div>
         ${fidTable('fid-numbers-table',['WhatsApp 号码','连接状态','负责人','会话','最近活跃','操作'],rows,'还没有号码，点击「扫码绑定」开始。',true,'Smartphone')}
       </div>
     </section>`;
@@ -1460,70 +1494,86 @@ window.WA_START = () => {
 
   function openwaShowPairing() {
     const pair = openwaPairing;
-    const reauth = pair.mode === 'reauth';
-    const loading = pair.phase === 'connecting';
-    const title = reauth ? '重新扫码绑定' : '扫码绑定 WhatsApp Business';
-    const description = reauth ? `<p>${esc(pair.name)} · ${esc(pair.number)}</p>` : '';
-    const status = loading
-      ? `<div class="openwa-pair-state" role="status" tabindex="-1">${icon('LoaderCircle')}<strong>已模拟扫码，正在验证会话…</strong></div>`
-      : `<div class="openwa-qr" role="img" aria-label="演示二维码，无法关联设备"><img alt="" width="165" height="165" src="${openwaDemoQr}"><span>演示码</span></div><div class="openwa-pair-state"><span class="state-dot warning"></span>等待扫码</div>`;
+    const title = pair.mode === 'bind' ? '扫码绑定 WhatsApp Business' : '重新连接';
+    const description = pair.label ? `<p>${esc(pair.label)}</p>` : '';
+    const status = pair.phase === 'scan' && pair.qr
+      ? `<div class="openwa-qr" role="img" aria-label="WhatsApp 关联设备二维码"><img alt="" width="264" height="264" src="${esc(pair.qr)}"></div><div class="openwa-pair-state"><span class="state-dot warning"></span>等待扫码</div>`
+      : pair.phase === 'error'
+        ? `<div class="openwa-pair-state openwa-pair-error" role="alert" tabindex="-1"><span class="state-dot offline"></span><strong>${esc(pair.error)}</strong></div>`
+        : `<div class="openwa-pair-state" role="status" tabindex="-1">${icon('LoaderCircle')}<strong>${pair.phase === 'verifying' ? '已扫码，正在验证…' : pair.mode === 'bind' ? '正在准备二维码…' : '正在恢复连接…'}</strong></div>`;
     openwaDialogContent(title, `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
       <div class="openwa-pair-copy"><strong>在手机上打开 WhatsApp Business</strong><p>选择「关联设备」→「关联新设备」，扫描二维码。</p>${description}</div>
       ${status}
-      <p class="openwa-pair-hint">本地演示。点击「模拟扫码」体验绑定。</p>
-    </div>`, fidButton('取消','close')+fidButton('模拟扫码','openwaScan','ScanQrCode','blue',loading?'disabled':''),
-      loading?'.openwa-pair-state':'[data-action="openwaScan"]');
+      <p class="openwa-pair-hint">二维码会自动更新。绑定后，这个号码的新消息会显示在在线聊天里。</p>
+    </div>`, fidButton('取消','close')+(pair.phase === 'error' ? fidButton('重试','openwaRetry','RefreshCw','blue') : ''),
+      pair.phase === 'error' ? '[data-action="openwaRetry"]' : '.openwa-pair-state');
   }
 
-  function openwaBeginPairing(mode, a) {
-    const existingNumber = fidPhoneDigits(a?.number);
-    const number = existingNumber.length >= 7 ? a.number : openwaNextNumber();
-    if (!number) return toast('当前演示号码已用完。');
-    openwaPairing = {mode, accountId:a?.id, persona:ui.persona, name:a?.name, number, phase:'waiting'};
+  // One answer of the server about the number that is being linked.
+  function openwaPairStep(pair, link) {
+    if (link.state === 'online') return openwaFinish(pair, link);
+    const phase = link.state === 'scan' ? 'scan' : link.state === 'verifying' ? 'verifying' : link.state === 'starting' ? 'starting' : 'error';
+    const error = phase !== 'error' ? '' : link.state === 'attention' ? (link.error || '需要先在手机上完成 WhatsApp 的验证，然后重试。') : '二维码已失效或连接中断，请重试。';
+    const qr = phase === 'scan' ? link.qr || '' : '';
+    if (phase === pair.phase && qr === pair.qr && error === pair.error) return;
+    Object.assign(pair, { phase, qr, error });
     openwaShowPairing();
   }
 
-  function openwaAddSampleChat(a) {
-    if (data.customers.some(c => c.account === a.id)) return;
-    const id = nextId('c');
-    const text = 'Hi! I found you on Facebook. Can you share more details?';
-    const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit', hour12:false});
-    data.customers.unshift({
-      id, name:'Taylor Morgan', initials:'TM', color:'peach', phone:'+1 (415) 555-0198',
-      country:'US', city:'San Francisco', timezone:'America/Los_Angeles', language:'英语',
-      owner:a.owner||ui.persona, account:a.id, tags:[], needsFirstReply:true, // the engagement module creates the first-reply to-do on the next render
-      source:'Facebook 广告', campaign:'示例广告', ad:'', unread:1, star:false,
-      last:time, preview:text, translation:'', followup:null, notes:'',
-      contactRefs:[{account:a.id, owner:a.owner||ui.persona}], createdAt:fidDay(), updatedAt:fidDay(), clientType:'新增线索-实时',
-    });
-    data.messages[id] = [{id:nextId('m'), side:'in', text, time}];
-    aiTranslateInbound(data.customers[0], data.messages[id][0]);
+  async function openwaRequestLink(pair) {
+    const answer = await openwaCall('POST', 'link', { account: pair.accountId });
+    if (openwaPairing !== pair) return openwaAbandon(pair);
+    if (answer.status === 200) openwaPairStep(pair, answer.body);
+    else {
+      Object.assign(pair, { phase: 'error', qr: '', error: openwaProblem(answer) });
+      openwaShowPairing();
+    }
+    if (openwaPairing === pair && pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
   }
 
-  function openwaFinish(pair) {
-    if (openwaPairing !== pair || !openwaDialog.open || pair.persona !== ui.persona) return;
-    let a = openwaVisibleAccount(pair.accountId);
-    if (pair.accountId && !a) { close(); return toast('此号码已不可用。'); }
+  async function openwaPoll(pair) {
+    if (openwaPairing !== pair) return;
+    const answer = await openwaCall('GET', 'link?account=' + encodeURIComponent(pair.accountId));
+    if (openwaPairing !== pair) return;
+    if (answer.status === 200) openwaPairStep(pair, answer.body);
+    else if (answer.status === 404) openwaPairStep(pair, { state: 'missing' });
+    if (openwaPairing === pair && pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
+  }
+
+  function openwaBeginPairing(mode, a) {
+    if (openwaServer && !openwaServer.configured) return toast('服务器尚未接入 WhatsApp 连接，请联系管理员。');
+    const pair = openwaPairing = { mode, accountId: a?.id || nextId('a'), label: a ? a.name + (fidPhoneDigits(a.number).length >= 7 ? ' · ' + a.number : '') : '', phase: 'starting', qr: '', error: '' };
+    openwaShowPairing();
+    openwaRequestLink(pair);
+  }
+
+  // The dialog was closed before the number came online. A number that was never linked leaves nothing behind.
+  function openwaAbandon(pair) {
+    clearTimeout(pair.timer);
+    if (!pair.done && !account(pair.accountId)?.linked) openwaCall('POST', 'unlink', { account: pair.accountId });
+  }
+
+  function openwaFinish(pair, link) {
+    pair.done = true;
+    clearTimeout(pair.timer);
+    openwaPairing = null;
+    let a = account(pair.accountId);
     if (!a) {
-      a = {id:nextId('a'), name:'WhatsApp Business · '+pair.number.slice(-4), owner:ui.persona,
-        number:pair.number, country:pair.number.includes('(787)')?'PR':'US', color:'jade', note:'OpenWA 演示绑定', createdAt:fidDay()};
+      a = { id: pair.accountId, name: link.name || 'WhatsApp · ' + String(link.phone || '').slice(-4), owner: ui.persona, number: '', country: '', note: '',
+        color: ['jade','blue','peach','purple','gold'][data.accounts.length % 5], createdAt: fidDay() };
       data.accounts.push(a);
     }
-    a.number = pair.number;
-    a.state = 'online';
-    a.lastSync = '刚刚';
-    if (pair.mode === 'bind') openwaAddSampleChat(a);
+    openwaSetState(a, link);
     persist();
     render();
-    openwaPairing = null;
-    const title = pair.mode === 'bind' ? '绑定成功' : '连接已恢复';
-    const action = pair.mode === 'bind' ? 'openwaOpenChat' : 'openwaReturnToChat';
+    const bind = pair.mode === 'bind';
+    const action = bind ? 'openwaOpenChat' : 'openwaReturnToChat';
     const inChat = ui.view === 'inbox' && fid.waTab === 'chat';
-    const label = pair.mode !== 'bind' && inChat && fid.chatOpen ? '返回当前会话' : '进入在线聊天';
-    openwaDialogContent(title, `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
+    const label = !bind && inChat && fid.chatOpen ? '返回当前会话' : '进入在线聊天';
+    openwaDialogContent(bind ? '绑定成功' : '连接已恢复', `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
       <div class="openwa-success-mark">${icon('Check')}</div>
       <div class="openwa-pair-copy"><strong>${esc(a.name)}</strong><p>${esc(a.number)} · 在线</p></div>
-      <p class="openwa-pair-hint">${pair.mode==='bind'?'已准备一条示例咨询，可进入聊天体验收发。':'原有会话和草稿已保留。'}</p>
+      <p class="openwa-pair-hint">${bind ? '客户给这个号码发消息后，会话会显示在在线聊天里。' : '原有会话和草稿已保留。'}</p>
     </div>`, fidButton('完成','close')+fidButton(label,action,'ArrowRight','blue',fidActionID(a.id)),
       `[data-action="${action}"]`);
   }
@@ -1531,12 +1581,11 @@ window.WA_START = () => {
   function openwaOpenChat(id) {
     const a = openwaVisibleAccount(id);
     if (!a) return;
-    const c = myCustomers().find(c => c.account === id);
+    const c = openwaOrder(myCustomers().filter(c => c.account === id))[0];
     if (openwaDialog.open) close();
     Object.assign(ui, {account:id, customer:c?.id||null, query:'', conversationFilter:'all', mobileChat:Boolean(c), profileTab:'details'});
     fid.waTab = 'chat';
     fid.chatOpen = Boolean(c);
-    if (c) c.unread = 0;
     navigate('inbox');
     if (c) $('.chat-person h2')?.focus({preventScroll:true});
     else $('#account-filter')?.focus({preventScroll:true});
@@ -1545,12 +1594,8 @@ window.WA_START = () => {
   function openwaReconnect(id) {
     const a = openwaVisibleAccount(id);
     if (!a || a.state === 'online') return;
-    if (a.state === 'pending') return openwaBeginPairing('bind', a);
-    openwaDialogContent('重新连接', `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
-      <div class="openwa-pair-copy"><strong>${esc(a.name)}</strong><p>${esc(a.number)}</p></div>
-      <p class="openwa-pair-hint">先尝试恢复原会话。手机已解除设备关联时，需要重新扫码。</p>
-    </div>`, fidButton('重新扫码','openwaReauth','QrCode','',fidActionID(id))+
-      fidButton('模拟重连','openwaRestore','RefreshCw','blue',fidActionID(id)), '[data-action="openwaRestore"]');
+    // An intact session comes back without a scan; otherwise the server answers with a new QR code.
+    openwaBeginPairing(a.state === 'pending' ? 'bind' : 'reconnect', a);
   }
 
   const openwaBaseChat = chatHTML;
@@ -1559,10 +1604,8 @@ window.WA_START = () => {
     let chat = openwaBaseChat(c);
     if (!a) return chat;
     chat = chat.replace('<div class="chat-person"><h2>', '<div class="chat-person"><h2 tabindex="-1">');
-    const action = a.state === 'online' && openwaVisibleAccount(a.id)
-      ? fidButton('模拟掉线','openwaDrop','WifiOff','slim',fidActionID(a.id)) : '';
     chat = chat.replace('<div class="source-strip">', `<div class="openwa-chat-status">
-      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span><span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':a.state==='pending'?'offline':''}"></span>${openwaState(a)}</span>${action}
+      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span><span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':a.state==='pending'?'offline':''}"></span>${openwaState(a)}</span>
     </div><div class="source-strip">`);
     if (a.state !== 'online') {
       chat = chat.replace(`${esc(a.name)} 待连接`, '发送已暂停')
@@ -1599,18 +1642,201 @@ window.WA_START = () => {
       </div></section>`;
   };
 
+  // ---- sending ----
+  // One press of the send button is one request: repeating it with the same id never sends twice.
+  async function openwaDeliver(c, message) {
+    const digits = fidPhoneDigits(c.phone);
+    const answer = c.waChat || digits.length >= 7
+      ? await openwaCall('POST', 'send', { account: c.account, to: c.waChat || digits + '@c.us', text: message.text, requestId: message.request })
+      : { status: 400, body: { error: 'no-number' } };
+    const list = data.messages[c.id] || [];
+    if (answer.status === 200) {
+      // The feed may have brought the same message first: keep this one and what the feed learned about it.
+      const twin = list.find(m => m !== message && m.wa === answer.body.messageId);
+      if (twin) data.messages[c.id] = list.filter(m => m !== twin);
+      Object.assign(message, { wa: answer.body.messageId, at: answer.body.timestamp, status: twin?.status || (message.status === 'sending' ? 'sent' : message.status) });
+      delete message.error;
+    } else {
+      const open = answer.status === 0 || answer.status === 502 || answer.body.error === 'outcome-unknown';
+      Object.assign(message, { status: open ? 'unknown' : 'failed', error: answer.body.error || 'network' });
+      toast(open ? '发送结果待确认，可稍后在消息旁重试。' : answer.body.error === 'not-connected' ? '号码未连接，消息没有发出。' : answer.body.error === 'no-number' ? '这位客户没有可用的 WhatsApp 号码。' : '消息没有发出，可在消息旁重试。');
+    }
+    persist();
+    openwaRefresh();
+  }
+
+  send = function() {
+    const c = selectedCustomer(), el = $('#composer-text');
+    if (!c || !el) return;
+    if (account(c.account)?.state !== 'online') return toast('号码尚未连接，草稿会保留。');
+    const text = el.value.trim();
+    if (!text) return;
+    const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
+    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending' };
+    (data.messages[c.id] ??= conversationMessages(c)).push(message);
+    Object.assign(c, { preview: outgoing, last: message.time, lastAt: message.at, unread: 0 });
+    ui.drafts[c.id] = { text: '', translated: '', source: '' };
+    persist();
+    render();
+    openwaDeliver(c, message);
+  };
+
+  // ---- the feed ----
+  function openwaNewCustomer(a, e) {
+    const name = e.name || (e.phone ? '+' + e.phone : 'WhatsApp 客户'), nowIso = new Date().toISOString();
+    const c = { id: nextId('c'), name, initials: initial(name), color: 'blue', phone: e.phone ? '+' + e.phone : '', waChat: e.chat,
+      country: a.country || '', city: '', timezone: '', language: '其他', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
+      source: '未知来源', campaign: '', ad: '', unread: 0, star: false, last: '', preview: '', translation: '', followup: null, notes: '',
+      contactRefs: [{ account: a.id, owner: a.owner || ui.persona }], createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', reactivatedCount: 0 };
+    // The engagement module creates the first-reply to-do on the next render.
+    if (!e.fromMe) c.needsFirstReply = true;
+    data.customers.unshift(c);
+    data.messages[c.id] = [];
+    return c;
+  }
+
+  const openwaFindMessage = (accountId, wa) => {
+    for (const c of data.customers) {
+      if (c.account !== accountId) continue;
+      const m = (data.messages[c.id] || []).find(m => m.wa === wa);
+      if (m) return [c, m];
+    }
+    return [];
+  };
+
+  // Applies one event of the feed to the data. Returns true when something changed.
+  function openwaApply(e) {
+    const a = data.accounts.find(a => a.id === e.account);
+    if (!a) return false;
+    if (e.kind === 'state') return openwaSetState(a, e);
+    if (e.kind === 'restriction') {
+      a.restricted = e.active;
+      if (e.active) toast(`WhatsApp 限制了 ${a.name} 的使用，请在手机上查看。`);
+      return true;
+    }
+    if (e.kind === 'receipt') {
+      const [, m] = openwaFindMessage(a.id, e.id);
+      const order = ['sending', 'unknown', 'sent', 'delivered', 'read', 'played'];
+      if (!m || m.side !== 'out' || (e.status !== 'failed' && order.indexOf(e.status) <= order.indexOf(m.status))) return false;
+      m.status = e.status;
+      return true;
+    }
+    if (e.kind === 'revoked' || e.kind === 'edited') {
+      const [c, m] = openwaFindMessage(a.id, e.id);
+      if (!m) return false;
+      Object.assign(m, e.kind === 'revoked' ? { text: '此消息已撤回', revoked: true, translated: '' } : { text: e.text, edited: true, translated: '' });
+      if ((data.messages[c.id] || []).at(-1) === m) c.preview = m.text;
+      if (e.kind === 'edited' && m.side === 'in') aiTranslateInbound(c, m);
+      return true;
+    }
+    if (e.kind !== 'message' || !e.chat) return false;
+    let c = data.customers.find(c => c.account === a.id && c.waChat === e.chat)
+      || (e.phone ? data.customers.find(c => c.account === a.id && !c.waChat && fidPhoneDigits(c.phone) === e.phone) : null);
+    if (c && !c.waChat) c.waChat = e.chat;
+    c ||= openwaNewCustomer(a, e);
+    const list = data.messages[c.id] ??= conversationMessages(c);
+    if (e.id && list.some(m => m.wa === e.id)) return false;
+    const text = e.text || openwaMediaText[e.type] || '[消息]';
+    if (e.fromMe) {
+      // What this page sent comes back through the feed: it is the message that is still waiting for its answer.
+      const mine = list.find(m => m.side === 'out' && !m.wa && m.status === 'sending' && m.text === e.text);
+      if (mine) {
+        Object.assign(mine, { wa: e.id, status: 'sent' });
+        return true;
+      }
+    }
+    const message = { id: nextId('m'), side: e.fromMe ? 'out' : 'in', text, time: openwaClock(e.at), at: e.at, wa: e.id, type: e.type, ...(e.fromMe ? { status: 'sent' } : {}) };
+    list.push(message);
+    list.sort((x, y) => (x.at || 0) - (y.at || 0));
+    if (list.at(-1) === message) Object.assign(c, { preview: text, translation: '', last: message.time, lastAt: e.at });
+    if (!e.fromMe) {
+      const closed = lcIsClosed(c);
+      c.unread = (Number(c.unread) || 0) + 1;
+      if (closed) lcLog(c.id, 'inbound', '已结束跟进的客户主动发来新消息（触发复联信号）');
+      if (e.type === 'text' && e.text) aiTranslateInbound(c, message);
+    }
+    return true;
+  }
+
+  // Draws the page again after the feed changed the data, without disturbing what is being typed.
+  let openwaComposing = false, openwaStale = false;
+  document.addEventListener('compositionstart', () => { openwaComposing = true; });
+  document.addEventListener('compositionend', () => { openwaComposing = false; if (openwaStale) openwaRefresh(); });
+  function openwaRefresh() {
+    if (openwaComposing) return void (openwaStale = true);
+    openwaStale = false;
+    const el = document.activeElement, id = $('#view').contains(el) ? el.id : '';
+    const range = id && typeof el.selectionStart === 'number' ? [el.selectionStart, el.selectionEnd] : null;
+    const box = $('#messages'), atBottom = !box || box.scrollHeight - box.clientHeight - box.scrollTop <= 40, top = box?.scrollTop;
+    const listTop = $('#conversation-list')?.scrollTop;
+    render();
+    if ($('#conversation-list') && listTop) $('#conversation-list').scrollTop = listTop;
+    if (!atBottom && $('#messages')) requestAnimationFrame(() => { const again = $('#messages'); if (again) again.scrollTop = top; });
+    const again = id && document.getElementById(id);
+    if (again) {
+      if (again !== document.activeElement) again.focus({ preventScroll: true });
+      if (range && typeof again.setSelectionRange === 'function') again.setSelectionRange(...range);
+    }
+  }
+
+  const openwaWait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  // Reads the feed for as long as the page is open. Another page that opens the sub-site takes the feed over.
+  async function openwaListen() {
+    const status = await openwaCall('GET', 'status');
+    if (status.status !== 200) return;
+    openwaServer = { configured: Boolean(status.body.configured), reachable: Boolean(status.body.reachable) };
+    if (!openwaServer.configured) return render();
+    let changed = false;
+    // Messages that were on their way when the page was closed: their outcome is open, and sending again is safe.
+    for (const list of Object.values(data.messages)) for (const m of list) if (m.status === 'sending') { m.status = 'unknown'; changed = true; }
+    if (changed) persist();
+    if ((await openwaCall('POST', 'claim', { client: openwaClient })).status !== 200) return render();
+    // First everything that happened while no page was open; then the numbers' states as the server sees them now.
+    for (let failures = 0, caughtUp = false; ;) {
+      const answer = await openwaCall('GET', `events?after=${Number(data.waCursor) || 0}&client=${openwaClient}&wait=${caughtUp ? 25 : 0}`);
+      if (answer.status === 409 && answer.body.error === 'taken-over') return window.WA_SITE.halt('已在其他页面打开', '这个子站刚刚在另一个页面或设备上打开，新消息改由那里接收。需要在本页继续时，请刷新页面。');
+      if (answer.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');
+      if (answer.status !== 200) {
+        failures += 1;
+        await openwaWait(Math.min(30000, 1000 * 2 ** failures));
+        continue;
+      }
+      failures = 0;
+      let applied = false;
+      for (const e of answer.body.events) applied = openwaApply(e) || applied;
+      if (answer.body.last > (Number(data.waCursor) || 0)) {
+        data.waCursor = answer.body.last;
+        persist();
+      }
+      if (!caughtUp && !answer.body.events.length) {
+        caughtUp = true;
+        const now = await openwaCall('GET', 'status');
+        if (now.status === 200 && now.body.reachable) {
+          openwaServer = { configured: true, reachable: true };
+          for (const a of data.accounts) {
+            const link = now.body.accounts.find(x => x.account === a.id);
+            if (link ? openwaSetState(a, link) : a.linked && openwaSetState(a, { state: 'missing' })) applied = true;
+          }
+          if (applied) persist();
+        }
+        applied = true;
+      }
+      if (applied) openwaRefresh();
+    }
+  }
+
   Object.assign(fidActions, {
     openwaBind:id=>{
       const a = openwaVisibleAccount(id);
       if (id && a?.state !== 'pending') return;
       openwaBeginPairing('bind',a);
     },
-    openwaScan:()=>{
+    openwaRetry:()=>{
       const pair = openwaPairing;
-      if (pair?.phase !== 'waiting') return;
-      pair.phase = 'connecting';
+      if (pair?.phase !== 'error') return;
+      Object.assign(pair, { phase: 'starting', qr: '', error: '' });
       openwaShowPairing();
-      pair.timer = setTimeout(()=>openwaFinish(pair),650);
+      openwaRequestLink(pair);
     },
     openwaOpenChat,
     openwaReturnToChat:id=>{
@@ -1619,37 +1845,39 @@ window.WA_START = () => {
       render();
       $('#composer-text')?.focus({preventScroll:true});
     },
-    openwaDrop:id=>{
+    connect:openwaReconnect,
+    openwaUnlinkAsk:id=>{
       const a = openwaVisibleAccount(id);
-      if (a?.state !== 'online') return;
-      a.state = 'reconnect';
-      a.lastSync = '刚刚掉线';
+      if (a && a.state !== 'pending') fidConfirm('解除绑定', `解除「${a.name}」与 WhatsApp 的关联？聊天记录会保留，之后可以重新扫码绑定。`, 'openwaUnlink', id);
+    },
+    openwaUnlink:async id=>{
+      const a = openwaVisibleAccount(id);
+      if (!a) return;
+      close();
+      const answer = await openwaCall('POST', 'unlink', { account: id });
+      if (answer.status !== 200 && answer.status !== 404) return toast(openwaProblem(answer));
+      Object.assign(a, { state: 'pending', linked: false, linkState: '', lastSync: '已解除绑定' });
       persist();
       render();
-      document.querySelector(`[data-action="connect"][data-id="${CSS.escape(id)}"]`)?.focus({preventScroll:true});
-      toast('已模拟掉线。');
+      toast('已解除绑定。');
     },
-    connect:openwaReconnect,
-    openwaReauth:id=>{
-      const a = openwaVisibleAccount(id);
-      if (a?.state === 'reconnect') openwaBeginPairing('reauth', a);
-    },
-    openwaRestore:id=>{
-      const a = openwaVisibleAccount(id);
-      if (a?.state !== 'reconnect') return;
-      const pair = {mode:'reconnect', accountId:id, persona:ui.persona, number:a.number};
-      openwaPairing = pair;
-      openwaDialogContent('正在重连', `<div id="openwa-dialog-body" class="modal-body openwa-pair-body"><div class="openwa-pair-state" role="status" tabindex="-1">${icon('LoaderCircle')}<strong>正在恢复原会话…</strong></div></div>`,
-        fidButton('取消','close'), '.openwa-pair-state');
-      pair.timer = setTimeout(()=>openwaFinish(pair),650);
+    openwaResend:id=>{
+      const c = selectedCustomer(), m = c && (data.messages[c.id] || []).find(m => m.id === id);
+      if (!m || !['failed', 'unknown'].includes(m.status) || !m.request) return;
+      if (account(c.account)?.state !== 'online') return toast('号码尚未连接，暂时不能重试。');
+      m.status = 'sending';
+      persist();
+      openwaRefresh();
+      openwaDeliver(c, m);
     },
   });
 
   openwaDialog.addEventListener('close', () => {
-    if (openwaDialog.open) return;
-    clearTimeout(openwaPairing?.timer);
+    if (openwaDialog.open || !openwaPairing) return;
+    openwaAbandon(openwaPairing);
     openwaPairing = null;
   });
+  setTimeout(openwaListen, 0);
 
   const dashboardFollowFilters = { all:'全部', overdue:'逾期', today:'今天', later:'以后' };
   const dashboardDateFormat = new Intl.DateTimeFormat('zh-CN', {dateStyle:'full'});
@@ -2395,7 +2623,6 @@ window.WA_START = () => {
         ${subtab('history', '跟进与操作日志', 'History', fidLogs().length)}
       </div>
       <div class="lc-radar-controls">
-        ${fidButton('模拟新客进线', 'lcSimLeadOpen', 'Sparkles', 'tint')}
         ${fidButton('新建跟进任务', 'newTask', 'Plus', 'blue')}
       </div>
     </div>`;
@@ -2445,7 +2672,6 @@ window.WA_START = () => {
           <td>${c.reactivatedCount || 0} 次</td>
           <td><div class="fid-icon-actions">
             ${fidButton('重新跟进', 'followup', 'RotateCcw', h.recontact ? 'slim blue' : 'slim tint', fidActionID(c.id))}
-            ${fidButton('模拟客户复联', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
             ${fidButton('去聊天', 'openConversation', 'MessageCircle', 'slim', fidActionID(c.id))}
           </div></td>
         </tr>`;
@@ -2704,7 +2930,6 @@ window.WA_START = () => {
         ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
         ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
         ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
-        ${fidButton('模拟对方回复', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
         ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
       </div>
     </div>`;
@@ -2815,51 +3040,6 @@ window.WA_START = () => {
     );
   }
 
-  function openSimLeadModal() {
-    const accounts = myAccounts();
-    if (!accounts.length) return toast('请先在号码管理绑定至少一个 WhatsApp 号码。');
-    fidForm(
-      '模拟新客户进线',
-      'lc-sim-lead',
-      `<p class="fid-field-help" style="margin-bottom:12px">模拟一位潜在客户添加你的 WhatsApp 号码并发来首条咨询，系统自动建立首响待办并点亮「客户待回复」信号。</p>
-       ${fidFormRow('进线号码', `<select class="fid-select" style="width:100%" name="accountId">${accounts.map(a => option(a.id, `${a.name} (${a.number})`, accounts[0].id)).join('')}</select>`)}
-       ${fidFormRow('客户称呼', `<input class="fid-input" style="width:100%" name="name" value=" Jordan Brooks" required>`, '', true)}
-       ${fidFormRow('客户语言', `<select class="fid-select" style="width:100%" name="language">${fidOption(['英语', '西班牙语'], '英语')}</select>`)}
-       ${fidFormRow('来源归因', `<select class="fid-select" style="width:100%" name="source">${fidOption(['Facebook 广告', 'Instagram 广告', '客户转介绍', '网站咨询'], 'Facebook 广告')}</select>`)}
-       ${fidFormRow('广告系列', `<input class="fid-input" style="width:100%" name="campaign" value="US · 咨询直连广告 E" placeholder="选填广告系列名称">`)}`,
-      '生成进线会话并查看',
-      { wide: true }
-    );
-  }
-
-  function lcSimulateCustomerReply(customerId) {
-    const c = customer(customerId);
-    if (!c) return;
-    const isEs = c.language === '西班牙语';
-    const closed = lcIsClosed(c);
-    const incoming = closed
-      ? (isEs
-          ? 'Hola, retomamos las compras esta semana. ¿Podemos revisar la cotización actualizada?'
-          : 'Hi! Our budget is ready now—could we revisit the quote and check current lead time?')
-      : (isEs
-          ? 'Gracias por responder rápido, me interesa ver las opciones disponibles.'
-          : 'Thanks for the quick response! Could you share the recommended starter option?');
-
-    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const message = { id: nextId('m'), side: 'in', text: incoming, time };
-    (data.messages[c.id] ??= []).push(message);
-    aiTranslateInbound(c, message);
-    c.preview = incoming;
-    c.translation = '';
-    c.last = '刚刚';
-    c.unread = (Number(c.unread) || 0) + 1;
-    lcLog(c.id, 'inbound', closed ? '已结束跟进的客户主动发来新消息（触发复联信号）' : '收到客户最新 WhatsApp 回复消息');
-    persist();
-    render();
-    lcRefreshOpenDossier(c.id);
-    toast(closed ? `收到 ${c.name} 的复联消息！已点亮「复联待处理」，可重新跟进。` : `已模拟收到 ${c.name} 的新回复。`);
-  }
-
   // New customers join the engagement loop with a first follow-up to-do
   function openLifecycleCustomerForm() {
     const accounts = myAccounts();
@@ -2883,8 +3063,6 @@ window.WA_START = () => {
   // Register engagement actions & form submissions
   // ============================================================================
   Object.assign(fidActions, {
-    lcSimLeadOpen: openSimLeadModal,
-    lcSimReply: lcSimulateCustomerReply,
     lcDossierTab: (id, btn) => {
       lcState.dossierTab = id;
       const cid = btn?.dataset?.customer || ui.customer;
@@ -3103,46 +3281,6 @@ window.WA_START = () => {
       render();
     },
 
-    'lc-sim-lead-form': (f, v) => {
-      const a = account(v('accountId'));
-      const name = v('name');
-      if (!a || !name) return error('请填写客户称呼并选择接待号码。');
-      const phone = openwaNextNumber() || '+1 (512) 555-0199';
-      const isEs = v('language') === '西班牙语';
-      const msg = isEs
-        ? 'Hola, vi su anuncio y agregué su WhatsApp. ¿Me comparte el catálogo y tiempos de envío?'
-        : 'Hi! Just added your WhatsApp from your ad. Could you share the catalog and shipping details?';
-      const id = nextId('c');
-      const nowIso = new Date().toISOString();
-      const c = {
-        id, name, initials: initial(name), color: 'blue', phone,
-        country: a.country || 'US', city: a.country === 'PR' ? 'San Juan' : 'Dallas',
-        timezone: a.country === 'PR' ? 'America/Puerto_Rico' : 'America/Chicago',
-        language: v('language'), owner: a.owner || ui.persona, account: a.id,
-        tags: [], engagement: 'open',
-        source: v('source'), campaign: v('campaign'), ad: '模拟进线会话',
-        unread: 1, star: false, last: '刚刚', preview: msg, translation: '',
-        followup: null, notes: '', contactRefs: [{ account: a.id, owner: a.owner || ui.persona }],
-        createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', intentLevel: '高意向',
-        reactivatedCount: 0,
-        qualification: { demand: '新加微咨询目录与发货安排', volume: '待首响确认', deliveryRegion: a.country === 'PR' ? 'PR · San Juan' : 'US · TX', objection: '', commWindow: v('language') + '沟通' },
-      };
-      data.customers.unshift(c);
-      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, time: '刚刚' }];
-      aiTranslateInbound(c, data.messages[id][0]);
-      lcCreateTask({
-        customerId: id,
-        title: `首响破冰回复 ${name} 并确认具体需求`,
-        dueIso: new Date(Date.now() + 3600000).toISOString(),
-        priority: 'high',
-      });
-      lcLog(id, 'inbound', `通过「${c.source}」首次进线，已自动建立首响待办`);
-      persist();
-      close();
-      lcState.followTab = 'signals'; lcState.signal = 'all'; navigate('followups');
-      toast(`新客户 ${name} 已进线，已建立首响待办。`);
-    },
-
     'lc-new-customer-form': (f, v) => {
       if (!v('name') || !v('phone')) return error('请填写客户称呼与 WhatsApp 号码。');
       const digits = fidPhoneDigits(v('phone'));
@@ -3180,7 +3318,7 @@ window.WA_START = () => {
     },
   });
 
-  // Customers added outside this module (OpenWA sample chats, legacy saves) join the loop on the next render
+  // Customers added outside this module (new WhatsApp chats, legacy saves) join the loop on the next render
   function lcSyncRuntimeCustomers() {
     for (const c of data.customers) {
       lcMigrateEngagement(c);
@@ -3199,7 +3337,7 @@ window.WA_START = () => {
           dueIso: new Date(Date.now() + 2 * 3600000).toISOString(),
           priority: 'high',
         });
-        lcLog(c.id, 'inbound', 'OpenWA 扫码进线会话已自动建立首响待办');
+        lcLog(c.id, 'inbound', '客户首次来信，已自动建立首响待办');
       }
     }
   }
@@ -3540,7 +3678,7 @@ window.WA_START = () => {
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
       <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
       <h2>最近调用</h2>
-      ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。在 WhatsApp API 中模拟对方回复或选择快捷回复后，这里会出现记录。')}
+      ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。收到客户消息或翻译回复后，这里会出现记录。')}
       <p class="fid-field-help">显示最近 ${AI_USAGE_SHOWN} 次调用，本机最多保留 ${AI_USAGE_KEPT} 条；累计数见上表。</p>
     </div></section>`;
   }

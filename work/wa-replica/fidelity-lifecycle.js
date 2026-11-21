@@ -565,7 +565,6 @@
         ${subtab('history', '跟进与操作日志', 'History', fidLogs().length)}
       </div>
       <div class="lc-radar-controls">
-        ${fidButton('模拟新客进线', 'lcSimLeadOpen', 'Sparkles', 'tint')}
         ${fidButton('新建跟进任务', 'newTask', 'Plus', 'blue')}
       </div>
     </div>`;
@@ -615,7 +614,6 @@
           <td>${c.reactivatedCount || 0} 次</td>
           <td><div class="fid-icon-actions">
             ${fidButton('重新跟进', 'followup', 'RotateCcw', h.recontact ? 'slim blue' : 'slim tint', fidActionID(c.id))}
-            ${fidButton('模拟客户复联', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
             ${fidButton('去聊天', 'openConversation', 'MessageCircle', 'slim', fidActionID(c.id))}
           </div></td>
         </tr>`;
@@ -874,7 +872,6 @@
         ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
         ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
         ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
-        ${fidButton('模拟对方回复', 'lcSimReply', 'MessageSquareReply', 'slim', fidActionID(c.id))}
         ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
       </div>
     </div>`;
@@ -985,51 +982,6 @@
     );
   }
 
-  function openSimLeadModal() {
-    const accounts = myAccounts();
-    if (!accounts.length) return toast('请先在号码管理绑定至少一个 WhatsApp 号码。');
-    fidForm(
-      '模拟新客户进线',
-      'lc-sim-lead',
-      `<p class="fid-field-help" style="margin-bottom:12px">模拟一位潜在客户添加你的 WhatsApp 号码并发来首条咨询，系统自动建立首响待办并点亮「客户待回复」信号。</p>
-       ${fidFormRow('进线号码', `<select class="fid-select" style="width:100%" name="accountId">${accounts.map(a => option(a.id, `${a.name} (${a.number})`, accounts[0].id)).join('')}</select>`)}
-       ${fidFormRow('客户称呼', `<input class="fid-input" style="width:100%" name="name" value=" Jordan Brooks" required>`, '', true)}
-       ${fidFormRow('客户语言', `<select class="fid-select" style="width:100%" name="language">${fidOption(['英语', '西班牙语'], '英语')}</select>`)}
-       ${fidFormRow('来源归因', `<select class="fid-select" style="width:100%" name="source">${fidOption(['Facebook 广告', 'Instagram 广告', '客户转介绍', '网站咨询'], 'Facebook 广告')}</select>`)}
-       ${fidFormRow('广告系列', `<input class="fid-input" style="width:100%" name="campaign" value="US · 咨询直连广告 E" placeholder="选填广告系列名称">`)}`,
-      '生成进线会话并查看',
-      { wide: true }
-    );
-  }
-
-  function lcSimulateCustomerReply(customerId) {
-    const c = customer(customerId);
-    if (!c) return;
-    const isEs = c.language === '西班牙语';
-    const closed = lcIsClosed(c);
-    const incoming = closed
-      ? (isEs
-          ? 'Hola, retomamos las compras esta semana. ¿Podemos revisar la cotización actualizada?'
-          : 'Hi! Our budget is ready now—could we revisit the quote and check current lead time?')
-      : (isEs
-          ? 'Gracias por responder rápido, me interesa ver las opciones disponibles.'
-          : 'Thanks for the quick response! Could you share the recommended starter option?');
-
-    const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const message = { id: nextId('m'), side: 'in', text: incoming, time };
-    (data.messages[c.id] ??= []).push(message);
-    aiTranslateInbound(c, message);
-    c.preview = incoming;
-    c.translation = '';
-    c.last = '刚刚';
-    c.unread = (Number(c.unread) || 0) + 1;
-    lcLog(c.id, 'inbound', closed ? '已结束跟进的客户主动发来新消息（触发复联信号）' : '收到客户最新 WhatsApp 回复消息');
-    persist();
-    render();
-    lcRefreshOpenDossier(c.id);
-    toast(closed ? `收到 ${c.name} 的复联消息！已点亮「复联待处理」，可重新跟进。` : `已模拟收到 ${c.name} 的新回复。`);
-  }
-
   // New customers join the engagement loop with a first follow-up to-do
   function openLifecycleCustomerForm() {
     const accounts = myAccounts();
@@ -1053,8 +1005,6 @@
   // Register engagement actions & form submissions
   // ============================================================================
   Object.assign(fidActions, {
-    lcSimLeadOpen: openSimLeadModal,
-    lcSimReply: lcSimulateCustomerReply,
     lcDossierTab: (id, btn) => {
       lcState.dossierTab = id;
       const cid = btn?.dataset?.customer || ui.customer;
@@ -1273,46 +1223,6 @@
       render();
     },
 
-    'lc-sim-lead-form': (f, v) => {
-      const a = account(v('accountId'));
-      const name = v('name');
-      if (!a || !name) return error('请填写客户称呼并选择接待号码。');
-      const phone = openwaNextNumber() || '+1 (512) 555-0199';
-      const isEs = v('language') === '西班牙语';
-      const msg = isEs
-        ? 'Hola, vi su anuncio y agregué su WhatsApp. ¿Me comparte el catálogo y tiempos de envío?'
-        : 'Hi! Just added your WhatsApp from your ad. Could you share the catalog and shipping details?';
-      const id = nextId('c');
-      const nowIso = new Date().toISOString();
-      const c = {
-        id, name, initials: initial(name), color: 'blue', phone,
-        country: a.country || 'US', city: a.country === 'PR' ? 'San Juan' : 'Dallas',
-        timezone: a.country === 'PR' ? 'America/Puerto_Rico' : 'America/Chicago',
-        language: v('language'), owner: a.owner || ui.persona, account: a.id,
-        tags: [], engagement: 'open',
-        source: v('source'), campaign: v('campaign'), ad: '模拟进线会话',
-        unread: 1, star: false, last: '刚刚', preview: msg, translation: '',
-        followup: null, notes: '', contactRefs: [{ account: a.id, owner: a.owner || ui.persona }],
-        createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', intentLevel: '高意向',
-        reactivatedCount: 0,
-        qualification: { demand: '新加微咨询目录与发货安排', volume: '待首响确认', deliveryRegion: a.country === 'PR' ? 'PR · San Juan' : 'US · TX', objection: '', commWindow: v('language') + '沟通' },
-      };
-      data.customers.unshift(c);
-      data.messages[id] = [{ id: nextId('m'), side: 'in', text: msg, time: '刚刚' }];
-      aiTranslateInbound(c, data.messages[id][0]);
-      lcCreateTask({
-        customerId: id,
-        title: `首响破冰回复 ${name} 并确认具体需求`,
-        dueIso: new Date(Date.now() + 3600000).toISOString(),
-        priority: 'high',
-      });
-      lcLog(id, 'inbound', `通过「${c.source}」首次进线，已自动建立首响待办`);
-      persist();
-      close();
-      lcState.followTab = 'signals'; lcState.signal = 'all'; navigate('followups');
-      toast(`新客户 ${name} 已进线，已建立首响待办。`);
-    },
-
     'lc-new-customer-form': (f, v) => {
       if (!v('name') || !v('phone')) return error('请填写客户称呼与 WhatsApp 号码。');
       const digits = fidPhoneDigits(v('phone'));
@@ -1350,7 +1260,7 @@
     },
   });
 
-  // Customers added outside this module (OpenWA sample chats, legacy saves) join the loop on the next render
+  // Customers added outside this module (new WhatsApp chats, legacy saves) join the loop on the next render
   function lcSyncRuntimeCustomers() {
     for (const c of data.customers) {
       lcMigrateEngagement(c);
@@ -1369,7 +1279,7 @@
           dueIso: new Date(Date.now() + 2 * 3600000).toISOString(),
           priority: 'high',
         });
-        lcLog(c.id, 'inbound', 'OpenWA 扫码进线会话已自动建立首响待办');
+        lcLog(c.id, 'inbound', '客户首次来信，已自动建立首响待办');
       }
     }
   }

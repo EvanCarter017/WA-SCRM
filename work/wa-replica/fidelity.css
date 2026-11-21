@@ -273,6 +273,11 @@
 .openwa-pair-state .icon { width:18px; height:18px; animation:openwa-spin 1s linear infinite; }
 .openwa-success-mark { display:grid; place-items:center; width:45px; height:45px; background:var(--fid-mint-bg); color:var(--paint-46); border-radius:50%; }
 .openwa-success-mark .icon { width:23px; height:23px; }
+.openwa-pair-state.openwa-pair-error { max-width:320px; line-height:1.5; }
+.openwa-mark { display:inline-flex; align-items:center; gap:3px; }
+.openwa-mark.warn { color:var(--warning); }
+.openwa-mark.read { color:var(--paint-46); }
+.message-meta .link { margin-left:6px; font-size:12px; }
 @keyframes openwa-spin { to { transform:rotate(360deg); } }
 @media(prefers-reduced-motion:reduce) { .openwa-pair-state .icon { animation:none; } }
 
