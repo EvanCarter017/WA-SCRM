@@ -1,0 +1,1567 @@
+# Plan 023: The page signs in and keeps its data on the server
+
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> maintain the index.
+>
+> **Drift check (run first)**: `git diff --stat b7c6fd9..HEAD -- work/wa-replica README.md PRODUCT.md DESIGN.md replica/build-log.md outputs/wa-replica-prototype/README.md`
+> If any in-scope file changed since this plan was written, compare the
+> "Current state" facts against the live code before proceeding; on a
+> mismatch, treat it as a STOP condition. (Changes under `plans/` only are expected and fine.)
+
+## Status
+
+- **Priority**: P1
+- **Effort**: L
+- **Risk**: HIGH (changes how the page starts and where every piece of data lives; removes the fictional data set)
+- **Depends on**: plans/022-site-server.md (DONE)
+- **Category**: direction
+- **Planned at**: commit `b7c6fd9`, 2026-11-21
+
+## Why this matters
+
+Plan 022 gave the server accounts, sign-in sessions and a data store for one sub-site. The page does not use them yet: it still opens without sign-in, loads a fictional data set (`demo-data.js`) and keeps everything in the visitor's browser. The owner decided on 2026-11-21 to turn the prototype into a product: "Transition everything from a prototype state to a production-ready state"; every employee has an individual account and works in a sub-site of their own.
+
+This plan switches the page over:
+
+1. **Sign-in.** The page opens on a sign-in screen (user name and password). An account that still has its temporary password must set its own first. Supervisors, administrators and employees of another sub-site get a notice and can leave; their views come with the master site, later.
+2. **Data on the server.** After sign-in the page loads the sub-site's data from `GET /api/data` and only then starts the app. After every change it sends the changed parts with `PUT /api/data`. If the server cannot be reached it says so and retries; if the data was changed elsewhere it asks for a refresh instead of overwriting; if the session ended it says so.
+3. **No fictional data.** `demo-data.js` is no longer shipped or loaded. A new sub-site starts empty. The browser keeps only what belongs to it: drafts, open tabs, the collapsed sidebar.
+4. Three small additions on the server that the page needs (Step 2).
+
+### Decisions already made (do not re-open; do not ask)
+
+- The app is not rewritten. It stays one script, but no longer starts by itself: the build turns it into a function `window.WA_START`, and a new start-up script (`fidelity-boot.js`, shipped as `boot.js`) calls it once the signed-in user's data is in `window.WA_SITE`.
+- A sub-site's document is written by one page at a time: its employee's. Whole top-level fields are saved, except `messages` and `activities`, which are saved one customer at a time.
+- A new sub-site's first document carries the flags `presetTagsRemoved`, `lcSeededV06`, `lcSeededOrders`, `lcSeededOrderHistory` and `chatArchiveSeeded`, so that the code of earlier builds that added sample customers, orders and archives on first use never runs for it. Deleting that code is a later plan; do not delete it here.
+- The simulated WhatsApp actions (scan, incoming message, new lead) stay; the real connection replaces them later.
+- The two standalone bundles are still built; opened as files they show "cannot reach the server". Removing them is a later plan.
+- UI texts are the Chinese texts given in the files of this plan; do not change them.
+- The version string, the storage key name and `requirement.updatedOn` do not change; the build's requirement records are not touched.
+
+## Current state
+
+### What this repository is
+
+A zero-dependency web app for an internal WhatsApp customer workbench: plain HTML/CSS/JS in the browser and a small Node server, `work/wa-replica/serve.cjs`, that serves the built page from `outputs/wa-replica-prototype/`, relays AI requests and — when started with `WA_SCRM_DATA_DIR` — keeps accounts and one sub-site's data (`site-auth.cjs`, `site-data.cjs`, `site-api.cjs`; they need Node 22.13 or newer). There is no package.json. UI and documentation text is **Simplified Chinese**.
+
+### How the build works
+
+`work/wa-replica/build-fidelity.cjs` reads a frozen baseline app (`work/wa-replica/fidelity-base/app.js`, **never edited**), applies string substitutions to it with `swap(from, to)` (first occurrence; the build fails when `from` is missing), puts the module files (`fidelity-*.js`) into the body of the same function, and writes `outputs/wa-replica-prototype/*` plus two identical standalone bundles in `outputs/`. **Never change an existing `swap` call. Outputs are committed and must be regenerated by running the build, never edited by hand.** The script defines a helper `cut(pattern, what)` (deletes what a pattern matches, fails when nothing matched) shortly above the line `new vm.Script(js, {filename:'app.js'});`; at that line `js` is the complete app.
+
+The list of files the build writes contains this line, which Step 4 changes:
+
+```js
+  'demo-data.js':read(base,'demo-data.js'),'icons.js':iconJS,
+```
+
+Icons: the build takes icon definitions from the existing `outputs/wa-replica-prototype/icons.js`. Restore that file from git before every build (command below).
+
+### How the page starts today
+
+The built `app.js` is one self-running function. Its first lines read the saved state from the browser's `localStorage` and fall back to the fictional data set:
+
+```js
+(() => {
+  'use strict';
+  const KEY='wa-desk-scrm-lifecycle-v06';
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}
+  let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);
+```
+
+A function `persist()` writes the whole state back to `localStorage` after every change. The page shell (`fidelity-index.html`) contains a screen `#subsite-login` with a button "enter the demo workbench"; `fidelity-subsite.js` shows it after "sign out", which only sets a flag in the browser.
+
+### Files this plan replaces as a whole
+
+| File | sha256 at the planned commit |
+|---|---|
+| `work/wa-replica/fidelity-subsite.js` | `22f9f5608f8d38b92588eb23cb032e1c3f395b327bc921a5204447a9ebd32b5e` |
+| `work/wa-replica/fidelity-index.html` | `17d0f66e17a865a581977c1d1e9f4a484035c379466244d68ab199e98ff6498c` |
+| `work/wa-replica/site-data.cjs` | `6dd8e14b1738a7d2f836904a77282a6995ff2516ed95e49c4c1c3e8c89d5baf3` |
+| `work/wa-replica/site-api.cjs` | `43bfbabe69e82a995888ab7bf3da5bedd139a60698901371c21f8bcf14157581` |
+| `work/wa-replica/site-admin.cjs` | `b61f9cf79b91e17ea3906b1c120aff52fc5c493bfc7b311dbb9cef0c8b7e72e9` |
+| `work/wa-replica/site-api.test.cjs` | `5f9f953f976ae132009dd76ce565ced9c9dd7039282b3c294a31fa4a2b811903` |
+
+### The validator, `work/wa-replica/validate-scrm-lifecycle.cjs`
+
+Numbered sections 1–19 of assertions, then a `const summary = {` object written to `outputs/wa-replica-prototype/validation.json`. It already defines `read`, `path`, `fs`, `assert`, `out` (the output folder), `appJs`, `indexHtml` and `siteSources` (the texts of the `site-*.cjs` files by name).
+
+### Repo conventions to match
+
+- Two-space indentation, semicolons, single quotes.
+- Commit messages: conventional commits, e.g. `feat(scrm): accounts, sign-in sessions and data on the server`.
+
+## Commands you will need
+
+Run from the repository root (inside your worktree).
+
+**This plan needs Node 22.13 or newer for the server tests and the smoke script.** Run `node --version`. If it prints an older version, find a newer binary on the machine (for example `ls ~/.local/node/bin/node`) and set `NODE` to its full path; otherwise set `NODE=node`. If the machine has none, STOP. The commands below use `$NODE` where the version matters.
+
+| Purpose | Command | Expected on success |
+|---|---|---|
+| Restore icon pool (before **every** build) | `git checkout b7c6fd9 -- outputs/wa-replica-prototype/icons.js` | exit 0 |
+| Build | `node work/wa-replica/build-fidelity.cjs` | exit 0; prints JSON with `"version": "0.8-scrm-engagement"` |
+| Validate | `node work/wa-replica/validate-scrm-lifecycle.cjs` | exit 0; prints JSON with `"status": "passed"` |
+| Server tests | `$NODE --test work/wa-replica/site-api.test.cjs` | the summary shows `pass 12` and `fail 0` |
+| Relay tests | `node --test work/wa-replica/ai-relay.test.cjs` | the summary shows `pass 12` and `fail 0` |
+| Smoke | `NODE=$NODE bash /tmp/wa-scrm-plan-023/smoke.sh` (script from Step 1; run from inside the repo) | last line `SMOKE PASS` |
+| Checksum of a file | `sha256sum <file>` | the value given in the step |
+| Icon set | `node -e "const vm=require('vm'),fs=require('fs'),cp=require('child_process');const keys=s=>{const w={};vm.runInNewContext(s,{window:w});return Object.keys(w.WA_ICONS)};const a=keys(cp.execSync('git show b7c6fd9:outputs/wa-replica-prototype/icons.js').toString()),b=keys(fs.readFileSync('outputs/wa-replica-prototype/icons.js','utf8'));console.log('removed='+a.filter(x=>!b.includes(x)).join(',')+' added='+b.filter(x=>!a.includes(x)).join(','))"` | `removed= added=` |
+
+## Scope
+
+**In scope** (the only files you may create, modify or delete):
+
+- `work/wa-replica/site-data.cjs`, `work/wa-replica/site-api.cjs`, `work/wa-replica/site-admin.cjs`, `work/wa-replica/site-api.test.cjs` (Step 2)
+- New: `work/wa-replica/fidelity-boot.js`; `work/wa-replica/fidelity-subsite.js`, `work/wa-replica/fidelity-index.html`, `work/wa-replica/fidelity.css` (Step 3)
+- `work/wa-replica/build-fidelity.cjs`; deleted: `outputs/wa-replica-prototype/demo-data.js` (Step 4)
+- `work/wa-replica/validate-scrm-lifecycle.cjs` (Step 5)
+- `README.md`, `PRODUCT.md`, `DESIGN.md`, `outputs/wa-replica-prototype/README.md`, `replica/build-log.md` (Step 6)
+- Build outputs, **only by running the build/validator**: `outputs/wa-replica-prototype/{index.html,app.js,app.css,tokens.css,components.css,icons.js,boot.js,lucide-license.txt,requirements.json,validation.json}`, `outputs/whatsapp-scrm-lifecycle.html`, `outputs/whatsapp-replica-ui-fidelity.html`
+
+**Out of scope** (do NOT touch):
+
+- `work/wa-replica/fidelity-base/**` (also its `demo-data.js`: the baseline folder stays as it is; the build simply no longer ships that file).
+- `work/wa-replica/serve.cjs`, `site-auth.cjs`, `ai-relay.cjs`, `ai-relay.test.cjs`, `ai.env.example`, and every `fidelity-*.js` module other than `fidelity-subsite.js` — including the code in them that added sample content in earlier builds.
+- The existing `swap(...)` calls of the build script.
+- Any real password, key or data folder inside the repository.
+- `启动SCRM原型预览.cmd`, `plans/**`, `outputs/review-prompts/**`, earlier entries of `replica/build-log.md`.
+- New dependencies, icons or colour values.
+
+## Git workflow
+
+- Work on the branch your worktree is already on. If (and only if) you find yourself on `main`, create and switch to `advisor/023-page-signs-in` first.
+- One to three commits are fine. Conventional commit message, e.g. `feat(scrm): sign in and keep the data on the server`.
+- Do NOT push, merge, rebase onto main, or open a PR.
+
+## Steps
+
+How to read the instructions: a **New file** / **Whole file** instruction gives the complete content of a file; compare the checksum afterwards. An **Edit** gives a text to find (it occurs exactly once in the named file) and the text that replaces it. An **Insert** names the beginning of an existing line and the lines to put above it. An **Append** adds text at the end of a file. The fenced blocks contain the text only — the fence lines are not part of it. Copy every block character for character; the most reliable way is a small script that reads this plan file and takes the lines strictly between the opening fence after an instruction and its closing fence. A block fenced with four backticks contains lines with three backticks that belong to the text.
+
+### Step 1: Create the smoke script (outside the repo) and record the baseline
+
+Save this script at the fixed path `/tmp/wa-scrm-plan-023/smoke.sh` (outside the repository; always call it by this literal path, from inside the repository). If your shell rejects heredocs, write the same content with your file-writing tool and then `chmod +x` it.
+
+```bash
+mkdir -p /tmp/wa-scrm-plan-023 && cat > /tmp/wa-scrm-plan-023/smoke.sh <<'EOF'
+#!/usr/bin/env bash
+# Checks the page and the server together: what a visitor sees without and with accounts, and the path from a
+# new account to saved data. NODE must be Node 22.13 or newer.
+set -u
+ROOT=$(git rev-parse --show-toplevel); OUT=$(mktemp -d); FAIL=0; NODE=${NODE:-node}
+same() { [ "$2" = "$3" ] && echo "ok   $1" || { echo "MISS $1 (got: $2)"; FAIL=1; }; }
+has() { grep -qF "$3" "$2" && echo "ok   $1" || { echo "MISS $1"; FAIL=1; }; }
+code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+"$NODE" -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)" && echo "ok   Node $("$NODE" --version) is new enough" || { echo "MISS Node 22.13 or newer is needed, got $("$NODE" --version)"; FAIL=1; }
+start() { PORT=$(( 56400 + RANDOM % 400 )); env -u WA_SCRM_AI_ENV "$@" "$NODE" "$ROOT/work/wa-replica/serve.cjs" "$PORT" >"$OUT/serve.log" 2>&1 & SRV=$!; for i in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.25; done; B="http://127.0.0.1:$PORT"; }
+dump() { prof=$(mktemp -d); timeout 90 /usr/bin/google-chrome --headless=new --no-sandbox --disable-gpu --user-data-dir="$prof" --enable-logging=stderr --v=0 --virtual-time-budget=4000 --dump-dom "$B/" 2>"$OUT/$1.log" >"$OUT/$1.html"; rm -rf "$prof"; same "$1: no script errors" "$(grep -ciE 'Uncaught|ReferenceError|TypeError|SyntaxError' "$OUT/$1.log")" 0; }
+# 1. a server without accounts
+start -u WA_SCRM_DATA_DIR
+dump off
+has 'off: the page says that accounts are not switched on' "$OUT/off.html" '<h1 id="subsite-login-title" tabindex="-1">服务器尚未启用账号</h1>'
+kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null
+# 2. a server with accounts
+export WA_SCRM_DATA_DIR="$OUT/data" WA_SCRM_SITE_ID=demo
+PW=$("$NODE" "$ROOT/work/wa-replica/site-admin.cjs" user add smoke agent Smoke Test | sed -n 's/^temporary password: //p')
+same 'an account was created with a temporary password' "${#PW}" 16
+start
+dump on
+has 'on: a visitor sees the sign-in form' "$OUT/on.html" '<h1 id="subsite-login-title" tabindex="-1">登录</h1>'
+has 'on: the app has not started for a visitor' "$OUT/on.html" '<main id="view" tabindex="-1"></main>'
+same 'the start-up script is served' "$(code "$B/boot.js")" 200
+same 'the fictional data set is not served' "$(code "$B/demo-data.js")" 404
+has 'the app waits to be started' "$ROOT/outputs/wa-replica-prototype/app.js" 'window.WA_START = () => {'
+J="$OUT/jar"; call() { curl -s -b "$J" -c "$J" -X "$1" -H 'Content-Type: application/json' ${3:+-d "$3"} "$B$2"; }
+same 'nobody is signed in at first' "$(call GET /api/auth/session)" '{"user":null,"site":"demo"}'
+same 'signing in with the temporary password works' "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" -c "$J" -X POST -H 'Content-Type: application/json' -d "{\"username\":\"smoke\",\"password\":\"$PW\"}" "$B/api/auth/login")" 200
+same 'the data waits for an own password' "$(call GET /api/data)" '{"error":"password-change-required"}'
+same 'the password can be changed' "$(curl -s -o /dev/null -w '%{http_code}' -b "$J" -c "$J" -X POST -H 'Content-Type: application/json' -d "{\"current\":\"$PW\",\"next\":\"smoke-test-passphrase\"}" "$B/api/auth/password")" 200
+same 'a new sub-site is empty' "$(call GET /api/data)" '{"version":0,"data":{}}'
+same 'a save is accepted' "$(call PUT /api/data '{"baseVersion":0,"set":{"customers":[],"messages/c1":[{"text":"hi"}]}}')" '{"version":1}'
+same 'a save based on an old version is refused' "$(call PUT /api/data '{"baseVersion":0,"set":{"customers":[]}}')" '{"error":"version-conflict","version":1}'
+same 'a part can be saved into a field that was saved whole' "$(call PUT /api/data '{"baseVersion":1,"set":{"activities":{"c1":["a"],"c2":["b"]}}}')$(call PUT /api/data '{"baseVersion":2,"set":{"activities/c2":["b","c"]}}')" '{"version":2}{"version":3}'
+kill "$SRV" 2>/dev/null; wait "$SRV" 2>/dev/null
+same 'every file of the data folder is private' "$(find "$OUT/data" -type f -perm /077 | wc -l)" 0
+unset WA_SCRM_DATA_DIR WA_SCRM_SITE_ID
+echo "artifacts: $OUT"
+[ "$FAIL" = 0 ] && echo "SMOKE PASS" || { echo "SMOKE FAIL"; exit 1; }
+EOF
+chmod +x /tmp/wa-scrm-plan-023/smoke.sh && ls -l /tmp/wa-scrm-plan-023/smoke.sh
+```
+
+**Verify**: `$NODE --version` → v22.13 or newer; `sha256sum work/wa-replica/fidelity-subsite.js work/wa-replica/fidelity-index.html work/wa-replica/site-data.cjs work/wa-replica/site-api.cjs work/wa-replica/site-admin.cjs work/wa-replica/site-api.test.cjs` → the values of the table in "Current state", in that order; `NODE=$NODE bash /tmp/wa-scrm-plan-023/smoke.sh; git status --porcelain` → the first line is `ok   Node … is new enough`; exactly these checks fail, so the run ends with `SMOKE FAIL` (expected at this point): nine `MISS` lines — `off: the page says that accounts are not switched on`, `on: a visitor sees the sign-in form`, `on: the app has not started for a visitor`, `the start-up script is served (got: 404)`, `the fictional data set is not served (got: 200)`, `the app waits to be started`, `nobody is signed in at first (got: {"error":"not-found"})`, `a part can be saved into a field that was saved whole (…)` and `every file of the data folder is private (got: 6)`; `git status --porcelain` prints **nothing**. If another check fails, a checksum differs, or `git status` shows changes, STOP.
+
+### Step 2: The server: private files, a quiet "who is signed in", saving a part into a whole field
+
+**Whole file 2.1** — replace the complete content of `work/wa-replica/site-data.cjs` with (109 lines; one newline at the end of the last line and nothing after it):
+
+```js
+// The data of one sub-site: one document, stored as rows so that a save rewrites only what changed.
+// A key is the name of a top-level field ("customers"), or "<field>/<id>" for one entry of a field that is a
+// map ("messages/c4"). Every save names the version it was based on; a save based on an older version is
+// refused, so two open pages cannot silently overwrite each other.
+// Needs Node 22.13 or newer (built-in SQLite).
+const { DatabaseSync } = require('node:sqlite');
+
+const KEY = /^[A-Za-z][A-Za-z0-9]{0,39}(\/[A-Za-z0-9_.-]{1,80})?$/;
+const MAX_VALUE = 2 * 1024 * 1024;
+const SAVES_KEPT = 10000;
+
+const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
+
+// Opens (and creates) the database of one sub-site. now() is replaceable for tests.
+function openData(file, { now = () => Date.now() } = {}) {
+  const db = new DatabaseSync(file);
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS doc (key TEXT PRIMARY KEY, json TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS saves (version INTEGER PRIMARY KEY, at TEXT NOT NULL, by TEXT NOT NULL, keys TEXT NOT NULL);
+  `);
+  const version = () => db.prepare('SELECT COALESCE(MAX(version), 0) AS v FROM saves').get().v;
+
+  // The whole document with its version. Split fields are put together again.
+  function read() {
+    const data = {};
+    for (const { key, json } of db.prepare('SELECT key, json FROM doc ORDER BY key').all()) {
+      const [field, id] = key.split('/');
+      if (id === undefined) data[field] = JSON.parse(json);
+      else (data[field] ??= {})[id] = JSON.parse(json);
+    }
+    return { version: version(), data };
+  }
+
+  function apply(set, remove, by) {
+    const current = version();
+    const put = db.prepare('INSERT INTO doc (key, json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET json = excluded.json');
+    // A field is stored either whole or split into parts. Before a part is saved or removed, a field that is
+    // still stored whole is split; it must be a map whose entry names can be keys.
+    const split = field => {
+      const whole = db.prepare('SELECT json FROM doc WHERE key = ?').get(field);
+      if (!whole) return;
+      const value = JSON.parse(whole.json);
+      if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(id => !KEY.test(field + '/' + id))) throw problem('key-conflict');
+      db.prepare('DELETE FROM doc WHERE key = ?').run(field);
+      for (const [id, part] of Object.entries(value)) put.run(field + '/' + id, JSON.stringify(part));
+    };
+    for (const [key, json] of set) {
+      const [field, id] = key.split('/');
+      if (id === undefined) db.prepare('DELETE FROM doc WHERE key LIKE ?').run(field + '/%');
+      else split(field);
+      put.run(key, json);
+    }
+    for (const key of remove) {
+      const [field, id] = key.split('/');
+      if (id !== undefined) split(field);
+      db.prepare('DELETE FROM doc WHERE key = ?').run(key);
+      if (id === undefined) db.prepare('DELETE FROM doc WHERE key LIKE ?').run(key + '/%');
+    }
+    const keys = [...set.map(([key]) => key), ...remove];
+    db.prepare('INSERT INTO saves (version, at, by, keys) VALUES (?, ?, ?, ?)').run(current + 1, new Date(now()).toISOString(), String(by), keys.join(' '));
+    if ((current + 1) % 1000 === 0) db.prepare('DELETE FROM saves WHERE version <= ?').run(current + 1 - SAVES_KEPT);
+    return current + 1;
+  }
+
+  function transaction(work) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = work();
+      db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  // Saves the named keys. baseVersion must be the version the caller last read.
+  function write({ baseVersion, set = {}, remove = [], by }) {
+    if (!set || typeof set !== 'object' || Array.isArray(set) || !Array.isArray(remove)) throw problem('invalid-request');
+    const keys = [...Object.keys(set), ...remove];
+    if (!Number.isInteger(baseVersion) || !keys.length || keys.some(key => typeof key !== 'string' || !KEY.test(key)) || new Set(keys).size !== keys.length) throw problem('invalid-request');
+    const rows = Object.entries(set).map(([key, value]) => {
+      const json = JSON.stringify(value);
+      if (json === undefined) throw problem('invalid-request');
+      if (json.length > MAX_VALUE) throw problem('too-long');
+      return [key, json];
+    });
+    return transaction(() => {
+      const current = version();
+      if (baseVersion !== current) throw problem('version-conflict', { version: current });
+      return { version: apply(rows, remove, by) };
+    });
+  }
+
+  // Replaces the whole document (used by the administration tool to load a saved copy).
+  function replace(data, by) {
+    if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).some(key => !KEY.test(key) || key.includes('/'))) throw problem('invalid-request');
+    return transaction(() => {
+      db.exec('DELETE FROM doc');
+      return { version: apply(Object.entries(data).map(([key, value]) => [key, JSON.stringify(value)]), [], by) };
+    });
+  }
+
+  const lastSaves = (count = 20) => db.prepare('SELECT version, at, by, keys FROM saves ORDER BY version DESC LIMIT ?').all(count);
+  return { read, write, replace, lastSaves, close: () => db.close() };
+}
+
+module.exports = { openData, KEY, MAX_VALUE };
+```
+
+Changed against the old file: before a part (`field/id`) is saved or removed, a field that is still stored whole is split into its parts.
+
+**Whole file 2.2** — replace the complete content of `work/wa-replica/site-api.cjs` with (155 lines; one newline at the end of the last line and nothing after it):
+
+```js
+// Sign-in and data routes of one sub-site, used by the preview server when WA_SCRM_DATA_DIR is set:
+//   GET  /api/site/status    is the sub-site's server side switched on?
+//   POST /api/auth/login     { username, password } → session cookie
+//   POST /api/auth/logout
+//   GET  /api/auth/me        the signed-in user (401 when nobody is signed in)
+//   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
+//   POST /api/auth/password  { current, next }
+//   GET  /api/data           the sub-site's data document
+//   PUT  /api/data           { baseVersion, set, remove }
+// The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it.
+// A log line carries the action, the user name and the outcome; never a password, a token or data.
+const path = require('node:path');
+const fs = require('node:fs');
+const { openAuth } = require('./site-auth.cjs');
+const { openData } = require('./site-data.cjs');
+
+const COOKIE = 'scrm_sid';
+const MAX_BODY = 8 * 1024 * 1024;
+const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const STATUS = {
+  'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
+  'password-change-required': 403, 'forbidden': 403, 'read-only': 403, 'version-conflict': 409, 'too-long': 413, 'too-many-attempts': 429,
+};
+const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
+
+function sendJson(res, status, body, headers = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
+  res.end(JSON.stringify(body));
+}
+
+async function readJson(req) {
+  if ((req.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') throw problem('invalid-request');
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+    size += chunk.length;
+    if (size > MAX_BODY) {
+      req.resume();
+      throw problem('too-long');
+    }
+    chunks.push(chunk);
+  }
+  let body = null;
+  try {
+    body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {}
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw problem('invalid-request');
+  return body;
+}
+
+function cookieToken(req) {
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const at = part.indexOf('=');
+    if (at > 0 && part.slice(0, at).trim() === COOKIE) return part.slice(at + 1).trim();
+  }
+  return '';
+}
+
+// The cookie is marked Secure when the request came in over HTTPS, or when WA_SCRM_COOKIE_SECURE=1.
+function cookieHeader(req, token, maxAgeSeconds) {
+  const secure = process.env.WA_SCRM_COOKIE_SECURE === '1' || req.headers['x-forwarded-proto'] === 'https';
+  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
+}
+
+function create({ dir, siteId = 'default', now }) {
+  if (!SITE_ID.test(siteId)) throw new Error('WA_SCRM_SITE_ID must be lower-case letters, digits and hyphens');
+  // The databases hold password hashes and customer data: every file this process creates from now on is private.
+  process.umask(0o077);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const auth = openAuth(path.join(dir, 'auth.db'), { now });
+  const data = openData(path.join(dir, `site-${siteId}.db`), { now });
+
+  const authenticate = req => auth.sessionUser(cookieToken(req));
+  // May this request use the other services of the server (the AI relay)? Signed in, and no password change pending.
+  const allows = req => { const user = authenticate(req); return Boolean(user && !user.mustChangePassword); };
+  // Who may read this sub-site's data: its own employee, and every supervisor and administrator.
+  const mayRead = user => user.role !== 'agent' || user.site === siteId;
+  const mayWrite = user => user.role === 'agent' && user.site === siteId;
+
+  function signedIn(req, { allowPendingPassword = false } = {}) {
+    const user = authenticate(req);
+    if (!user) throw problem('not-signed-in');
+    if (user.mustChangePassword && !allowPendingPassword) throw problem('password-change-required');
+    return user;
+  }
+
+  const routes = {
+    'GET /api/site/status': () => ({ body: { enabled: true, site: siteId } }),
+    'POST /api/auth/login': async req => {
+      const body = await readJson(req);
+      try {
+        const { token, user } = await auth.signIn(body.username, body.password);
+        console.log(`site login ok user=${user.username}`);
+        return { body: { user }, headers: { 'Set-Cookie': cookieHeader(req, token, 30 * 24 * 60 * 60) } };
+      } catch (error) {
+        if (error.code) console.error(`site login failed error=${error.code}`);
+        throw error;
+      }
+    },
+    'POST /api/auth/logout': req => {
+      auth.signOut(cookieToken(req));
+      return { body: { ok: true }, headers: { 'Set-Cookie': cookieHeader(req, '', 0) } };
+    },
+    'GET /api/auth/me': req => ({ body: { user: signedIn(req, { allowPendingPassword: true }), site: siteId } }),
+    'GET /api/auth/session': req => ({ body: { user: authenticate(req), site: siteId } }),
+    'POST /api/auth/password': async req => {
+      const user = signedIn(req, { allowPendingPassword: true });
+      const body = await readJson(req);
+      const changed = await auth.changePassword(user.id, body.current, body.next, cookieToken(req));
+      console.log(`site password changed user=${user.username}`);
+      return { body: { user: changed } };
+    },
+    'GET /api/data': req => {
+      const user = signedIn(req);
+      if (!mayRead(user)) throw problem('forbidden');
+      return { body: data.read() };
+    },
+    'PUT /api/data': async req => {
+      const user = signedIn(req);
+      if (!mayRead(user)) throw problem('forbidden');
+      if (!mayWrite(user)) throw problem('read-only');
+      const body = await readJson(req);
+      const saved = data.write({ baseVersion: body.baseVersion, set: body.set, remove: body.remove, by: user.username });
+      return { body: saved };
+    },
+  };
+
+  async function handle(req, res, pathname) {
+    const route = routes[`${req.method} ${pathname}`];
+    if (!route) {
+      const known = Object.keys(routes).some(key => key.endsWith(' ' + pathname));
+      return sendJson(res, known ? 405 : 404, { error: known ? 'method-not-allowed' : 'not-found' });
+    }
+    // A page of another site must not act with this site's cookie: browsers mark such requests.
+    if (req.method !== 'GET' && req.headers['sec-fetch-site'] === 'cross-site') {
+      req.resume();
+      return sendJson(res, 403, { error: 'forbidden' });
+    }
+    try {
+      const { body, headers } = await route(req);
+      return sendJson(res, 200, body, headers);
+    } catch (error) {
+      if (!error.code || !Object.hasOwn(STATUS, error.code)) {
+        console.error(`site request failed route=${req.method} ${pathname} error=${error.code || error.name}`);
+        return sendJson(res, 500, { error: 'internal' });
+      }
+      const extra = error.code === 'version-conflict' ? { version: error.version } : error.code === 'too-many-attempts' ? { retryAfter: error.retryAfter } : {};
+      return sendJson(res, STATUS[error.code], { error: error.code, ...extra }, error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {});
+    }
+  }
+
+  return { handle, authenticate, allows, auth, data, siteId, close: () => { auth.close(); data.close(); } };
+}
+
+module.exports = { create, COOKIE };
+```
+
+Changed against the old file: every file the process creates is private (`process.umask(0o077)`); a new route `GET /api/auth/session` answers with the signed-in user or `null` and never with an error.
+
+**Whole file 2.3** — replace the complete content of `work/wa-replica/site-admin.cjs` with (67 lines; one newline at the end of the last line and nothing after it):
+
+```js
+// Administration tool for the accounts and the data of a sub-site. Run it on the server, as the user that runs
+// the service:
+//   node site-admin.cjs user add <username> <agent|supervisor|admin> <display name>
+//   node site-admin.cjs user reset <username>        a new temporary password; ends the account's sessions
+//   node site-admin.cjs user disable <username>      user enable <username>
+//   node site-admin.cjs user list
+//   node site-admin.cjs data export <file>           data import <file>
+// Environment: WA_SCRM_DATA_DIR (required), WA_SCRM_SITE_ID (the sub-site an agent is created for and whose
+// data is exported or imported; default "default"). A temporary password is printed once and stored nowhere
+// else; its owner has to change it at the first sign-in. Needs Node 22.13 or newer.
+const fs = require('node:fs');
+const path = require('node:path');
+
+async function main([area, action, ...rest]) {
+  const dir = process.env.WA_SCRM_DATA_DIR;
+  const siteId = process.env.WA_SCRM_SITE_ID || 'default';
+  if (!dir) throw new Error('WA_SCRM_DATA_DIR is not set');
+  process.umask(0o077); // databases and exported copies are private files
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (area === 'user') {
+    const auth = require('./site-auth.cjs').openAuth(path.join(dir, 'auth.db'));
+    try {
+      if (action === 'add') {
+        const [username, role, ...name] = rest;
+        const { user, password } = await auth.createUser({ username, role, name: name.join(' '), site: role === 'agent' ? siteId : null });
+        return console.log(`created ${user.username} (${user.role}${user.site ? ', sub-site ' + user.site : ''})\ntemporary password: ${password}`);
+      }
+      if (action === 'reset') {
+        const { user, password } = await auth.resetPassword(rest[0]);
+        return console.log(`password of ${user.username} was reset\ntemporary password: ${password}`);
+      }
+      if (action === 'disable' || action === 'enable') {
+        const user = auth.setDisabled(rest[0], action === 'disable');
+        return console.log(`${user.username} is ${user.disabled ? 'disabled' : 'enabled'}`);
+      }
+      if (action === 'list') {
+        for (const user of auth.listUsers()) console.log([user.username, user.role, user.site || '-', user.disabled ? 'disabled' : 'active', user.mustChangePassword ? 'temporary password' : 'own password', user.name].join('\t'));
+        return;
+      }
+    } finally {
+      auth.close();
+    }
+  }
+  if (area === 'data' && rest[0]) {
+    const data = require('./site-data.cjs').openData(path.join(dir, `site-${siteId}.db`));
+    try {
+      if (action === 'export') {
+        const saved = data.read();
+        fs.writeFileSync(rest[0], JSON.stringify(saved, null, 2) + '\n', { mode: 0o600 });
+        return console.log(`exported version ${saved.version} of sub-site ${siteId} to ${rest[0]}`);
+      }
+      if (action === 'import') {
+        const loaded = JSON.parse(fs.readFileSync(rest[0], 'utf8'));
+        const { version } = data.replace(loaded.data || loaded, 'site-admin');
+        return console.log(`imported ${rest[0]} into sub-site ${siteId} as version ${version}`);
+      }
+    } finally {
+      data.close();
+    }
+  }
+  throw new Error('usage: site-admin.cjs user add|reset|disable|enable|list … | data export|import <file>');
+}
+
+main(process.argv.slice(2)).catch(error => {
+  console.error('site-admin: ' + (error.code || error.message));
+  process.exitCode = 1;
+});
+```
+
+Changed against the old file: the tool creates private files too.
+
+**Whole file 2.4** — replace the complete content of `work/wa-replica/site-api.test.cjs` with (305 lines; one newline at the end of the last line and nothing after it):
+
+```js
+// Tests of the accounts, the sessions and the data store of a sub-site.
+// Run with Node 22.13 or newer:  node --test work/wa-replica/site-api.test.cjs
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const http = require('node:http');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawn, spawnSync } = require('node:child_process');
+const siteApi = require('./site-api.cjs');
+const { SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_MS } = require('./site-auth.cjs');
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-site-'));
+let clock = Date.parse('2026-11-21T08:00:00Z');
+const site = siteApi.create({ dir: path.join(tmp, 'main'), siteId: 's1', now: () => clock });
+const server = http.createServer((req, res) => site.handle(req, res, new URL(req.url, 'http://localhost').pathname));
+let port;
+const PASSWORD = 'correct horse battery';
+const logged = [];
+for (const level of ['log', 'error']) {
+  const original = console[level];
+  console[level] = (...args) => { logged.push(args.join(' ')); if (!String(args[0]).startsWith('site ')) original(...args); };
+}
+
+const call = (pathname, { method = 'GET', body, cookie, headers = {}, base = `http://127.0.0.1:${port}` } = {}) =>
+  fetch(base + pathname, { method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
+    .then(async response => ({ status: response.status, setCookie: response.headers.get('set-cookie') || '', retryAfter: response.headers.get('retry-after'), raw: await response.text() }))
+    .then(result => ({ ...result, json: JSON.parse(result.raw) }));
+const cookieOf = response => response.setCookie.split(';')[0];
+// Creates an account whose password is already its owner's, and signs it in.
+async function member(username, role, siteId) {
+  const { password } = await site.auth.createUser({ username, role, name: username + ' name', site: siteId });
+  const first = await call('/api/auth/login', { method: 'POST', body: { username, password } });
+  assert.equal(first.status, 200);
+  const changed = await call('/api/auth/password', { method: 'POST', cookie: cookieOf(first), body: { current: password, next: PASSWORD } });
+  assert.equal(changed.status, 200);
+  return cookieOf(first);
+}
+
+test.before(() => new Promise(resolve => server.listen(0, '127.0.0.1', () => { port = server.address().port; resolve(); })));
+test.after(() => {
+  server.closeAllConnections(); server.close(); site.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('status: the sub-site answers without sign-in', async () => {
+  const status = await call('/api/site/status');
+  assert.deepEqual([status.status, status.json], [200, { enabled: true, site: 's1' }]);
+});
+
+test('accounts: rules for names, roles and passwords; the password is not stored', async () => {
+  const add = fields => site.auth.createUser({ username: 'rules', role: 'agent', name: 'Rules', site: 's1', ...fields });
+  await assert.rejects(add({ username: 'ab' }), { code: 'invalid-username' });
+  await assert.rejects(add({ username: 'Has Space' }), { code: 'invalid-username' });
+  await assert.rejects(add({ role: 'owner' }), { code: 'invalid-role' });
+  await assert.rejects(add({ site: null }), { code: 'site-required' });
+  await assert.rejects(add({ name: '  ' }), { code: 'invalid-name' });
+  await assert.rejects(add({ password: 'short' }), { code: 'invalid-password' });
+  const created = await add({ username: ' Rules ' });
+  assert.equal(created.user.username, 'rules');
+  assert.equal(created.user.mustChangePassword, true);
+  assert.match(created.password, /^[a-zA-Z2-9]{16}$/);
+  await assert.rejects(add({ username: 'RULES' }), { code: 'username-taken' });
+  const supervisor = await site.auth.createUser({ username: 'boss', role: 'supervisor', name: 'Boss', site: 's1' });
+  assert.equal(supervisor.user.site, null, 'only an agent belongs to a sub-site');
+  assert(!JSON.stringify(site.auth.listUsers()).includes('scrypt'), 'the list of accounts carries no password hash');
+  const stored = fs.readFileSync(path.join(tmp, 'main', 'auth.db')).toString('latin1') + (fs.existsSync(path.join(tmp, 'main', 'auth.db-wal')) ? fs.readFileSync(path.join(tmp, 'main', 'auth.db-wal')).toString('latin1') : '');
+  assert(!stored.includes(created.password) && stored.includes('scrypt$16384$8$1$'), 'the database holds a hash, not the password');
+});
+
+test('sign-in: a wrong password and an unknown account get the same answer; the cookie is HttpOnly; me returns the user', async () => {
+  const { password } = await site.auth.createUser({ username: 'ana', role: 'agent', name: 'Ana', site: 's1' });
+  const wrong = await call('/api/auth/login', { method: 'POST', body: { username: 'ana', password: 'not the password' } });
+  const unknown = await call('/api/auth/login', { method: 'POST', body: { username: 'nobody', password: 'not the password' } });
+  assert.deepEqual([wrong.status, wrong.json], [401, { error: 'invalid-credentials' }]);
+  assert.deepEqual([unknown.status, unknown.json], [401, { error: 'invalid-credentials' }]);
+  assert.equal(wrong.setCookie, '');
+  const ok = await call('/api/auth/login', { method: 'POST', body: { username: ' ANA ', password } });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.json.user, { id: ok.json.user.id, username: 'ana', name: 'Ana', role: 'agent', site: 's1', mustChangePassword: true, disabled: false });
+  assert.match(ok.setCookie, /^scrm_sid=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
+  const https = await call('/api/auth/login', { method: 'POST', body: { username: 'ana', password }, headers: { 'X-Forwarded-Proto': 'https' } });
+  assert(https.setCookie.endsWith('; Secure'), 'Secure when the request came over HTTPS');
+  assert(!ok.raw.includes(password) && !ok.raw.includes('scrypt'));
+  const me = await call('/api/auth/me', { cookie: cookieOf(ok) });
+  assert.deepEqual([me.status, me.json.user.username, me.json.site], [200, 'ana', 's1']);
+  assert.deepEqual((await call('/api/auth/me')).json, { error: 'not-signed-in' });
+  assert.deepEqual([(await call('/api/auth/session')).status, (await call('/api/auth/session')).json], [200, { user: null, site: 's1' }], 'the page can ask without an error');
+  assert.equal((await call('/api/auth/session', { cookie: cookieOf(ok) })).json.user.username, 'ana');
+  assert.equal((await call('/api/auth/session', { cookie: 'scrm_sid=forged' })).json.user, null);
+  assert.equal((await call('/api/auth/me', { cookie: 'scrm_sid=forged' })).status, 401);
+  assert.equal((await call('/api/auth/login', { method: 'POST', body: 'username=ana', headers: { 'Content-Type': 'text/plain' } })).status, 400);
+});
+
+test('a temporary password must be changed first; the change ends the other sessions', async () => {
+  const { password } = await site.auth.createUser({ username: 'ben', role: 'agent', name: 'Ben', site: 's1' });
+  const one = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'ben', password } }));
+  const two = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'ben', password } }));
+  assert.deepEqual((await call('/api/data', { cookie: one })).json, { error: 'password-change-required' });
+  assert.equal((await call('/api/data', { method: 'PUT', cookie: one, body: { baseVersion: 0, set: { a: 1 } } })).status, 403);
+  const change = body => call('/api/auth/password', { method: 'POST', cookie: one, body });
+  assert.deepEqual([(await change({ current: 'wrong password!', next: PASSWORD })).status, (await change({ current: password, next: 'short' })).json.error, (await change({ current: password, next: password })).json.error], [401, 'invalid-password', 'invalid-password']);
+  const changed = await change({ current: password, next: PASSWORD });
+  assert.deepEqual([changed.status, changed.json.user.mustChangePassword], [200, false]);
+  assert.equal((await call('/api/data', { cookie: one })).status, 200, 'the session that changed the password stays');
+  assert.equal((await call('/api/auth/me', { cookie: two })).status, 401, 'the other session ended');
+  assert.equal((await call('/api/auth/login', { method: 'POST', body: { username: 'ben', password } })).status, 401, 'the temporary password no longer works');
+  assert.equal((await call('/api/auth/password', { method: 'POST', body: { current: PASSWORD, next: PASSWORD + '!' } })).status, 401, 'not without a session');
+});
+
+test('five failed sign-ins lock the account for five minutes, also for the right password', async () => {
+  await member('cleo', 'agent', 's1');
+  const attempt = password => call('/api/auth/login', { method: 'POST', body: { username: 'cleo', password } });
+  for (let i = 0; i < 5; i++) assert.equal((await attempt('wrong password ' + i)).status, 401);
+  const locked = await attempt(PASSWORD);
+  assert.deepEqual([locked.status, locked.json, locked.retryAfter], [429, { error: 'too-many-attempts', retryAfter: 300 }, '300']);
+  clock += LOCK_MS - 1000;
+  assert.equal((await attempt(PASSWORD)).status, 429);
+  clock += 2000;
+  assert.equal((await attempt(PASSWORD)).status, 200);
+  for (let i = 0; i < 4; i++) await attempt('wrong again ' + i);
+  assert.equal((await attempt(PASSWORD)).status, 200, 'a success clears the count');
+});
+
+test('sessions end: after seven idle days, after thirty days, on sign-out, when the account is disabled or reset', async () => {
+  const idle = await member('dana', 'agent', 's1');
+  clock += SESSION_IDLE_MS - 60000;
+  assert.equal((await call('/api/auth/me', { cookie: idle })).status, 200, 'used within seven days: still valid');
+  clock += SESSION_IDLE_MS + 1000;
+  assert.equal((await call('/api/auth/me', { cookie: idle })).status, 401, 'seven idle days');
+  const long = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
+  for (let day = 0; day < 29; day += 5) { clock += 5 * 24 * 60 * 60 * 1000; assert.equal((await call('/api/auth/me', { cookie: long })).status, 200, 'day ' + (day + 5)); }
+  clock += SESSION_MAX_MS - 29 * 24 * 60 * 60 * 1000;
+  assert.equal((await call('/api/auth/me', { cookie: long })).status, 401, 'thirty days at most');
+  const out = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
+  const signedOut = await call('/api/auth/logout', { method: 'POST', cookie: out, body: {} });
+  assert.match(signedOut.setCookie, /^scrm_sid=; Path=\/; HttpOnly; SameSite=Lax; Max-Age=0$/);
+  assert.equal((await call('/api/auth/me', { cookie: out })).status, 401);
+  const disabled = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
+  site.auth.setDisabled('dana', true);
+  assert.equal((await call('/api/auth/me', { cookie: disabled })).status, 401);
+  assert.equal((await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } })).status, 401, 'a disabled account cannot sign in');
+  site.auth.setDisabled('dana', false);
+  const reset = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
+  const { password } = await site.auth.resetPassword('dana');
+  assert.equal((await call('/api/auth/me', { cookie: reset })).status, 401, 'a reset ends the sessions');
+  assert.equal((await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password } })).json.user.mustChangePassword, true);
+});
+
+test('data: saved by key with a version; a save based on an old version is refused; split fields are put together', async () => {
+  const cookie = await member('eli', 'agent', 's1');
+  const put = body => call('/api/data', { method: 'PUT', cookie, body });
+  assert.deepEqual((await call('/api/data', { cookie })).json, { version: 0, data: {} });
+  const first = await put({ baseVersion: 0, set: { customers: [{ id: 'c1', name: '张伟' }], 'messages/c1': [{ id: 'm1', text: 'Hola' }], 'messages/c2': [], settings: { tone: 'casual' } } });
+  assert.deepEqual([first.status, first.json], [200, { version: 1 }]);
+  assert.deepEqual((await call('/api/data', { cookie })).json, { version: 1, data: { customers: [{ id: 'c1', name: '张伟' }], messages: { c1: [{ id: 'm1', text: 'Hola' }], c2: [] }, settings: { tone: 'casual' } } });
+  const stale = await put({ baseVersion: 0, set: { customers: [] } });
+  assert.deepEqual([stale.status, stale.json], [409, { error: 'version-conflict', version: 1 }]);
+  assert.equal((await call('/api/data', { cookie })).json.data.customers.length, 1, 'a refused save changes nothing');
+  assert.deepEqual((await put({ baseVersion: 1, set: { 'messages/c1': [{ id: 'm1', text: 'Hola' }, { id: 'm2', text: 'Gracias' }] }, remove: ['messages/c2', 'settings'] })).json, { version: 2 });
+  assert.deepEqual((await call('/api/data', { cookie })).json.data, { customers: [{ id: 'c1', name: '张伟' }], messages: { c1: [{ id: 'm1', text: 'Hola' }, { id: 'm2', text: 'Gracias' }] } });
+  assert.deepEqual((await put({ baseVersion: 2, set: { 'customers/c9': {} } })).json, { error: 'key-conflict' }, 'a list cannot be saved in parts');
+  assert.deepEqual((await put({ baseVersion: 2, set: { messages: {} } })).json, { version: 3 }, 'a whole value replaces the parts');
+  assert.deepEqual((await call('/api/data', { cookie })).json.data.messages, {});
+  assert.deepEqual((await put({ baseVersion: 3, remove: ['messages'] })).json, { version: 4 });
+  assert.equal('messages' in (await call('/api/data', { cookie })).json.data, false);
+  // a map that was saved whole is split when one of its parts is saved or removed
+  assert.deepEqual((await put({ baseVersion: 4, set: { activities: { c1: ['a'], c2: ['b'], c3: ['c'] } } })).json, { version: 5 });
+  assert.deepEqual((await put({ baseVersion: 5, set: { 'activities/c2': ['b', 'b2'] } })).json, { version: 6 });
+  assert.deepEqual((await put({ baseVersion: 6, remove: ['activities/c3'] })).json, { version: 7 });
+  assert.deepEqual((await call('/api/data', { cookie })).json.data.activities, { c1: ['a'], c2: ['b', 'b2'] });
+  assert.deepEqual((await put({ baseVersion: 7, set: { odd: { 'not a key': 1 } } })).json, { version: 8 });
+  assert.deepEqual((await put({ baseVersion: 8, set: { 'odd/x': 1 } })).json, { error: 'key-conflict' }, 'entry names that cannot be keys keep the field whole');
+  assert.deepEqual((await put({ baseVersion: 8, remove: ['odd', 'activities'] })).json, { version: 9 });
+  assert.deepEqual(site.data.lastSaves(2).map(save => [save.version, save.by, save.keys]), [[9, 'eli', 'odd activities'], [8, 'eli', 'odd']]);
+});
+
+test('data: malformed saves are refused and change nothing', async () => {
+  const cookie = await member('finn', 'agent', 's1');
+  const version = (await call('/api/data', { cookie })).json.version;
+  const refused = async (body, status, error, headers) => { const r = await call('/api/data', { method: 'PUT', cookie, body, headers }); assert.deepEqual([r.status, r.json.error], [status, error], JSON.stringify(body).slice(0, 80)); };
+  await refused({ set: { a: 1 } }, 400, 'invalid-request');
+  await refused({ baseVersion: String(version), set: { a: 1 } }, 400, 'invalid-request');
+  await refused({ baseVersion: version }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: [] }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { 'bad key': 1 } }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { 'a/b/c': 1 } }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { '../x': 1 } }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { a: 1 }, remove: ['a'] }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { a: 1 }, remove: 'a' }, 400, 'invalid-request');
+  await refused({ baseVersion: version, set: { big: 'x'.repeat(2 * 1024 * 1024) } }, 413, 'too-long');
+  await refused('[1]', 400, 'invalid-request');
+  await refused('not json', 400, 'invalid-request');
+  await refused('{"baseVersion":0,"set":{"a":1}}', 400, 'invalid-request', { 'Content-Type': 'text/plain' });
+  assert.equal((await call('/api/data', { cookie })).json.version, version);
+});
+
+test('access: only the sub-site\'s own employee writes; supervisors and administrators read; others are refused', async () => {
+  const owner = await member('gus', 'agent', 's1');
+  const other = await member('hana', 'agent', 's2');
+  const supervisor = await member('ivo', 'supervisor');
+  const admin = await member('joy', 'admin');
+  const version = (await call('/api/data', { cookie: owner })).json.version;
+  assert.equal((await call('/api/data', { method: 'PUT', cookie: owner, body: { baseVersion: version, set: { note: 'mine' } } })).status, 200);
+  for (const cookie of [supervisor, admin]) {
+    assert.equal((await call('/api/data', { cookie })).json.data.note, 'mine');
+    assert.deepEqual((await call('/api/data', { method: 'PUT', cookie, body: { baseVersion: version + 1, set: { note: 'changed' } } })).json, { error: 'read-only' });
+  }
+  assert.deepEqual((await call('/api/data', { cookie: other })).json, { error: 'forbidden' });
+  assert.deepEqual((await call('/api/data', { method: 'PUT', cookie: other, body: { baseVersion: version + 1, set: { note: 'x' } } })).json, { error: 'forbidden' });
+  assert.equal((await call('/api/data')).status, 401);
+  assert.equal((await call('/api/data', { cookie: owner })).json.data.note, 'mine');
+  const crossSite = await call('/api/data', { method: 'PUT', cookie: owner, body: { baseVersion: version + 1, set: { note: 'x' } }, headers: { 'Sec-Fetch-Site': 'cross-site' } });
+  assert.deepEqual([crossSite.status, crossSite.json], [403, { error: 'forbidden' }]);
+  assert.equal((await call('/api/data', { method: 'DELETE', cookie: owner })).status, 405);
+  assert.equal((await call('/api/auth/unknown')).status, 404);
+});
+
+test('the log names users and outcomes, never a password, a token or data', () => {
+  const lines = logged.filter(line => line.startsWith('site '));
+  assert(lines.some(line => line === 'site login ok user=ana') && lines.some(line => line === 'site login failed error=invalid-credentials') && lines.some(line => line === 'site password changed user=ben'), lines.slice(0, 8).join('\n'));
+  const all = logged.join('\n');
+  for (const secret of [PASSWORD, 'scrm_sid', '张伟', 'Gracias', 'wrong password']) assert(!all.includes(secret), secret);
+});
+
+test('administration tool: creates an account with a temporary password, lists, resets, disables; exports and imports the data', async () => {
+  const dir = path.join(tmp, 'cli');
+  const run = (...args) => spawnSync(process.execPath, [path.join(__dirname, 'site-admin.cjs'), ...args], { env: { ...process.env, WA_SCRM_DATA_DIR: dir, WA_SCRM_SITE_ID: 'shop' }, encoding: 'utf8' });
+  const added = run('user', 'add', 'kim', 'agent', 'Kim', 'Lee');
+  assert.equal(added.status, 0, added.stderr);
+  const password = added.stdout.match(/^temporary password: ([a-zA-Z2-9]{16})$/m)?.[1];
+  assert(password && added.stdout.startsWith('created kim (agent, sub-site shop)\n'), added.stdout);
+  assert.equal(run('user', 'add', 'kim', 'agent', 'Again').stderr.trim(), 'site-admin: username-taken');
+  assert.equal(run('user', 'add', 'lead', 'supervisor', 'Lead').status, 0);
+  assert.deepEqual(run('user', 'list').stdout.trim().split('\n'), ['kim\tagent\tshop\tactive\ttemporary password\tKim Lee', 'lead\tsupervisor\t-\tactive\ttemporary password\tLead']);
+  const other = siteApi.create({ dir, siteId: 'shop' });
+  try {
+    assert.equal((await other.auth.signIn('kim', password)).user.site, 'shop');
+    other.data.write({ baseVersion: 0, set: { customers: [{ id: 'c1' }], 'messages/c1': [{ text: 'hi' }] }, by: 'kim' });
+  } finally {
+    other.close();
+  }
+  const reset = run('user', 'reset', 'kim');
+  assert.match(reset.stdout, /^password of kim was reset\ntemporary password: [a-zA-Z2-9]{16}\n$/);
+  assert(!reset.stdout.includes(password));
+  assert.equal(run('user', 'disable', 'kim').stdout.trim(), 'kim is disabled');
+  assert.equal(run('user', 'enable', 'kim').stdout.trim(), 'kim is enabled');
+  assert.equal(run('user', 'reset', 'ghost').stderr.trim(), 'site-admin: unknown-user');
+  const file = path.join(tmp, 'export.json');
+  assert.equal(run('data', 'export', file).stdout.trim(), `exported version 1 of sub-site shop to ${file}`);
+  const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(exported, { version: 1, data: { customers: [{ id: 'c1' }], messages: { c1: [{ text: 'hi' }] } } });
+  exported.data.customers.push({ id: 'c2' });
+  fs.writeFileSync(file, JSON.stringify(exported));
+  assert.equal(run('data', 'import', file).stdout.trim(), `imported ${file} into sub-site shop as version 2`);
+  const again = siteApi.create({ dir, siteId: 'shop' });
+  try {
+    assert.deepEqual(again.data.read(), { version: 2, data: { customers: [{ id: 'c1' }, { id: 'c2' }], messages: { c1: [{ text: 'hi' }] } } });
+  } finally {
+    again.close();
+  }
+  for (const name of fs.readdirSync(dir)) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
+  assert.equal(fs.statSync(file).mode & 0o077, 0, 'an exported copy is private');
+  assert.equal(run('nonsense').status, 1);
+  assert.equal(spawnSync(process.execPath, [path.join(__dirname, 'site-admin.cjs'), 'user', 'list'], { env: { ...process.env, WA_SCRM_DATA_DIR: '' }, encoding: 'utf8' }).stderr.trim(), 'site-admin: WA_SCRM_DATA_DIR is not set');
+});
+
+test('the preview server: without a data folder the routes are off; with one, the AI relay answers signed-in users only', async () => {
+  const start = env => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(__dirname, 'serve.cjs'), '0'], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', chunk => { out += chunk; const m = out.match(/PREVIEW_URL=(http:\/\/127\.0\.0\.1:\d+)/); if (m) resolve({ child, base: m[1] }); });
+    child.on('exit', code => reject(new Error('serve.cjs exited early: ' + code)));
+    setTimeout(() => reject(new Error('serve.cjs did not start')), 8000);
+  });
+  const off = await start({ WA_SCRM_DATA_DIR: '', WA_SCRM_AI_ENV: '' });
+  try {
+    assert.deepEqual((await call('/api/site/status', { base: off.base })).json, { enabled: false });
+    const me = await call('/api/auth/me', { base: off.base });
+    assert.deepEqual([me.status, me.json], [503, { error: 'not-enabled' }]);
+    assert.equal((await call('/api/ai/status', { base: off.base })).status, 200, 'the relay is open as before');
+    assert.equal((await fetch(off.base + '/')).status, 200);
+  } finally {
+    off.child.kill();
+  }
+  const dir = path.join(tmp, 'served');
+  const setup = siteApi.create({ dir, siteId: 'default' });
+  const { password } = await setup.auth.createUser({ username: 'lia', role: 'agent', name: 'Lia', site: 'default' });
+  setup.close();
+  const on = await start({ WA_SCRM_DATA_DIR: dir, WA_SCRM_SITE_ID: '', WA_SCRM_AI_ENV: '' });
+  try {
+    assert.deepEqual((await call('/api/site/status', { base: on.base })).json, { enabled: true, site: 'default' });
+    assert.deepEqual((await call('/api/ai/status', { base: on.base })).json, { error: 'not-signed-in' });
+    assert.equal((await call('/api/ai/translate', { base: on.base, method: 'POST', body: { text: 'hi', to: 'English' } })).status, 401);
+    const first = await call('/api/auth/login', { base: on.base, method: 'POST', body: { username: 'lia', password } });
+    assert.equal((await call('/api/ai/status', { base: on.base, cookie: cookieOf(first) })).status, 401, 'not before the temporary password is changed');
+    assert.equal((await call('/api/auth/password', { base: on.base, method: 'POST', cookie: cookieOf(first), body: { current: password, next: PASSWORD } })).status, 200);
+    assert.deepEqual((await call('/api/ai/status', { base: on.base, cookie: cookieOf(first) })).json, { configured: false, reason: 'no-settings-file' });
+    assert.deepEqual((await call('/api/data', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
+    for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
+    assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
+  } finally {
+    on.child.kill();
+  }
+});
+```
+
+**Verify**: `sha256sum work/wa-replica/site-data.cjs work/wa-replica/site-api.cjs work/wa-replica/site-admin.cjs work/wa-replica/site-api.test.cjs` → in this order `541a826a542af00eaac848a157049e880ef2facce93facc7acecd5f38bcbde8f`, `81e477780a8eb800685e2a65c66430f662caa21b2d42c088157ad7c530339803`, `f5b0e5ae175b8a8a3e86ff8c0964d2740f25e964ffbe81422b9fc9a7b83327ad`, `5c5e897854c553634d3ddd31969d1ba7c1bd7949e5f023e5055da93ab05455f6`; `$NODE --test work/wa-replica/site-api.test.cjs` → `pass 12`, `fail 0`; `node --test work/wa-replica/ai-relay.test.cjs` → `pass 12`, `fail 0`. If a checksum does not match, write that file again from this plan; do not edit it by hand.
+
+### Step 3: The page: start-up script, sign-in screen, signing out
+
+**New file 3.1** — create `work/wa-replica/fidelity-boot.js` with this content (229 lines; one newline at the end of the last line and nothing after it):
+
+```js
+// Start-up of the page. It asks the server who is signed in, shows the sign-in screen when nobody is, loads
+// the sub-site's data, and only then starts the app (window.WA_START, defined by app.js). It also keeps the
+// data saved on the server: after every change the app calls WA_SITE.save(data) and the changed parts are sent.
+(() => {
+  'use strict';
+  const $ = selector => document.querySelector(selector);
+  // Fields that are maps by customer id; each entry is saved on its own.
+  const SPLIT = ['messages', 'activities'];
+  const SAVE_DELAY = 400;
+  const screen = { title: $('#subsite-login-title'), notice: $('#site-notice'), signIn: $('#site-sign-in'), password: $('#site-password'), leave: $('#site-leave') };
+
+  const request = (path, { method = 'GET', body, keepalive = false } = {}) =>
+    fetch(path, { method, keepalive, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+      .then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }));
+
+  function paintIcons(root) {
+    for (const el of root.querySelectorAll('[data-icon]:empty')) {
+      const nodes = window.WA_ICONS?.[el.dataset.icon];
+      if (!nodes) continue;
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value);
+      for (const [tag, attributes] of nodes) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+        svg.append(node);
+      }
+      el.replaceChildren(svg);
+    }
+  }
+
+  // Shows the screen before the app: a title, an optional notice, and one of the two forms or none.
+  function show(title, notice = '', form = null, { leave = false } = {}) {
+    $('#app-shell').hidden = true;
+    $('.skip-link').hidden = true;
+    $('#subsite-login').hidden = false;
+    screen.title.textContent = title;
+    screen.notice.textContent = notice;
+    screen.notice.hidden = !notice;
+    screen.signIn.hidden = form !== 'signIn';
+    screen.password.hidden = form !== 'password';
+    screen.leave.hidden = !leave;
+    for (const line of document.querySelectorAll('.fid-sign-in-error')) line.hidden = true;
+    for (const input of document.querySelectorAll('#subsite-login input[type="password"]')) input.value = '';
+    paintIcons($('#subsite-login'));
+    (form ? (form === 'signIn' ? screen.signIn : screen.password).querySelector('input') : screen.title).focus();
+  }
+  function fail(form, text) {
+    const line = form.querySelector('.fid-sign-in-error');
+    line.textContent = text;
+    line.hidden = false;
+  }
+  const busy = (form, on) => { form.querySelector('button[type="submit"]').disabled = on; };
+
+  async function begin() {
+    let status, me;
+    try {
+      status = await request('/api/site/status');
+      if (status.status !== 200 || !status.body.enabled) return show('服务器尚未启用账号', '服务器没有开启账号与数据存储，请联系管理员。');
+      me = await request('/api/auth/session');
+    } catch {
+      return show('无法连接服务器', '请通过工作台的服务器地址打开本页面；如果服务器正在重启，请稍后刷新。');
+    }
+    if (me.status !== 200) return show('无法连接服务器', '请稍后刷新重试。');
+    if (!me.body.user) return show('登录', '', 'signIn');
+    return enter(me.body.user, me.body.site);
+  }
+
+  async function enter(user, site) {
+    if (user.mustChangePassword) return show('请先修改临时密码', `${user.name}，你正在使用管理员发放的临时密码。设置自己的密码后才能进入工作台。`, 'password', { leave: true });
+    if (user.role !== 'agent') return show('主管与管理员入口尚未开放', '查看各员工子站的入口将随主站一起提供。请使用员工账号登录。', null, { leave: true });
+    let loaded;
+    try {
+      loaded = await request('/api/data');
+    } catch {
+      return show('无法连接服务器', '请稍后刷新重试。');
+    }
+    if (loaded.status === 403) return show('无法进入这个子站', '当前账号不属于这个子站，请联系管理员。', null, { leave: true });
+    if (loaded.status !== 200) return show('无法读取数据', '请稍后刷新重试。', null, { leave: true });
+    return start(user, site, loaded.body);
+  }
+
+  // One [key, value] per saved part: a whole top-level field, or one entry of a split field.
+  function parts(data) {
+    const list = [];
+    for (const [field, value] of Object.entries(data)) {
+      if (SPLIT.includes(field) && value && typeof value === 'object' && !Array.isArray(value)) for (const [id, part] of Object.entries(value)) list.push([field + '/' + id, part]);
+      else list.push([field, value]);
+    }
+    return list;
+  }
+
+  function start(user, site, { version, data }) {
+    // What the server holds, as text per key; a save sends what differs from it.
+    const synced = new Map(parts(data).map(([key, value]) => [key, JSON.stringify(value)]));
+    // A new sub-site starts empty. The flags mark the sample content of earlier builds as "already handled",
+    // so that nothing fictional is ever added to it.
+    if (!Object.keys(data).length) {
+      Object.assign(data, {
+        presetTagsRemoved: true, lcSeededV06: true, lcSeededOrders: true, lcSeededOrderHistory: true, chatArchiveSeeded: true,
+        operations: { assetGroups: [{ id: 'ops-text', type: 'text', name: '常用文本', note: '' }], assets: [] },
+      });
+    }
+    for (const [field, empty] of Object.entries({ version: 1, members: [], accounts: [], tagGroups: [], tags: [], customers: [], messages: {}, activities: {}, tasks: [], quickReplies: [] })) data[field] ??= empty;
+    if (!data.members.some(member => member.id === user.username)) data.members.push({ id: user.username, name: user.name, initial: [...user.name].at(-1) || '', role: 'agent', team: '', color: 'jade' });
+
+    let timer = 0, saving = false, pending = null, failures = 0, stopped = false;
+    const note = text => {
+      const toast = $('#toast');
+      toast.textContent = text;
+      toast.classList.toggle('show', Boolean(text));
+    };
+    function stop(title, notice) {
+      stopped = true;
+      clearTimeout(timer);
+      show(title, notice, null, { leave: true });
+      screen.leave.textContent = '刷新页面';
+      screen.leave.dataset.reload = '1';
+    }
+    async function flush({ keepalive = false } = {}) {
+      clearTimeout(timer);
+      timer = 0;
+      if (saving || stopped || !pending) return;
+      const current = new Map(parts(pending).map(([key, value]) => [key, JSON.stringify(value)]));
+      const set = {}, remove = [...synced.keys()].filter(key => !current.has(key));
+      for (const [key, json] of current) if (synced.get(key) !== json) set[key] = JSON.parse(json);
+      pending = null;
+      if (!Object.keys(set).length && !remove.length) return;
+      saving = true;
+      let answer;
+      try {
+        answer = await request('/api/data', { method: 'PUT', keepalive, body: { baseVersion: version, set, remove } });
+      } catch {
+        answer = { status: 0, body: {} };
+      }
+      saving = false;
+      if (answer.status === 200) {
+        version = answer.body.version;
+        for (const key of Object.keys(set)) synced.set(key, current.get(key));
+        for (const key of remove) synced.delete(key);
+        if (failures) note('');
+        failures = 0;
+        if (pending) timer = setTimeout(flush, SAVE_DELAY);
+      } else if (answer.status === 409) {
+        stop('数据已在别处更新', '这个子站的数据刚刚在另一个页面或设备上被修改。请刷新后继续；本页最近一次修改没有保存。');
+      } else if (answer.status === 401) {
+        stop('登录已失效', '请刷新页面后重新登录；本页最近一次修改没有保存。');
+      } else {
+        // The server could not be reached or had trouble: keep the changes and try again, more slowly each time.
+        pending ??= window.WA_SITE.data;
+        failures += 1;
+        note('修改暂未保存到服务器，正在重试…');
+        timer = setTimeout(flush, Math.min(30000, 1000 * 2 ** failures));
+      }
+    }
+    function save(data) {
+      if (stopped) return;
+      pending = data;
+      clearTimeout(timer);
+      timer = setTimeout(flush, SAVE_DELAY);
+    }
+    // Resolves when everything is saved (used before signing out, and by tests).
+    const idle = () => new Promise(resolve => {
+      const check = () => (stopped || (!timer && !saving && !pending) ? resolve() : setTimeout(check, 50));
+      check();
+    });
+    async function signOut() {
+      await flush();
+      await idle();
+      await request('/api/auth/logout', { method: 'POST', body: {} }).catch(() => {});
+      location.reload();
+    }
+    addEventListener('pagehide', () => { flush({ keepalive: true }); });
+
+    window.WA_SITE = { user, site, data, save, idle, signOut };
+    $('#subsite-login').hidden = true;
+    $('#app-shell').hidden = false;
+    $('.skip-link').hidden = false;
+    $('.fid-sign-out').title = `已登录：${user.name}（${user.username}）`;
+    window.WA_START();
+    // A new sub-site, or one with a new member entry, is saved right away.
+    save(data);
+  }
+
+  screen.signIn.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = screen.signIn, username = form.elements.username.value.trim(), password = form.elements.password.value;
+    if (!username || !password) return fail(form, '请输入用户名和密码。');
+    busy(form, true);
+    let answer;
+    try {
+      answer = await request('/api/auth/login', { method: 'POST', body: { username, password } });
+    } catch {
+      answer = { status: 0, body: {} };
+    }
+    busy(form, false);
+    if (answer.status === 200) return begin();
+    form.elements.password.value = '';
+    form.elements.password.focus();
+    if (answer.status === 429) return fail(form, `尝试次数过多，请 ${Math.max(1, Math.ceil((answer.body.retryAfter || 60) / 60))} 分钟后再试。`);
+    if (answer.status === 401) return fail(form, '用户名或密码不正确。');
+    return fail(form, '暂时无法登录，请稍后再试。');
+  });
+
+  screen.password.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = screen.password, current = form.elements.current.value, next = form.elements.next.value;
+    if (next.length < 10) return fail(form, '新密码至少 10 位。');
+    if (next !== form.elements.repeat.value) return fail(form, '两次输入的新密码不一致。');
+    busy(form, true);
+    let answer;
+    try {
+      answer = await request('/api/auth/password', { method: 'POST', body: { current, next } });
+    } catch {
+      answer = { status: 0, body: {} };
+    }
+    busy(form, false);
+    if (answer.status === 200) return begin();
+    if (answer.status === 401) return fail(form, '当前密码不正确。');
+    if (answer.status === 400) return fail(form, '新密码至少 10 位，且不能与当前密码相同。');
+    return fail(form, '暂时无法修改密码，请稍后再试。');
+  });
+
+  screen.leave.addEventListener('click', async () => {
+    if (!screen.leave.dataset.reload) await request('/api/auth/logout', { method: 'POST', body: {} }).catch(() => {});
+    location.reload();
+  });
+
+  begin();
+})();
+```
+
+What it does, for your orientation: it asks `/api/site/status` and `/api/auth/session`, shows the sign-in screen, the change-of-password form or a notice, loads `/api/data`, gives an empty sub-site its first document, publishes `window.WA_SITE = { user, site, data, save, idle, signOut }`, calls `window.WA_START()`, and from then on sends changed parts of the data to the server.
+
+**Whole file 3.2** — replace the complete content of `work/wa-replica/fidelity-subsite.js` with (14 lines; one newline at the end of the last line and nothing after it):
+
+```js
+  // Signing in happens before the app starts (fidelity-boot.js). The app shows itself and offers signing out,
+  // which saves what is pending, ends the session on the server and returns to the sign-in screen.
+  // The earlier layers ask this before they follow the address bar; the app only runs while someone is signed in.
+  const subsiteSignedOut = false;
+  function renderSignInState() {
+    $('#app-shell').hidden = false;
+    $('#subsite-login').hidden = true;
+    $('.skip-link').hidden = false;
+    return true;
+  }
+
+  Object.assign(fidActions, {
+    subsiteLogout:()=>window.WA_SITE.signOut(),
+  });
+```
+
+**Whole file 3.3** — replace the complete content of `work/wa-replica/fidelity-index.html` with (50 lines; one newline at the end of the last line and nothing after it):
+
+```html
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><meta name="color-scheme" content="light">
+  <title>WA Desk SCRM · WhatsApp 客户跟进闭环工作台原型</title>
+  <link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="components.css"><link rel="stylesheet" href="app.css">
+</head>
+<body class="fidelity">
+  <a class="skip-link" href="#view">跳到工作区</a>
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar" aria-label="功能导航">
+      <a class="brand" href="#dashboard" data-nav="dashboard" aria-label="WA Desk 首页"><span class="brand-symbol" data-icon="MessagesSquare"></span><span class="brand-name" translate="no"><strong>WA Desk SCRM</strong><small>WhatsApp 客户管理系统</small></span></a>
+      <nav id="nav" aria-label="主导航"></nav>
+      <div class="sidebar-bottom"><button class="collapse-button" type="button" data-action="toggleSidebar" aria-label="折叠菜单"><span data-icon="PanelLeftClose"></span><span class="nav-label">收起</span></button></div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="header-left"><button class="icon-button" type="button" data-action="toggleSidebar" aria-label="切换导航"><span data-icon="Menu"></span></button><span class="fid-edition"><b>内部版</b><span>当前工作台： <strong>WhatsApp</strong></span></span></div>
+        <div class="top-actions"><button class="icon-button fid-notify" data-action="fidTasks" aria-label="跟进待办"><span data-icon="Bell"></span><span id="header-tasks" class="header-count"></span></button><button class="fid-btn fid-sign-out" data-action="subsiteLogout" type="button"><span data-icon="LogOut"></span>退出登录</button></div>
+      </header>
+      <nav class="workspace-tabs" id="workspace-tabs" aria-label="已打开的页面"></nav>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <main id="subsite-login" class="fid-sign-in" aria-labelledby="subsite-login-title">
+    <div class="fid-sign-in-panel">
+      <div class="fid-sign-in-brand" translate="no"><span class="brand-symbol" data-icon="MessagesSquare"></span><strong>WA Desk SCRM</strong></div>
+      <h1 id="subsite-login-title" tabindex="-1">正在连接…</h1>
+      <p id="site-notice" class="fid-sign-in-note" role="status" hidden></p>
+      <form id="site-sign-in" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">用户名<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+        <label class="field">密码<input name="password" type="password" autocomplete="current-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">登录</button>
+      </form>
+      <form id="site-password" class="fid-sign-in-form" hidden novalidate>
+        <label class="field">当前（临时）密码<input name="current" type="password" autocomplete="current-password"></label>
+        <label class="field">新密码（至少 10 位）<input name="next" type="password" autocomplete="new-password"></label>
+        <label class="field">再输入一次新密码<input name="repeat" type="password" autocomplete="new-password"></label>
+        <p class="fid-sign-in-error" role="alert" hidden></p>
+        <button class="fid-btn gradient" type="submit">保存新密码并进入</button>
+      </form>
+      <button id="site-leave" class="link" type="button" hidden>退出登录</button>
+    </div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="dialog" aria-label="编辑信息"><div id="dialog-content"></div></dialog>
+  <script src="icons.js"></script><script src="app.js"></script><script src="boot.js"></script>
+</body>
+</html>
+```
+
+Changed against the old file: the screen `#subsite-login` holds the two forms, a notice line and a "leave" button instead of the demo button, and is visible until the start-up script decides; the script tags are `icons.js`, `app.js`, `boot.js` (no `demo-data.js`).
+
+**Edit 3.4** — `work/wa-replica/fidelity.css` — styles of the forms. Find exactly (it occurs once):
+
+```text
+.fid-sign-in-panel .fid-btn { min-height:44px; padding-inline:18px; }
+```
+
+Replace with:
+
+```text
+.fid-sign-in-panel .fid-btn { min-height:44px; padding-inline:18px; }
+.fid-sign-in-note { margin:0; color:var(--fid-quiet); font-size:13px; line-height:20px; text-align:center; }
+.fid-sign-in-form { display:grid; gap:14px; width:100%; }
+.fid-sign-in-form[hidden] { display:none; }
+.fid-sign-in-form .field { display:grid; gap:6px; font-size:13px; }
+.fid-sign-in-form .field input { height:40px; padding:0 12px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
+.fid-sign-in-form .field input:focus { border-color:var(--color-accent); outline:1px solid var(--color-accent); outline-offset:0; }
+.fid-sign-in-error { margin:0; color:var(--color-danger); font-size:13px; line-height:20px; }
+```
+
+**Verify**: `sha256sum work/wa-replica/fidelity-boot.js work/wa-replica/fidelity-subsite.js work/wa-replica/fidelity-index.html` → in this order `e49a38d54e48093590d1e41d1fa5f9e8a35b6c980b6998f1aaa7d5253d1dcf95`, `bbfc7e4a7498630aec321284fc056d3ccb2bd258e793f253781a34e802e8d2d0`, `d7df8b964be09adbdd78db8917a86ee364ce62a1202cb16032a33653b0f9b040`; `node --check work/wa-replica/fidelity-boot.js` → exit 0; `git diff --stat -- work/wa-replica/fidelity.css` → `1 file changed, 7 insertions(+)`.
+
+### Step 4: The build (`work/wa-replica/build-fidelity.cjs`) and the file that is no longer shipped
+
+4a. The app waits to be started, reads its data from `window.WA_SITE` and saves through it.
+
+**Insert 4.1** — `work/wa-replica/build-fidelity.cjs`. Insert above the line that starts with (one line starts this way; it stays unchanged):
+
+```text
+new vm.Script(js, {filename:'app.js'});
+```
+
+these lines:
+
+```text
+// The page signs in and keeps its data on the server (plan 023). The app no longer starts by itself:
+// fidelity-boot.js loads the signed-in user's data into window.WA_SITE and then calls window.WA_START.
+swap("(() => {\n  'use strict';\n  const KEY=", "window.WA_START = () => {\n  'use strict';\n  const KEY=");
+swap("let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY)||localStorage.getItem('wa-desk-internal-prototype-v02')||localStorage.getItem('wa-desk-internal-prototype-v01')||'null')}catch(e){}", "const UI_KEY=KEY+':'+window.WA_SITE.user.username;\n  let saved=null;try{saved=JSON.parse(localStorage.getItem(UI_KEY)||'null')}catch(e){}");
+swap('let data=[6].includes(saved?.version)&&Array.isArray(saved?.data?.customers)?saved.data:clone(window.WA_DEMO);', 'let data=window.WA_SITE.data;');
+swap("const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');", 'const subsiteMember=data.members.find(m=>m.id===window.WA_SITE.user.username);');
+swap("persona:subsiteMember.id,customer:'c1',", "persona:subsiteMember.id,customer:data.customers[0]?.id||'',");
+{
+  // Only what belongs to this browser (drafts, open tabs) stays in its storage; the data goes to the server.
+  const next = js.replace(/^  function persist\(\)\{[^\n]*\}\n/m, "  function persist(){try{localStorage.setItem(UI_KEY,JSON.stringify({version:6,receiveTranslation:ui.receiveTranslation,drafts:ui.drafts,noteDrafts:ui.noteDrafts,attachments:ui.attachments,openTabs:ui.openTabs,navCollapsed:ui.navCollapsed}))}catch(e){}window.WA_SITE.save(data)}\n");
+  assert(next !== js, 'Missing the function that saves');
+  js = next;
+}
+cut(/^      case 'resetDemo':[^\n]*\n      case 'confirmReset':[^\n]*\n/m, 'reset to the sample data');
+{
+  const next = js.replace(/\n  render\(\);\n\}\)\(\);\n$/, '\n  render();\n};\n');
+  assert(next !== js, 'Missing the end of the app');
+  js = next;
+}
+assert(!/clone\(window\.WA_DEMO\)|localStorage\.(setItem|getItem)\(KEY[,)]/.test(js), 'the app must not start from sample data or keep its data in the browser');
+```
+
+4b. The files the build writes.
+
+**Edit 4.2** — `work/wa-replica/build-fidelity.cjs`. Find exactly (it occurs once):
+
+```text
+  'demo-data.js':read(base,'demo-data.js'),'icons.js':iconJS,
+```
+
+Replace with:
+
+```text
+  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),
+```
+
+4c. The stale output file (the build does not delete files).
+
+**Delete file 4.3** — `outputs/wa-replica-prototype/demo-data.js`: run `git rm -q outputs/wa-replica-prototype/demo-data.js`.
+
+**Verify**: `git checkout b7c6fd9 -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` → exit 0 with `"version": "0.8-scrm-engagement"`; `head -1 outputs/wa-replica-prototype/app.js` → `window.WA_START = () => {`; `tail -1 outputs/wa-replica-prototype/app.js` → `};`; `grep -c 'clone(window.WA_DEMO)' outputs/wa-replica-prototype/app.js` → `0`; `cmp work/wa-replica/fidelity-boot.js outputs/wa-replica-prototype/boot.js` → identical (no output); `ls outputs/wa-replica-prototype/ | grep -c demo-data` → `0`; the icon-set command → `removed= added=`; `git diff -- work/wa-replica/build-fidelity.cjs | grep -c '^-swap('` → `0`; `git diff --stat -- work/wa-replica/build-fidelity.cjs` → `1 file changed, 21 insertions(+), 1 deletion(-)`.
+
+### Step 5: Validator (`work/wa-replica/validate-scrm-lifecycle.cjs`)
+
+**Edit 5.1** — `work/wa-replica/validate-scrm-lifecycle.cjs` — section 19: its last check becomes a rule for the start-up script. Find exactly (it occurs once):
+
+```text
+assert(!/\b(localhost|127\.0\.0\.1):\d+\/api\/(auth|data)/.test(appJs), 'the page does not use the account and data routes yet');
+```
+
+Replace with:
+
+```text
+// The page's start-up script talks to the account and data routes only (the app itself to the AI relay only, section 3).
+const bootSource = read(path.join(__dirname, 'fidelity-boot.js'));
+for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/status|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
+assert(!/\bfetch\s*\(\s*['"`]/.test(bootSource), 'fidelity-boot.js must send every request through its request helper');
+```
+
+**Edit 5.2** — `work/wa-replica/validate-scrm-lifecycle.cjs` — a new section 20, directly above the summary object. Find exactly (it occurs once):
+
+```text
+const summary = {
+```
+
+Replace with:
+
+```text
+// 20. The page signs in and keeps its data on the server; no fictional data set is shipped or loaded
+for (const required of ['window.WA_START = () => {', 'let data=window.WA_SITE.data;', 'window.WA_SITE.save(data)', "const UI_KEY=KEY+':'+window.WA_SITE.user.username;"]) {
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert(!/clone\(window\.WA_DEMO\)|case 'resetDemo'|case 'confirmReset'|subsiteEnterDemo/.test(appJs), 'the app must not start from, or reset to, sample data');
+for (const required of ['id="site-sign-in"', 'id="site-password"', '<script src="boot.js"></script>']) {
+  assert(indexHtml.includes(required), `index.html is missing ${required}`);
+}
+assert(!indexHtml.includes('demo-data.js') && !indexHtml.includes('进入演示工作台') && !fs.existsSync(path.join(out, 'demo-data.js')), 'the page must not ship the fictional data set');
+assert.equal(read(path.join(out, 'boot.js')), bootSource, 'boot.js must be the built copy of fidelity-boot.js');
+for (const required of ['lcSeededV06: true', 'presetTagsRemoved: true', "request('/api/data', { method: 'PUT'", 'window.WA_START();']) {
+  assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
+}
+assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');
+
+const summary = {
+```
+
+**Edit 5.3** — `work/wa-replica/validate-scrm-lifecycle.cjs` — the summary. Find exactly (it occurs once):
+
+```text
+  serverSide: 'optional, behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only; the page still keeps its data in the browser',
+```
+
+Replace with:
+
+```text
+  serverSide: 'behind WA_SCRM_DATA_DIR: accounts with scrypt password hashes, sign-in sessions, one sub-site data document in SQLite, AI relay for signed-in users only',
+  signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
+```
+
+**Verify**: `node work/wa-replica/validate-scrm-lifecycle.cjs` → exit 0 with `"status": "passed"` and `"signIn"` in the output; `git diff --stat -- work/wa-replica/validate-scrm-lifecycle.cjs` → `1 file changed, 22 insertions(+), 2 deletions(-)`.
+
+### Step 6: Documentation, final rebuild and verification
+
+**Edit 6.1** — `README.md`. Find exactly (it occurs once):
+
+````text
+本项目前端原型采用**零外部依赖、零网络外呼**的原生 HTML / CSS / JS 架构，克隆仓库后无需 `npm install` 即可直接预览或重新构建：
+
+### 方式 A：双击单文件离线运行（最快）
+直接在浏览器中打开以下独立构建文件即可体验完整交互：
+- [`outputs/whatsapp-scrm-lifecycle.html`](outputs/whatsapp-scrm-lifecycle.html)（同构同步输出至 `outputs/whatsapp-replica-ui-fidelity.html`）
+
+### 方式 B：启动本地预览服务
+```bash
+# 启动本地预览服务（默认监听 http://127.0.0.1:56141）
+node work/wa-replica/serve.cjs
+```
+*(Windows 下也可直接双击根目录 `启动SCRM原型预览.cmd` 一键打开 `http://127.0.0.1:56141/#followups`。)*
+
+#### 接入真实的 AI 翻译（可选）
+预览服务带有 AI 中转接口（`/api/ai/*`）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到**仓库以外**的私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动：
+```bash
+WA_SCRM_AI_ENV=/path/to/private/ai.env node work/wa-replica/serve.cjs
+```
+未设置该变量、文件不完整，或以方式 A 打开单文件时，没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
+
+#### 服务器端账号与数据（可选；页面尚未接入）
+预览服务可以保存账号和一个子站的数据。把环境变量 `WA_SCRM_DATA_DIR` 指向**仓库以外**的私有目录后，服务提供登录接口（`/api/auth/*`）与数据接口（`/api/data`），AI 中转接口同时改为只对已登录用户开放。这部分需要 Node 22.13 或更新版本（使用内置 SQLite）。账号用管理工具创建：
+```bash
+WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
+```
+工具只显示一次临时密码，持有人首次登录后必须修改。子站编号由 `WA_SCRM_SITE_ID` 指定（默认 `default`）。未设置 `WA_SCRM_DATA_DIR` 时以上接口关闭，页面仍把数据保存在浏览器中；页面改为使用这些接口是下一步工作（见 `plans/`）。
+````
+
+Replace with:
+
+````text
+本项目采用**零外部依赖**的原生 HTML / CSS / JS 页面和一个 Node 服务，克隆仓库后无需 `npm install`。页面需要通过服务登录后使用，数据保存在服务器上。
+
+### 启动服务
+需要 Node 22.13 或更新版本（使用内置 SQLite）。数据目录与 AI 设置文件都放在**仓库以外**的私有位置：
+```bash
+# 账号与数据保存在 WA_SCRM_DATA_DIR；默认监听 http://127.0.0.1:56141
+WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/serve.cjs
+```
+首次使用先创建账号（每位员工一个账号；`agent` 属于一个子站，子站编号由 `WA_SCRM_SITE_ID` 指定，默认 `default`）：
+```bash
+WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
+```
+工具只显示一次临时密码，持有人首次登录后必须修改。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
+
+#### 接入 AI 翻译（可选）
+服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
+
+`outputs/whatsapp-scrm-lifecycle.html` 等单文件已不能独立使用（打开后只显示无法连接服务器的提示），将在后续清理中移除。
+````
+
+**Edit 6.2** — `README.md`. Find exactly (it occurs once):
+
+```text
+│   ├── whatsapp-scrm-lifecycle.html                   # 独立单文件离线可交互原型（零依赖双击即用）
+```
+
+Replace with:
+
+```text
+│   ├── whatsapp-scrm-lifecycle.html                   # 单文件构建产物（已不能独立使用，待清理）
+```
+
+**Edit 6.3** — `README.md`. Find exactly (it occurs once):
+
+```text
+│   ├── whatsapp-replica-ui-fidelity.html              # 同构离线构建产物（兼容历史预览路径）
+```
+
+Replace with:
+
+```text
+│   ├── whatsapp-replica-ui-fidelity.html              # 同上（兼容历史路径，待清理）
+```
+
+**Edit 6.4** — `README.md`. Find exactly (it occurs once):
+
+```text
+│   │   ├── demo-data.js / icons.js                    # 虚构演示数据集与内联 Lucide 矢量图标集
+```
+
+Replace with:
+
+```text
+│   │   ├── boot.js / icons.js                         # 启动、登录与数据同步脚本；内联 Lucide 矢量图标集
+```
+
+**Edit 6.5** — `README.md`. Find exactly (it occurs once):
+
+```text
+│       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
+```
+
+Replace with:
+
+```text
+│       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
+│       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
+```
+
+**Edit 6.6** — `README.md`. Find exactly (it occurs once):
+
+```text
+- 仓库内所有客户姓名、美区/波多黎各号码、聊天对话与二维码均为**纯本地虚构演示数据**，保存在浏览器 `localStorage`，不连接真实 WhatsApp。
+```
+
+Replace with:
+
+```text
+- 客户、会话、标签与待办等数据保存在服务器的数据目录（`WA_SCRM_DATA_DIR`，SQLite 文件，位于仓库之外）；浏览器只保存草稿、已打开页签等界面状态；账号密码以 scrypt 哈希保存。目前尚未连接真实 WhatsApp，会话仍由「模拟」操作产生。
+```
+
+**Edit 6.7** — `PRODUCT.md`. Find exactly (it occurs once):
+
+```text
+- 当前交付为纯本地可交互高保真原型（版本 `0.8-scrm-engagement`），采用虚构演示数据并持久化于当前浏览器 `localStorage`。
+```
+
+Replace with:
+
+```text
+- 当前版本（`0.8-scrm-engagement`）需登录使用：每位员工一个账号，登录后进入自己的子站；客户、会话、标签与待办保存在服务器，浏览器只保存草稿等界面状态；新子站从空白开始，不再内置虚构数据。
+```
+
+**Edit 6.8** — `PRODUCT.md`. Find exactly (it occurs once):
+
+```text
+- 服务器端已具备账号、登录会话与子站数据存储（由环境变量启用，页面尚未接入）：每位员工一个账号，员工读写自己子站的数据，主管与管理员只读。
+```
+
+Replace with:
+
+```text
+- 员工读写自己子站的数据；主管与管理员对子站数据只读，其查看入口将随主站提供。同一子站在两个页面同时被修改时，后保存的一方会被提示刷新，不会互相覆盖。
+```
+
+**Edit 6.9** — `DESIGN.md`. Find exactly (it occurs once):
+
+```text
+- 独立单文件离线包：`outputs/whatsapp-scrm-lifecycle.html`（同构同步输出至 `outputs/whatsapp-replica-ui-fidelity.html`，双击即可离线运行）
+```
+
+Replace with:
+
+```text
+- 单文件构建产物：`outputs/whatsapp-scrm-lifecycle.html`（及 `outputs/whatsapp-replica-ui-fidelity.html`）。自 2026-11-21 起页面需登录并从服务器读取数据，单文件已不能独立使用，待清理。
+- 登录界面：居中的单栏卡片（品牌、标题、说明、表单）。三种状态共用同一卡片——登录（用户名、密码）、修改临时密码（当前密码、新密码两次）、说明（服务器未启用、无法连接、主管入口尚未开放、数据已在别处更新、登录已失效），说明状态下提供「退出登录」或「刷新页面」。
+```
+
+**Edit 6.10** — `outputs/wa-replica-prototype/README.md`. Find exactly (it occurs once):
+
+```text
+1. **本地服务预览（推荐）**
+   - 直接访问：`http://127.0.0.1:56141/#followups`（或双击项目根目录 `启动SCRM原型预览.cmd`）
+   - 首页总览：`http://127.0.0.1:56141/#dashboard`
+   - 在线聊天：`http://127.0.0.1:56141/#inbox`
+2. **离线单文件直接打开**
+   - 双击 `D:\Projects\wa-scrm\outputs\whatsapp-scrm-lifecycle.html`（或 `whatsapp-replica-ui-fidelity.html`）即可在任意现代浏览器中完整交互。
+```
+
+Replace with:
+
+```text
+1. **通过服务访问（需登录）**
+   - 服务地址：`http://127.0.0.1:56141/`，用管理员创建的账号登录；首次登录需先修改临时密码。
+   - 登录后的常用入口：`#dashboard`（首页）、`#inbox`（在线聊天）、`#followups`（跟进闭环）。
+2. 单文件（`outputs/whatsapp-scrm-lifecycle.html` 等）已不能独立使用，只显示无法连接服务器的提示。
+```
+
+**Append 6.11** — `replica/build-log.md`. Add at the end of the file, after one empty line:
+
+```markdown
+## 登录与服务器数据：页面接入 · 2026-11-21
+
+页面改为先登录、再从服务器读取数据。打开页面先看到登录界面（用户名与密码）；使用临时密码的账号必须先设置自己的密码；主管与管理员、以及其他子站的员工会看到说明并可退出。登录后页面从 `/api/data` 读取所属子站的数据再启动；之后每次修改在约半秒后把变化的部分保存到服务器（`messages`、`activities` 按客户分别保存）。服务器暂时连不上时页面提示并自动重试；同一子站在另一处被修改时，落后的页面提示刷新而不是覆盖；登录失效时提示重新登录。浏览器里只保留草稿、已打开页签等界面状态，按用户名分开存放。
+
+不再内置虚构数据：页面不再加载 `demo-data.js`，新子站从空白开始（只有登录者本人这一名成员和一个空的「常用文本」素材分组），早期版本在首次打开时补入的示例客户、示例订单与示例归档不会出现在新子站。「恢复初始演示数据」的残留代码一并删除。原来的「已退出登录 / 进入演示工作台」界面由登录界面取代，退出登录会先保存再结束服务器上的会话。
+
+服务器端同时做了三处补充：数据目录里的文件一律以仅本人可读写的权限创建；新增 `GET /api/auth/session`，供页面在打开时询问登录状态（未登录也返回 200，避免浏览器控制台出现错误）；一个尚按整体保存的字段，在保存其中一项时自动拆分。
+
+仍然是模拟的部分：WhatsApp 连接、扫码与收发消息（接入 OpenWA 时替换）。两个单文件构建产物已不能独立使用，待后续清理；页面里尚存的示例种子代码（对带有标记的新子站不会执行）也在后续清理。
+```
+
+Then rebuild and verify everything once more:
+
+```bash
+git checkout b7c6fd9 -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs && node work/wa-replica/validate-scrm-lifecycle.cjs && $NODE --test work/wa-replica/site-api.test.cjs && node --test work/wa-replica/ai-relay.test.cjs && NODE=$NODE bash /tmp/wa-scrm-plan-023/smoke.sh
+```
+
+**Verify**: build exit 0 with `"version": "0.8-scrm-engagement"`; validator `"status": "passed"`; both test runs `pass 12`, `fail 0`; smoke ends with `SMOKE PASS`; `git status --porcelain` lists only in-scope paths (one of them as a deletion, one as a new file under `outputs/`, one as a new source file). Commit everything. After the commit `git status --porcelain` must be empty.
+
+## Test plan
+
+- **Server tests** — the changed file covers the three additions: private files, the session route, splitting a whole field.
+- **Validator** — the rule for the start-up script's requests and the new section 20 (Step 5).
+- **Smoke** (`/tmp/wa-scrm-plan-023/smoke.sh`) — in a headless browser: without accounts the page says so, with accounts a visitor sees the sign-in form and the app has not started, both without script errors; over the API: from a new account's temporary password to an own password, an empty sub-site, a save, a refused stale save, a part saved into a whole field; private files.
+- **Verified by the reviewer in scripted browser sessions, not by you**: the whole product behind a real sign-in with a filled sub-site (about sixty-five tests, among them: a wrong password, the forced change, supervisor and foreign-employee notices, a change seen from a second browser, two pages that would overwrite each other, a lost connection, an ended session, signing out); an empty sub-site on every page; with and without a model service. Then the deployment on the live server.
+
+## Done criteria
+
+Machine-checkable. ALL must hold:
+
+- [ ] `git checkout b7c6fd9 -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"`
+- [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
+- [ ] `$NODE --test work/wa-replica/site-api.test.cjs` → `pass 12`, `fail 0`; `node --test work/wa-replica/ai-relay.test.cjs` → `pass 12`, `fail 0`
+- [ ] `NODE=$NODE bash /tmp/wa-scrm-plan-023/smoke.sh` ends with `SMOKE PASS`
+- [ ] `sha256sum work/wa-replica/fidelity-boot.js` → `e49a38d54e48093590d1e41d1fa5f9e8a35b6c980b6998f1aaa7d5253d1dcf95`
+- [ ] `sha256sum work/wa-replica/fidelity-subsite.js` → `bbfc7e4a7498630aec321284fc056d3ccb2bd258e793f253781a34e802e8d2d0`
+- [ ] `sha256sum work/wa-replica/fidelity-index.html` → `d7df8b964be09adbdd78db8917a86ee364ce62a1202cb16032a33653b0f9b040`
+- [ ] `sha256sum work/wa-replica/site-data.cjs` → `541a826a542af00eaac848a157049e880ef2facce93facc7acecd5f38bcbde8f`
+- [ ] `sha256sum work/wa-replica/site-api.cjs` → `81e477780a8eb800685e2a65c66430f662caa21b2d42c088157ad7c530339803`
+- [ ] `sha256sum work/wa-replica/site-admin.cjs` → `f5b0e5ae175b8a8a3e86ff8c0964d2740f25e964ffbe81422b9fc9a7b83327ad`
+- [ ] `sha256sum work/wa-replica/site-api.test.cjs` → `5c5e897854c553634d3ddd31969d1ba7c1bd7949e5f023e5055da93ab05455f6`
+- [ ] `cmp work/wa-replica/fidelity-boot.js outputs/wa-replica-prototype/boot.js` → identical (no output)
+- [ ] `grep -c 'clone(window.WA_DEMO)\|subsiteEnterDemo\|进入演示工作台' outputs/wa-replica-prototype/app.js outputs/wa-replica-prototype/index.html` → both `:0`
+- [ ] `test ! -e outputs/wa-replica-prototype/demo-data.js && echo gone` → `gone`
+- [ ] the icon-set command prints `removed= added=`
+- [ ] `cmp outputs/whatsapp-scrm-lifecycle.html outputs/whatsapp-replica-ui-fidelity.html` → identical (no output)
+- [ ] `git diff --stat b7c6fd9 -- work/wa-replica/fidelity-base work/wa-replica/serve.cjs work/wa-replica/site-auth.cjs work/wa-replica/ai-relay.cjs work/wa-replica/ai-relay.test.cjs work/wa-replica/fidelity-ai.js work/wa-replica/fidelity-lifecycle.js work/wa-replica/fidelity-openwa.js work/wa-replica/fidelity-ui.js work/wa-replica/fidelity-customer-pages.js work/wa-replica/fidelity-operations.js work/wa-replica/fidelity-dashboard.js outputs/review-prompts` → empty
+- [ ] `git diff b7c6fd9 -- work/wa-replica/build-fidelity.cjs | grep -c '^-swap('` → `0`
+- [ ] `git ls-files | grep -cE '\.db(-wal|-shm)?$'` → `0`
+- [ ] `git status --porcelain` is empty after your final commit, and `git diff --name-only b7c6fd9..HEAD` lists only in-scope paths (plus `plans/` files changed by commits that are not yours)
+- [ ] `plans/README.md` status row updated (skip if a reviewer dispatched you and said they maintain the index)
+
+## STOP conditions
+
+Stop and report back (do not improvise) if:
+
+- No Node 22.13 or newer exists on the machine.
+- Step 1's baseline check fails (a failing check other than the named ones, a different checksum).
+- A checksum does not match after you have written the file a second time from this plan.
+- The build fails with `Missing prototype source anchor`, `Missing reviewer-tool code`, `Missing the function that saves`, `Missing the end of the app` or `the app must not start from sample data …`: compare the lines of Step 4a character for character with this plan; if they are identical, STOP — do not adjust a pattern.
+- A server test fails although the four checksums of Step 2 match, or a relay test fails.
+- A text to find does not occur exactly once in its file.
+- The validator fails in a section this plan does not change.
+- The icon-set command prints anything other than `removed= added=`.
+- The work appears to require editing an out-of-scope file, or creating a data folder, a password or a key inside the repository.
+- You believe a decision under "Decisions already made" is wrong. Report it; do not act on it.
+
+## Maintenance notes
+
+- **Deployment is not part of this plan, and the merge and the deployment belong together**: once this is live, the service must run with `WA_SCRM_DATA_DIR` on Node 22.13 or newer and accounts must exist, otherwise visitors only see "accounts are not switched on".
+- Data saved in browsers by earlier builds is not migrated; it was fictional.
+- Whole top-level lists (`customers`, `tasks`, …) are sent again whenever one entry changes, and a value is limited to 2 MB. That is fine for a handful of employees with hundreds of customers each; before it gets close, the lists have to be saved one entry at a time like `messages`.
+- A sub-site's document has one writer at a time. A second page of the same employee is told to refresh when it is behind. Incoming WhatsApp messages (later) must not be written into the document by the server; they have to reach the page as events that the page applies.
+- The code of earlier builds that adds sample customers, orders and archives is still in the modules and never runs for a sub-site created by this build (flags). It, the two standalone bundles and `启动SCRM原型预览.cmd` are to be removed in a clean-up plan.
+- Over plain HTTP, passwords and sessions can be read on the network path; until the service has HTTPS it should be reachable from known addresses only.
+- What a reviewer should scrutinise: that nothing fictional reaches a new sub-site; that the data is not in `localStorage`; the three stop screens; that no existing `swap` was touched; the server's private files.
+- `validation.json`: re-run the validator once in the main checkout after merging from a worktree.
