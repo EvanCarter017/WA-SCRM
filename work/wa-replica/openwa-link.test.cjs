@@ -60,10 +60,16 @@ const gateway = http.createServer((req, res) => {
     }
     if (action === 'start') {
       if (started) return fail(400, 'Bad Request', 'Session is already started');
-      Object.assign(session, { status: 'qr_ready', engineLoaded: true });
+      Object.assign(session, { status: 'qr_ready', engineLoaded: true, starts: (session.starts || 0) + 1 });
       return answer(200, session);
     }
-    if (action === 'qr') return session.status === 'qr_ready' ? answer(200, { qrCode: QR, status: 'qr_ready' }) : fail(400, 'Bad Request', 'Session is not started. Call POST /sessions/:sessionId/start first.');
+    if (action === 'stop') {
+      if (!started) return fail(400, 'Bad Request', 'Session is not started. Call POST /sessions/:sessionId/start first.');
+      Object.assign(session, { status: 'disconnected', engineLoaded: false });
+      return answer(200, session);
+    }
+    // Every start brings a new code: the first one is QR, later ones carry the number of the start.
+    if (action === 'qr') return session.status === 'qr_ready' ? answer(200, { qrCode: session.starts > 1 ? QR + session.starts : QR, status: 'qr_ready' }) : fail(400, 'Bad Request', 'Session is not started. Call POST /sessions/:sessionId/start first.');
     if (action === 'logout') {
       if (!started) return fail(400, 'Bad Request', 'Session is not started. Call POST /sessions/:sessionId/start first.');
       Object.assign(session, { status: 'disconnected', phone: null, engineLoaded: false });
@@ -211,6 +217,21 @@ test('an attempt that stopped half-way is completed; a session removed at OpenWA
   assert.deepEqual([anew.json.state, gwSessionOf('a2').id !== left.id, gw.hooks.get(gwSessionOf('a2').id).length], ['scan', true, 1]);
   gwSessionOf('a2').status = 'disconnected';
   assert.deepEqual([(await call('/api/wa/link?account=a2', { cookie: lin })).json.state, (await post('/api/wa/link', { account: 'a2' })).json.state], ['offline', 'scan'], 'a stopped session is started again');
+});
+
+test('a fresh QR code on request: a number that waits for the scan is started anew; a linked number is left alone', async () => {
+  const first = await post('/api/wa/link', { account: 'a5' });
+  assert.deepEqual([first.json.state, first.json.qr], ['scan', QR]);
+  const session = gwSessionOf('a5');
+  const stops = () => gw.calls.filter(c => c === `POST /api/sessions/${session.id}/stop`).length;
+  assert.deepEqual([(await post('/api/wa/link', { account: 'a5' })).json.qr, stops()], [QR, 0], 'without the request the waiting session is left as it is');
+  assert.deepEqual([(await post('/api/wa/link', { account: 'a5', fresh: 'yes' })).json.qr, stops()], [QR, 0], 'only the value true asks for a new code');
+  const fresh = await post('/api/wa/link', { account: 'a5', fresh: true });
+  assert.deepEqual([fresh.status, fresh.json.state, fresh.json.qr, stops(), gwSessionOf('a5').id], [200, 'scan', QR + '2', 1, session.id], 'the same session, stopped once and started again, with a new code');
+  assert.deepEqual((await call('/api/wa/link?account=a5', { cookie: lin })).json.qr, QR + '2');
+  Object.assign(session, { status: 'ready', phone: '15550005555' });
+  assert.deepEqual([(await post('/api/wa/link', { account: 'a5', fresh: true })).json.state, stops()], ['online', 1], 'a linked number is never stopped');
+  assert.equal((await post('/api/wa/unlink', { account: 'a5' })).status, 200);
 });
 
 test('OpenWA down, or refusing the key: the status says so and nothing is half-done', async () => {

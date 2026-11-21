@@ -7,7 +7,8 @@
 //   OPENWA_HOOK_SECRET  signs OpenWA's deliveries; at least 32 characters
 // Routes:
 //   GET  /api/wa/status                          is the link set up and reachable; the numbers and their state
-//   POST /api/wa/link    { account }             creates the number's session if needed and starts it
+//   POST /api/wa/link    { account, fresh? }     creates the number's session if needed and starts it; with fresh,
+//                                                a session that waits for the scan is started anew (a new QR code)
 //   GET  /api/wa/link?account=<id>               the number's state; while it waits for the scan, the QR code
 //   POST /api/wa/unlink  { account }             unlinks the phone and removes the session
 //   POST /api/wa/send    { account, to, text, requestId }
@@ -265,7 +266,7 @@ function create({ dir, siteId, site, now = () => Date.now() }) {
     'POST /api/wa/link': async req => {
       employee(req);
       const config = settings();
-      const { account } = await readJson(req);
+      const { account, fresh } = await readJson(req);
       if (typeof account !== 'string' || !ACCOUNT.test(account)) throw problem('invalid-request');
       let row = await ensureAccount(config, account);
       let session = await ask(config, 'GET', `/api/sessions/${row.session}`);
@@ -276,6 +277,13 @@ function create({ dir, siteId, site, now = () => Date.now() }) {
         session = await ask(config, 'GET', `/api/sessions/${row.session}`);
       }
       if (session.status !== 200) throw problem('gateway-failed');
+      // When the page finds that a QR code is no longer renewed, it asks for a new one: a session that still
+      // waits for the scan is stopped, so that the start below brings a new code.
+      if (fresh === true && session.body.status === 'qr_ready') {
+        await ask(config, 'POST', `/api/sessions/${row.session}/stop`);
+        session = await ask(config, 'GET', `/api/sessions/${row.session}`);
+        if (session.status !== 200) throw problem('gateway-failed');
+      }
       if (['created', 'disconnected', 'failed'].includes(session.body.status)) {
         const started = await ask(config, 'POST', `/api/sessions/${row.session}/start`);
         session = started.status === 200 ? started : await ask(config, 'GET', `/api/sessions/${row.session}`);

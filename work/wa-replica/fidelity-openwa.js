@@ -5,6 +5,10 @@
   // What the server said about the link: null until asked, then { configured, reachable }.
   let openwaServer = null;
   const openwaClient = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  // OpenWA renews a QR code in rounds: the first code of a round after about a minute, five more every twenty
+  // seconds, then nothing for about a minute until the next round. The longest it shows one code is about seventy
+  // seconds; a code that has been shown longer than this without a new one is no longer renewed.
+  const openwaQrLife = 90000;
 
   async function openwaCall(method, path, body) {
     try {
@@ -127,7 +131,7 @@
     openwaDialogContent(title, `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
       <div class="openwa-pair-copy"><strong>在手机上打开 WhatsApp Business</strong><p>选择「关联设备」→「关联新设备」，扫描二维码。</p>${description}</div>
       ${status}
-      <p class="openwa-pair-hint">二维码会自动更新。绑定后，这个号码的新消息会显示在在线聊天里。</p>
+      <p class="openwa-pair-hint">二维码会自动更换；扫码没有成功时，请等新的二维码出现后再扫。绑定后，这个号码的新消息会显示在在线聊天里。</p>
     </div>`, fidButton('取消','close')+(pair.phase === 'error' ? fidButton('重试','openwaRetry','RefreshCw','blue') : ''),
       pair.phase === 'error' ? '[data-action="openwaRetry"]' : '.openwa-pair-state');
   }
@@ -139,13 +143,15 @@
     const error = phase !== 'error' ? '' : link.state === 'attention' ? (link.error || '需要先在手机上完成 WhatsApp 的验证，然后重试。') : '二维码已失效或连接中断，请重试。';
     const qr = phase === 'scan' ? link.qr || '' : '';
     if (phase === pair.phase && qr === pair.qr && error === pair.error) return;
+    if (qr !== pair.qr) pair.qrAt = Date.now();
     Object.assign(pair, { phase, qr, error });
     openwaShowPairing();
   }
 
   async function openwaRequestLink(pair) {
-    const answer = await openwaCall('POST', 'link', { account: pair.accountId });
+    const answer = await openwaCall('POST', 'link', pair.expired ? { account: pair.accountId, fresh: true } : { account: pair.accountId });
     if (openwaPairing !== pair) return openwaAbandon(pair);
+    if (answer.status === 200) pair.expired = false;
     if (answer.status === 200) openwaPairStep(pair, answer.body);
     else {
       Object.assign(pair, { phase: 'error', qr: '', error: openwaProblem(answer) });
@@ -160,7 +166,13 @@
     if (openwaPairing !== pair) return;
     if (answer.status === 200) openwaPairStep(pair, answer.body);
     else if (answer.status === 404) openwaPairStep(pair, { state: 'missing' });
-    if (openwaPairing === pair && pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
+    if (openwaPairing !== pair) return;
+    if (pair.phase === 'scan' && Date.now() - pair.qrAt > openwaQrLife) {
+      // The code is no longer renewed. "重试" asks the server for a new one.
+      Object.assign(pair, { phase: 'error', qr: '', error: '二维码已过期，请点击「重试」获取新的二维码。', expired: true });
+      return openwaShowPairing();
+    }
+    if (pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
   }
 
   function openwaBeginPairing(mode, a) {
