@@ -2306,30 +2306,31 @@ window.WA_START = () => {
   // ============================================================================
   const lcNextTask = cid => data.tasks.filter(t => t.customer === cid && !t.done).sort((a, b) => new Date(a.due) - new Date(b.due))[0] || null;
 
+  // A customer has a follow-up status only where a person made one: an unfinished to-do (`planned`), or a
+  // follow-up that was ended by hand (`closed`). Without either, `primary` is null and the page shows nothing
+  // about follow-ups for the customer.
   function lcHealth(c) {
     const closed = lcIsClosed(c);
     const nextTask = lcNextTask(c.id);
-    const awaitingReply = !closed && c.unread > 0;
+    const planned = !closed && Boolean(nextTask);
+    const awaitingReply = planned && c.unread > 0;
     const recontact = closed && c.unread > 0;
-    const overdue = !closed && Boolean(nextTask && beforeToday(nextTask.due));
-    const noPlan = !closed && !nextTask;
+    const overdue = planned && beforeToday(nextTask.due);
 
-    let primary = { key: 'healthy', label: '跟进正常', tone: 'ok', icon: 'BadgeCheck' };
+    let primary = planned ? { key: 'healthy', label: '跟进正常', tone: 'ok', icon: 'BadgeCheck' } : null;
     if (recontact) primary = { key: 'recontact', label: '复联待处理', tone: 'hot', icon: 'Flame' };
     else if (overdue) primary = { key: 'overdue', label: '跟进已逾期', tone: 'hot', icon: 'ClockAlert' };
     else if (awaitingReply) primary = { key: 'reply', label: '客户待回复', tone: 'warn', icon: 'Zap' };
-    else if (noPlan) primary = { key: 'noplan', label: '跟进断档', tone: 'warn', icon: 'TriangleAlert' };
     else if (closed) primary = { key: 'closed', label: '已结束跟进', tone: 'neutral', icon: 'Archive' };
 
-    return { primary, nextTask, closed, awaitingReply, recontact, overdue, noPlan };
+    return { primary, nextTask, closed, planned, awaitingReply, recontact, overdue };
   }
 
-  // Does the customer carry this status: 'reply', 'overdue', 'noplan' or 'recontact'. The dashboard counts by it.
+  // Does the customer carry this status: 'reply', 'overdue' or 'recontact'. The dashboard counts by it.
   function lcMatchesSignal(c, signal) {
     const h = lcHealth(c);
     if (signal === 'reply') return h.awaitingReply;
     if (signal === 'overdue') return h.overdue;
-    if (signal === 'noplan') return h.noPlan;
     return signal === 'recontact' && h.recontact;
   }
   const lcHasFollowTags = c => lcState.followTags.every(id => c.tags.includes(id));
@@ -2507,24 +2508,15 @@ window.WA_START = () => {
              <p style="font-size:13px;font-weight:650">${esc(h.nextTask.title)}</p>
              <small style="color:var(--color-text-muted)">计划时间：${esc(dateLabel(h.nextTask.due))}</small>
            </div>`
-        : !h.closed
-          ? `<div class="lc-card-block warn-block">
-               <div class="lc-block-head">
-                 <h3>${icon('TriangleAlert')}跟进断档预警</h3>
-                 <div class="lc-deal-actions">
-                   ${fidButton('立即补排跟进', 'followup', 'CalendarPlus', 'slim blue', fidActionID(c.id))}
-                   ${fidButton('结束跟进', 'lcCloseOpen', 'Archive', 'slim', fidActionID(c.id))}
-                 </div>
-               </div>
-               <p style="font-size:12px;color:var(--fid-ink)">该客户尚未安排下一次跟进，极易造成意向流失。请补排跟进，或明确结束跟进。</p>
-             </div>`
-          : `<div class="lc-card-block">
+        : h.closed
+          ? `<div class="lc-card-block">
                <div class="lc-block-head">
                  <h3>${icon('Archive')}已结束跟进</h3>
                  ${fidButton('重新跟进', 'followup', 'RotateCcw', 'slim blue', fidActionID(c.id))}
                </div>
                <p style="font-size:12px;color:var(--fid-ink)">结束原因：${esc(c.closedReason || '未记录')}${c.closedAt ? `（${esc(fidDate(c.closedAt).slice(0, 10))}）` : ''}。客户再次来信时会提示「复联待处理」。</p>
-             </div>`;
+             </div>`
+          : '';
 
       const duplicateNotice = (c.contactRefs?.length || 0) > 1
         ? `<button type="button" class="duplicate-note" style="margin-top:10px;width:100%" data-action="duplicate" ${fidActionID(c.id)}>${icon('Copy')}跨号撞单提示：该号码在 ${c.contactRefs.length} 个业务 WhatsApp 号下有接触记录${icon('ChevronRight')}</button>`
@@ -2685,10 +2677,10 @@ window.WA_START = () => {
         <div class="lc-dossier-grade">${lcGradeControls(c)}</div>
       </div>
       <div class="lc-dossier-kpis">
-        <div class="lc-mini-kpi"><span>当前跟进状态</span><strong style="font-size:12px">${esc(h.primary.label)}</strong></div>
-        <div class="lc-mini-kpi"><span>下次跟进</span><strong>${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '未安排'}</strong></div>
+        ${h.primary ? `<div class="lc-mini-kpi"><span>当前跟进状态</span><strong style="font-size:12px">${esc(h.primary.label)}</strong></div>
+        <div class="lc-mini-kpi"><span>下次跟进</span><strong>${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '未安排'}</strong></div>` : ''}
         <div class="lc-mini-kpi"><span>最近互动</span><strong>${esc(c.last || '—')}</strong></div>
-        <div class="lc-mini-kpi"><span>重新跟进次数</span><strong>${c.reactivatedCount || 0} 次</strong></div>
+        ${h.primary ? `<div class="lc-mini-kpi"><span>重新跟进次数</span><strong>${c.reactivatedCount || 0} 次</strong></div>` : ''}
       </div>
       <div class="lc-dossier-tabs" role="tablist" aria-label="客户档案分栏">
         ${[
@@ -2865,7 +2857,6 @@ window.WA_START = () => {
     const h = lcHealth(c);
     if (lcState.customerHealthFilter === 'reply') return h.awaitingReply;
     if (lcState.customerHealthFilter === 'overdue') return h.overdue;
-    if (lcState.customerHealthFilter === 'noplan') return h.noPlan;
     if (lcState.customerHealthFilter === 'recontact') return h.recontact;
     if (lcState.customerHealthFilter === 'closed') return h.closed;
     return true;
@@ -2896,7 +2887,7 @@ window.WA_START = () => {
         <td>${lcCustomerStatusPill(c)}</td>
         <td><button type="button" class="fid-link fid-tag-cell" data-action="fidViewCustomerTags" ${fidActionID(c.id)} aria-label="查看${esc(c.name)}的标签，共 ${assigned.length} 个">${tagPreview}${tagDetail}</button></td>
         <td>${esc(c.phone)}<span class="fid-cell-detail">${esc(country(c))} · ${esc(aiLanguageLabel(c))}</span></td>
-        <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span></td>
+        <td>${h.primary ? `<span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span>` : '—'}</td>
         <td>${esc(c.last || '—')}${c.unread ? `<span class="fid-cell-detail">${c.unread} 条未读</span>` : ''}</td>
         <td>${esc(fidDate(c.createdAt))}<span class="fid-cell-detail">更新 ${esc(fidDate(c.updatedAt))}</span></td>
         <td><div class="fid-icon-actions">${fidIcon('打开' + c.name + '会话', 'openConversation', 'MessageCircle', c.id)}${fidIcon('360° 客户档案：' + c.name, 'profile', 'ContactRound', c.id)}${fidIcon('安排跟进：' + c.name, 'followup', 'CalendarPlus', c.id)}</div></td>
@@ -2916,7 +2907,7 @@ window.WA_START = () => {
         <input class="fid-input" id="fid-customer-end" aria-label="截止时间" placeholder="截止时间" value="${esc(fid.customerEnd)}" data-fid-date>
         <select class="fid-select" id="fid-customer-field" aria-label="客户查询字段">${fidOption([['name', '联系人'], ['phone', '手机号'], ['account', '主账号'], ['note', '备注'], ['source', '来源']], fid.customerField)}</select>
         <input class="fid-input" id="customer-search" aria-label="搜索客户库" placeholder="请输入" value="${esc(ui.customerQuery)}">
-        <select class="fid-select" id="fid-customer-health-select" aria-label="跟进状态">${fidOption([['all', '全部跟进状态'], ['reply', '客户待回复'], ['overdue', '跟进已逾期'], ['noplan', '跟进断档(无待办)'], ['recontact', '复联待处理'], ['closed', '已结束跟进']], lcState.customerHealthFilter)}</select>
+        <select class="fid-select" id="fid-customer-health-select" aria-label="跟进状态">${fidOption([['all', '全部跟进状态'], ['reply', '客户待回复'], ['overdue', '跟进已逾期'], ['recontact', '复联待处理'], ['closed', '已结束跟进']], lcState.customerHealthFilter)}</select>
         <select class="fid-select" id="fid-customer-country" aria-label="国家">${fidOption([['all', '请选择国家'], ['US', '美国'], ['PR', '波多黎各'], ['OTHER', '其他地区']], fid.customerCountry)}</select>
         <select class="fid-select" id="fid-customer-type" aria-label="客户类型">${fidOption([['all', '请选择客户类型'], '新增线索-实时', '新增线索-补录', '重复线索'], fid.customerType)}</select>
       </div>
@@ -2963,7 +2954,7 @@ window.WA_START = () => {
   fidActions.fidExportCustomers = function() {
     const safe = v => '"' + (/^[=+\-@\t\r]/.test(String(v ?? '')) ? "'" : '') + String(v ?? '').replaceAll('"', '""') + '"';
     const rows = [['主账号', '联系人', '手机号', '客户等级', '客户状态', '跟进状态', '最近互动', '客户类型', '国家', '标签'],
-      ...filteredCustomers().map(c => [account(c.account)?.name, c.name, c.phone, lcTier(c) || '未评级', lcCustomerStatusLabel(c), lcHealth(c).primary.label, c.last, c.clientType, country(c), c.tags.map(tag).filter(t => t && myTags().includes(t)).map(t => t.name).join('、')])];
+      ...filteredCustomers().map(c => [account(c.account)?.name, c.name, c.phone, lcTier(c) || '未评级', lcCustomerStatusLabel(c), lcHealth(c).primary?.label || '', c.last, c.clientType, country(c), c.tags.map(tag).filter(t => t && myTags().includes(t)).map(t => t.name).join('、')])];
     const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -2981,6 +2972,7 @@ window.WA_START = () => {
     const html = lcBaseRenderDashboard();
     const customers = myCustomers();
     const closedCount = customers.filter(lcIsClosed).length;
+    const plannedCount = customers.filter(c => lcHealth(c).planned).length;
     const chip = (id, label, glyph, tone) => {
       const n = customers.filter(c => lcMatchesSignal(c, id)).length;
       return `<button type="button" class="lc-radar-chip ${n ? tone : ''}" data-action="lcJumpSignal" data-id="${id}">${icon(glyph)}${label} <b>${n}</b></button>`;
@@ -2989,7 +2981,7 @@ window.WA_START = () => {
       <div class="dash-lc-head">
         <h2>${icon('ClipboardList')}跟进闭环概览</h2>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:12px;color:var(--color-text-muted)">跟进中：<b>${customers.length - closedCount}</b> · 已结束跟进：<b>${closedCount}</b></span>
+          <span style="font-size:12px;color:var(--color-text-muted)">跟进中：<b>${plannedCount}</b> · 已结束跟进：<b>${closedCount}</b></span>
           <a class="dash-link" href="#followups" data-nav="followups">进入跟进闭环中心${icon('ChevronRight')}</a>
         </div>
       </div>
@@ -2997,7 +2989,6 @@ window.WA_START = () => {
         <span style="font-size:12px;color:var(--color-text-muted);font-weight:600">待处理信号：</span>
         ${chip('reply', '客户待回复', 'Zap', 'is-alert')}
         ${chip('overdue', '跟进已逾期', 'ClockAlert', 'is-hot')}
-        ${chip('noplan', '跟进断档', 'TriangleAlert', 'is-alert')}
         ${chip('recontact', '复联待处理', 'Flame', 'is-hot')}
       </div>
     </section>`;
@@ -3041,7 +3032,7 @@ window.WA_START = () => {
     let html = lcPrevChatHTML(c);
     const h = lcHealth(c);
     const strip = `<div class="lc-chat-strip" aria-label="客户跟进协同栏">
-      <button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="${h.closed || h.nextTask ? '在跟进闭环中查看此客户' : '为此客户安排跟进'}">${icon(h.primary.icon)}${esc(h.primary.label)}</button>
+      ${h.primary ? `<button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon(h.primary.icon)}${esc(h.primary.label)}</button>` : ''}
       ${h.nextTask ? `<button type="button" class="lc-pill lc-pill-link info" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</button>` : ''}
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
@@ -3449,7 +3440,7 @@ window.WA_START = () => {
       persist();
       close();
       render();
-      toast(`客户 ${c.name} 已创建，尚未安排跟进。`);
+      toast(`客户 ${c.name} 已创建。`);
     },
   });
 
@@ -3464,8 +3455,8 @@ window.WA_START = () => {
         objection: '',
         commWindow: aiCustomerLanguage(c) ? aiCustomerLanguage(c) + '沟通' : '',
       };
-      // Follow-up to-dos are made by hand only. A first message is noted in the customer's history; the customer
-      // shows under the signal "客户待回复" until the message is read.
+      // Follow-up to-dos are made by hand only. A first message is noted in the customer's history; nothing about
+      // follow-ups shows for the customer until a person plans one.
       if (c.needsFirstReply) {
         delete c.needsFirstReply;
         lcLog(c.id, 'inbound', '客户首次来信');

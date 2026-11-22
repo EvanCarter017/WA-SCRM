@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-22T14:10:38.641Z",
+  "checkedAt": "2026-11-22T14:38:14.893Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -11,7 +11,6 @@
   "attentionSignals": [
     "reply",
     "overdue",
-    "noplan",
     "recontact"
   ],
   "deferredModules": [

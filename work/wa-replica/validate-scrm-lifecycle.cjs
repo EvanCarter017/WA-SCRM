@@ -81,6 +81,16 @@ for (const required of ["${fidIcon('删除待办：' + t.title, 'lcTaskDelete', 
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 
+// A customer has a follow-up status only where a person made one (an unfinished to-do, or a follow-up ended by
+// hand). Nothing works out a status for the other customers, and the status "no to-do planned" is gone.
+for (const gone of ['跟进断档', 'noPlan', "'noplan'", '尚未安排跟进', '立即补排跟进', "let primary = { key: 'healthy'"]) {
+  assert(!moduleSource.includes(gone), `fidelity-lifecycle.js still works out a follow-up status for a customer nobody planned one for (${gone})`);
+  assert(!appJs.includes(gone), `app.js still works out a follow-up status for a customer nobody planned one for (${gone})`);
+}
+for (const required of ['const planned = !closed && Boolean(nextTask);', 'const awaitingReply = planned && c.unread > 0;', "let primary = planned ? { key: 'healthy', label: '跟进正常', tone: 'ok', icon: 'BadgeCheck' } : null;", "${h.primary ? `<button type=\"button\" class=\"lc-pill lc-pill-link ${h.primary.tone}\" data-action=\"lcTrackFollow\"", "lcHealth(c).primary?.label || ''", 'const plannedCount = customers.filter(c => lcHealth(c).planned).length;']) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+}
+
 // 7. Invitation codes were removed from the prototype (2026-11-17): no wording, helper or filter field is left
 const invitationCode = /邀请码|invite/i;
 for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html', 'fidelity.css', 'fidelity-dashboard.css', 'fidelity-lifecycle.css']) {
@@ -311,7 +321,7 @@ const summary = {
   projectRoot: path.basename(root),
   historicalBaselineVerified: verifiedBaseline,
   engagementStates: ['open', 'closed'],
-  attentionSignals: ['reply', 'overdue', 'noplan', 'recontact'],
+  attentionSignals: ['reply', 'overdue', 'recontact'],
   deferredModules: ['P-LIFECYCLE', 'P-PIPELINES', 'P-DEALS'],
   invitationCodes: 'removed',
   customerTiers: ['S', 'A', 'B', 'C', 'D'],
