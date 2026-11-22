@@ -972,6 +972,14 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .openwa-file svg { flex:none; width:var(--fid-px-18); height:var(--fid-px-18); }
 .openwa-media-missing { display:block; margin:0 0 var(--fid-px-6); color:var(--color-text-muted); font-size:var(--fid-px-12); }
 .message-bubble>.openwa-media:last-child,.message-bubble>.openwa-file:last-child,.message-bubble>.openwa-media-missing:last-child { margin-bottom:0; }
+/* A file attached to the message that is being written (plan 043): a picture small beside its name, the note
+   while it is on its way, and the conversation while a file is dragged over it. */
+.openwa-attached { height:var(--fid-px-40); max-width:var(--fid-px-64); margin-right:var(--fid-px-8); border-radius:var(--fid-px-6); object-fit:cover; vertical-align:middle; }
+.openwa-attached-busy { color:var(--color-text-muted); }
+.chat-pane.openwa-file-over { outline:var(--fid-px-2) dashed var(--color-accent); outline-offset:var(--fid-px-neg-2); }
+/* With the button for files the tools beside the message box are one more: where the conversation is too narrow
+   for one line they take a second one instead of running into the send button. */
+.composer-tools { flex-wrap:wrap; row-gap:var(--fid-px-4); }
 
 /* The words of a voice note (plan 034): the button that asks for them, and the text under the player. */
 .ai-transcribe { display:inline-flex; align-items:center; gap:var(--fid-px-4); margin:0 0 var(--fid-px-6); font-size:var(--fid-px-12); }

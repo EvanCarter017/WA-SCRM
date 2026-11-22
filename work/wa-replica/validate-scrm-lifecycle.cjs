@@ -327,6 +327,19 @@ for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?accou
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }
 assert(appJs.includes("<div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?"), 'a message bubble must show its media and the text under it');
+// A file is attached to a message and sent with it: the button stands where the baseline had its made-up one, the
+// file goes to the server as it is, what the page sends is marked like every message, and what was just sent or
+// has just arrived stays in view.
+for (const required of ['function openwaAttachButton() {', "fetch('/api/wa/send-file', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([details, '\\n', held.file]) })", 'if (held) return openwaSendFile(c, held, text, outgoing);', "if (held.caption !== caption) Object.assign(held, { caption, request: nextId('r') });", 'for (const id of Object.keys(ui.attachments)) delete ui.attachments[id];', 'if (e.fromMe && openwaFiles.get(c.id)?.sending) message.translatedTo = aiSettings().readLanguage;', 'if (box && box.contains(event.target) && openwaAtEnd) openwaShowEnd();', 'requestAnimationFrame(openwaShowEnd);']) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
+for (const required of ["<div class=\"composer-tools\">'+openwaAttachButton()+'<button class=\"icon-button\" data-action=\"quickAll\"", 'enabled=online&&(d.text.trim()||ui.attachment);']) {
+  assert(appJs.includes(required), `the built page is missing ${required}`);
+}
+assert(!/添加演示附件|data-action="attachment"/.test(appJs), 'the made-up attachment of the baseline must be gone');
+for (const required of ["'POST /api/wa/send-file': async req => {", "if (mediaType(req.headers['content-type']) !== 'application/octet-stream') {", 'const body = await readRaw(req, SEND_DETAILS_MAX + SEND_FILE_MAX), end = body.subarray(0, SEND_DETAILS_MAX).indexOf(10);', 'const SEND_FILE_MAX = 16 * 1024 * 1024;', 'mediaKeep(mediaKey(row.id, to, outcome.messageId), { mime, name, bytes });', "function sendForm(bytes, declared = '') {"]) {
+  assert(read(path.join(__dirname, 'openwa-link.cjs')).includes(required), `openwa-link.cjs is missing ${required}`);
+}
 // The list of conversations keeps its place when the page is drawn again.
 for (const required of ["const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\\n');", "if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });", 'else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
@@ -381,6 +394,7 @@ const summary = {
   whatsappConnection: 'real, through the sub-site\'s own server: QR code, incoming events, sending; no simulation',
   priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing',
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
+  fileSending: 'one file per message from the message box (the + button, paste, drop), sent by the server through OpenWA with the typed words as its caption; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

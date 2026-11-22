@@ -27,7 +27,7 @@ for (const level of ['log', 'error']) {
 }
 
 // ---- the stand-in for OpenWA ----
-const gw = { sessions: new Map(), hooks: new Map(), sends: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map(), media: new Map() };
+const gw = { sessions: new Map(), hooks: new Map(), sends: [], files: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map(), media: new Map() };
 const uuid = () => crypto.randomUUID();
 const gwSession = name => ({ id: uuid(), name, status: 'created', phone: null, pushName: null, connectedAt: null, lastActive: null, createdAt: new Date(clock).toISOString(), updatedAt: new Date(clock).toISOString(), lastError: null, restriction: null, engineLoaded: false });
 const publicHook = ({ secret, ...hook }) => hook;
@@ -101,9 +101,11 @@ const gateway = http.createServer((req, res) => {
       return answer(200, (gw.history.get(decodeURIComponent(third)) || []).slice(-limit));
     }
     if (action === 'contacts') return gw.contacts.has(decodeURIComponent(third)) ? answer(200, gw.contacts.get(decodeURIComponent(third))) : fail(404, 'Not Found', 'Contact not found');
-    if (action === 'messages' && third === 'send-text' && !fourth) {
+    if (action === 'messages' && /^send-(text|image|video|audio|document)$/.test(third) && !fourth) {
       const key = req.headers['idempotency-key'];
-      gw.sends.push({ sessionId, key, body });
+      // A text is noted as it is, a file by its route, its fingerprint and what came with it.
+      if (third === 'send-text') gw.sends.push({ sessionId, key, body });
+      else gw.files.push({ route: third, key, chatId: body.chatId, mimetype: body.mimetype, filename: body.filename, caption: body.caption, sha: crypto.createHash('sha256').update(Buffer.from(body.base64, 'base64')).digest('hex') });
       if (!started) return fail(400, 'Bad Request', `Session '${sessionId}' is not active`);
       if (session.status !== 'ready') return fail(409, 'Conflict', 'Session is not connected. The WhatsApp client is not ready.');
       if (gw.sendMode === 'error') return fail(500, 'Internal Server Error', 'boom');
@@ -648,6 +650,114 @@ test('what kind of media some bytes are is told by how they begin', () => {
   assert.equal(openwaLink.mediaKind(Buffer.from([0xff, 0xd8, 0xff])), null, 'too short to tell');
 });
 
+test('what a file is sent as is told by its bytes: a picture, a video or a recording only in a format WhatsApp shows as such, everything else a document', () => {
+  const form = (head, declared, tail = '') => openwaLink.sendForm(Buffer.concat([Buffer.from(head), Buffer.alloc(32), Buffer.from(tail)]), declared);
+  assert.deepEqual([
+    form([0xff, 0xd8, 0xff, 0xe1], 'image/jpeg'), form([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 'image/png'), form([0xff, 0xd8, 0xff, 0xe1], 'application/pdf'), form([0xff, 0xd8, 0xff, 0xe1]),
+    form('\0\0\0\x20ftypisom', 'video/mp4'), form('\0\0\0\x20ftypmp42', 'video/mp4', 'stsd....avc1'), form('\0\0\0\x20ftypisom', 'application/octet-stream'),
+    form('OggS', 'audio/ogg'), form('ID3\x04', 'audio/mpeg'), form('\0\0\0\x20ftypM4A ', 'audio/x-m4a'), form('\0\0\0\x20ftypisom', 'audio/mp4'), form([0xff, 0xf1, 0x50], 'audio/aac'),
+  ], [
+    { type: 'image', mime: 'image/jpeg' }, { type: 'image', mime: 'image/png' }, { type: 'image', mime: 'image/jpeg' }, { type: 'image', mime: 'image/jpeg' },
+    { type: 'video', mime: 'video/mp4' }, { type: 'video', mime: 'video/mp4' }, { type: 'video', mime: 'video/mp4' },
+    { type: 'audio', mime: 'audio/ogg' }, { type: 'audio', mime: 'audio/mpeg' }, { type: 'audio', mime: 'audio/mp4' }, { type: 'audio', mime: 'audio/mp4' }, { type: 'audio', mime: 'audio/aac' },
+  ]);
+  // a document: under the type the browser gave it, or what its bytes say, or as bytes without a type
+  assert.deepEqual([
+    form('%PDF-1.7', 'application/pdf'), form('PK\x03\x04', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), form('GIF89a', 'image/gif'), form('RIFF\0\0\0\0WEBPVP8 ', 'image/webp'),
+    form('RIFF\0\0\0\0WAVEfmt ', 'audio/wav'), form([0x1a, 0x45, 0xdf, 0xa3], 'video/webm'), form('<!doctype html>', 'image/jpeg'), form('%PDF-1.7'), form('GIF89a'), form('%PDF-1.7', 'not a type'), form('%PDF-1.7', 'a/' + 'b'.repeat(100)),
+  ], [
+    { type: 'document', mime: 'application/pdf' }, { type: 'document', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }, { type: 'document', mime: 'image/gif' }, { type: 'document', mime: 'image/webp' },
+    { type: 'document', mime: 'audio/wav' }, { type: 'document', mime: 'video/webm' }, { type: 'document', mime: 'image/jpeg' }, { type: 'document', mime: 'application/octet-stream' }, { type: 'document', mime: 'image/gif' },
+    { type: 'document', mime: 'application/octet-stream' }, { type: 'document', mime: 'application/octet-stream' },
+  ]);
+  // a video WhatsApp Web could not play goes out as a document: another kind of file in the same wrapping, or pictures in a newer format
+  for (const [head, declared, tail] of [['\0\0\0\x20ftypqt  ', 'video/quicktime'], ['\0\0\0\x20ftypheic', 'image/heic'], ['\0\0\0\x20ftyp3gp4', 'video/3gpp'], ['\0\0\0\x20ftypisom', 'video/mp4', 'stsd....hvc1'], ['\0\0\0\x20ftypmp42', 'video/mp4', 'hev1'], ['\0\0\0\x20ftypisom', 'video/mp4', 'av01'], ['\0\0\0\x20ftypiso5', 'video/mp4', 'vp09']]) {
+    assert.deepEqual(form(head, declared, tail), { type: 'document', mime: declared }, head.slice(4) + ' ' + (tail || ''));
+  }
+  assert.deepEqual(openwaLink.sendForm(Buffer.from([0xff, 0xd8, 0xff]), 'image/jpeg'), { type: 'document', mime: 'image/jpeg' }, 'too short to tell');
+});
+
+test('sending a file: its details come first in the request, then the file; it goes out by the route of its kind with its caption; one file per request; what was sent is kept for the page; limits and who may send', async () => {
+  gwSessionOf('a1').status = 'ready';
+  gw.files.length = 0;
+  const to = '15550001111@c.us', sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]);
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(120, 3)]);
+  const ogg = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(120, 1)]);
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(120, 2)]);
+  // The body of a request: one line of JSON with the details, then the file as it is.
+  const send = (bytes, details, { content = 'application/octet-stream', cookie = lin, headers = {}, line } = {}) =>
+    fetch(`http://127.0.0.1:${port}/api/wa/send-file`, { method: 'POST', headers: { 'Content-Type': content, ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: Buffer.concat([Buffer.from(line ?? JSON.stringify({ account: 'a1', to, ...details }) + '\n'), bytes]) })
+      .then(async r => ({ status: r.status, json: await r.json() }));
+  // a picture with a caption
+  const sent = await send(jpeg, { requestId: 'file-0000001', name: 'photo.jpg', type: 'image/jpeg', caption: '  Here it is  ' });
+  assert.deepEqual([sent.status, sent.json.type, sent.json.file, sent.json.timestamp, typeof sent.json.messageId], [200, 'image', 'photo.jpg', Math.floor(clock / 1000) * 1000, 'string']);
+  assert.deepEqual(gw.files, [{ route: 'send-image', key: 's1-file-0000001', chatId: to, mimetype: 'image/jpeg', filename: undefined, caption: 'Here it is', sha: sha(jpeg) }]);
+  // repeated, it is not sent again; the same request with another file or another caption is a conflict
+  assert.deepEqual((await send(jpeg, { requestId: 'file-0000001', name: 'photo.jpg', type: 'image/jpeg', caption: 'Here it is' })).json, sent.json);
+  assert.equal(gw.files.length, 1, 'the repeated request does not reach OpenWA');
+  assert.deepEqual([(await send(pdf, { requestId: 'file-0000001', name: 'photo.jpg', caption: 'Here it is' })).status, (await send(jpeg, { requestId: 'file-0000001', name: 'photo.jpg', caption: 'Other' })).json], [409, { error: 'request-conflict' }]);
+  // what was sent is kept: the page gets it without OpenWA being asked
+  gw.calls.length = 0;
+  const kept = await fetch(`http://127.0.0.1:${port}/api/wa/media?account=a1&chat=${encodeURIComponent(to)}&id=${encodeURIComponent(sent.json.messageId)}`, { headers: { Cookie: lin } });
+  assert.deepEqual([kept.status, kept.headers.get('content-type'), Buffer.from(await kept.arrayBuffer()).equals(jpeg)], [200, 'image/jpeg', true]);
+  assert.deepEqual(gw.calls, [], 'the kept file is served without a call to OpenWA');
+  // each kind by its route; a document under its own name, cleaned of what cannot be part of one
+  gw.files.length = 0;
+  for (const [id, bytes, type, name, route, mime, filename] of [
+    ['file-0000010', mp4, 'video/mp4', 'clip.mp4', 'send-video', 'video/mp4', undefined],
+    ['file-0000011', ogg, 'audio/ogg', 'note.ogg', 'send-audio', 'audio/ogg', undefined],
+    ['file-0000012', pdf, 'application/pdf', '报价 2026.pdf', 'send-document', 'application/pdf', '报价 2026.pdf'],
+    ['file-0000013', jpeg, 'application/pdf', 'really a picture.pdf', 'send-image', 'image/jpeg', undefined],
+    ['file-0000014', pdf, '', '', 'send-document', 'application/octet-stream', 'file'],
+    ['file-0000015', pdf, 'application/pdf', 'a/b\\c\u0001d.pdf', 'send-document', 'application/pdf', 'a b c d.pdf'],
+    ['file-0000016', pdf, 'application/pdf', 'x'.repeat(300) + '.pdf', 'send-document', 'application/pdf', 'x'.repeat(200)],
+  ]) {
+    const answer = await send(bytes, { requestId: id, name, type });
+    assert.deepEqual([answer.status, answer.json.type, answer.json.file], [200, route.replace('send-', ''), filename === 'file' ? undefined : filename ?? name], id);
+    assert.deepEqual(gw.files.at(-1), { route, key: 's1-' + id, chatId: to, mimetype: mime, filename, caption: undefined, sha: sha(bytes) }, id);
+  }
+  // limits and bad requests: nothing reaches OpenWA
+  const before = gw.files.length;
+  const sven = await member('sven', 'supervisor', null), olga = await member('olga', 'agent', 'elsewhere');
+  for (const [what, bytes, details, options, status, error] of [
+    ['an empty file', Buffer.alloc(0), { requestId: 'file-0000020', name: 'a.pdf' }, {}, 400, 'invalid-request'],
+    ['details that are not JSON', pdf, {}, { line: 'account=a1\n' }, 400, 'invalid-request'],
+    ['details that are a list', pdf, {}, { line: '["a1"]\n' }, 400, 'invalid-request'],
+    ['details without their end of line', Buffer.alloc(200, 2), {}, { line: JSON.stringify({ account: 'a1', to, requestId: 'file-0000018' }) }, 400, 'invalid-request'],
+    ['details that take more than their room', pdf, { requestId: 'file-0000019', name: 'x'.repeat(17000) }, {}, 400, 'invalid-request'],
+    ['details of another kind than text', pdf, { requestId: 'file-0000017', to: 15550001111 }, {}, 400, 'invalid-request'],
+    ['a file over the limit', Buffer.alloc(16 * 1024 * 1024 + 1, 1), { requestId: 'file-0000021', name: 'big.bin' }, {}, 413, 'too-long'],
+    ['a caption over the limit', pdf, { requestId: 'file-0000022', name: 'a.pdf', caption: 'x'.repeat(1025) }, {}, 400, 'invalid-request'],
+    ['a group', pdf, { requestId: 'file-0000023', name: 'a.pdf', to: '1203630@g.us' }, {}, 400, 'invalid-request'],
+    ['a request id that is too short', pdf, { requestId: 'short', name: 'a.pdf' }, {}, 400, 'invalid-request'],
+    ['a body announced as a form', pdf, { requestId: 'file-0000024', name: 'a.pdf' }, { content: 'text/plain' }, 400, 'invalid-request'],
+    ['a body announced as a picture', jpeg, { requestId: 'file-0000025', name: 'a.jpg' }, { content: 'image/jpeg' }, 400, 'invalid-request'],
+    ['an unknown number', pdf, { requestId: 'file-0000026', name: 'a.pdf', account: 'zz' }, {}, 404, 'unknown-account'],
+    ['nobody signed in', pdf, { requestId: 'file-0000027', name: 'a.pdf' }, { cookie: '' }, 401, 'not-signed-in'],
+    ['a supervisor', pdf, { requestId: 'file-0000028', name: 'a.pdf' }, { cookie: sven }, 403, 'read-only'],
+    ['an employee of another sub-site', pdf, { requestId: 'file-0000029', name: 'a.pdf' }, { cookie: olga }, 403, 'forbidden'],
+    ['a page of another site', pdf, { requestId: 'file-0000030', name: 'a.pdf' }, { headers: { 'Sec-Fetch-Site': 'cross-site' } }, 403, 'forbidden'],
+  ]) {
+    const answer = await send(bytes, details, options);
+    assert.deepEqual([answer.status, answer.json], [status, { error }], what);
+  }
+  assert.equal(gw.files.length, before);
+  // a file of exactly the largest size goes through
+  const largest = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(16 * 1024 * 1024 - 9, 5)]);
+  assert.equal((await send(largest, { requestId: 'file-0000040', name: 'large.pdf', type: 'application/pdf' })).status, 200);
+  assert.equal(gw.files.at(-1).sha, sha(largest));
+  // the number is not connected; an answer that leaves the outcome open; the same request again goes through
+  gwSessionOf('a1').status = 'qr_ready';
+  assert.deepEqual((await send(pdf, { requestId: 'file-0000050', name: 'a.pdf' })).json, { error: 'not-connected' });
+  gwSessionOf('a1').status = 'ready';
+  gw.sendMode = 'error';
+  assert.deepEqual([(await send(pdf, { requestId: 'file-0000051', name: 'a.pdf' })).status, (await send(pdf, { requestId: 'file-0000051', name: 'a.pdf' })).json], [409, { error: 'outcome-unknown' }]);
+  gw.sendMode = 'ok';
+  assert.equal((await send(pdf, { requestId: 'file-0000051', name: 'a.pdf' })).status, 200, 'the same request goes through once OpenWA answers');
+  assert.deepEqual(gw.files.slice(-3).map(f => f.key), Array(3).fill('s1-file-0000051'), 'OpenWA gets the same key every time');
+});
+
 test('unlinking removes the session at OpenWA and the record; later deliveries of it are dropped', async () => {
   await post('/api/wa/link', { account: 'a4' });
   const id = gwSessionOf('a4').id;
@@ -663,10 +773,10 @@ test('unlinking removes the session at OpenWA and the record; later deliveries o
 
 test('the log names actions and numbers, never a key, a secret, a phone number or message text', () => {
   const lines = logged.filter(line => line.startsWith('wa '));
-  for (const expected of ['wa link ok account=a1 state=scan', 'wa hook stored event=message.received account=a1', 'wa send ok account=a1 chars=5', 'wa send failed account=a1 error=not-connected upstream=409', 'wa unlink ok account=a4', 'error=gateway-unreachable', 'error=gateway-refused']) {
+  for (const expected of ['wa link ok account=a1 state=scan', 'wa hook stored event=message.received account=a1', 'wa send ok account=a1 chars=5', 'wa send failed account=a1 error=not-connected upstream=409', 'wa send ok account=a1 file=image bytes=304', 'wa send failed account=a1 file=document error=not-connected upstream=409', 'wa unlink ok account=a4', 'error=gateway-unreachable', 'error=gateway-refused']) {
     assert(lines.some(line => line.includes(expected)), expected);
   }
-  for (const secret of [KEY, SECRET, '15550001111', '15550009999', 'hello', 'Hola', 'On my way', QR]) assert(!lines.some(line => line.includes(secret)), secret);
+  for (const secret of [KEY, SECRET, '15550001111', '15550009999', 'hello', 'Hola', 'On my way', 'Here it is', 'photo.jpg', QR]) assert(!lines.some(line => line.includes(secret)), secret);
   const stored = ['wa-s1.db', 'wa-s1.db-wal'].map(name => path.join(tmp, 'main', name)).filter(file => fs.existsSync(file)).map(file => fs.readFileSync(file).toString('latin1')).join('');
   assert(!stored.includes(KEY) && !stored.includes(SECRET), 'the link\'s records hold neither the key nor the secret');
   assert.equal(fs.statSync(path.join(tmp, 'main', 'wa-s1.db')).mode & 0o077, 0, 'the records are private');

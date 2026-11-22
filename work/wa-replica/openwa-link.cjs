@@ -57,6 +57,21 @@ const MEDIA_TIMEOUT_MS = Number(process.env.WA_SCRM_OPENWA_MEDIA_TIMEOUT_MS) || 
 const MEDIA_MESSAGES = 50;
 const MEDIA_RETRY_MS = 10 * 60 * 1000;
 const MEDIA_FILE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+// Sending a file from the page: the largest file taken, the room for its details in front of it, how long OpenWA
+// may take (the proxy in front of this server gives a request a minute), and the longest caption and file name
+// passed on.
+const SEND_FILE_MAX = 16 * 1024 * 1024;
+const SEND_DETAILS_MAX = 16 * 1024;
+const SEND_FILE_TIMEOUT_MS = 45000;
+const SEND_CAPTION_MAX = 1024;
+const SEND_NAME_MAX = 200;
+// What a file goes out as. A picture, a video or a recording goes out as one only in a format WhatsApp shows as
+// such; everything else — also a picture or a video of another kind — goes out as a document under its own name.
+const SEND_AS = { 'image/jpeg': 'image', 'image/png': 'image', 'video/mp4': 'video', 'audio/mpeg': 'audio', 'audio/ogg': 'audio', 'audio/mp4': 'audio', 'audio/aac': 'audio' };
+// An MP4 file is a video for WhatsApp only when it is of the usual kind (H.264): one that calls itself something
+// else at its start, or holds pictures in H.265, AV1 or VP9, would never finish loading in WhatsApp Web.
+const SEND_VIDEO_KINDS = ['isom', 'iso2', 'iso4', 'iso5', 'iso6', 'mp41', 'mp42', 'avc1', 'M4V ', 'mmp4'];
+const SEND_VIDEO_OTHER = ['hvc1', 'hev1', 'av01', 'vp09'];
 const SENT = Symbol('answered');
 const ACCOUNT = /^[A-Za-z0-9]{1,24}$/;
 const MESSAGE = /^[A-Za-z0-9_@.:-]{3,160}$/;
@@ -135,14 +150,14 @@ function signed(raw, header, secret) {
 
 // One call to OpenWA: { status, body } for every answer. No answer at all is 'gateway-unreachable', a key
 // OpenWA does not accept is 'gateway-refused'.
-async function ask(config, method, pathname, body, headers = {}) {
+async function ask(config, method, pathname, body, headers = {}, timeout = TIMEOUT_MS) {
   let response;
   try {
     response = await fetch(config.baseUrl + pathname, {
       method,
       headers: { 'X-API-Key': config.key, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeout),
     });
   } catch {
     throw problem('gateway-unreachable');
@@ -172,6 +187,16 @@ function mediaKind(bytes, declared = '') {
   if (text(4, 8) === 'ftyp') return sound || text(8, 11) === 'M4A' ? 'audio/mp4' : 'video/mp4';
   if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return sound ? 'audio/webm' : 'video/webm';
   return null;
+}
+
+// What a file is sent as, and under which type: told by its bytes, never by its name. declared is the type the
+// browser gave the file; a document keeps it.
+function sendForm(bytes, declared = '') {
+  const kind = mediaKind(bytes, declared);
+  const usual = kind !== 'video/mp4' || (SEND_VIDEO_KINDS.includes(bytes.subarray(8, 12).toString('latin1')) && !SEND_VIDEO_OTHER.some(code => bytes.includes(code)));
+  const type = (usual && SEND_AS[kind]) || 'document';
+  const named = declared.length <= 100 && /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(declared);
+  return { type, mime: type !== 'document' ? kind : named ? declared : kind || 'application/octet-stream' };
 }
 
 // One stored delivery in this project's own form, or null when the page has no use for it.
@@ -544,6 +569,53 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       console.error(`wa send failed account=${row.id} error=${code} upstream=${answer.status}`);
       throw problem(code);
     },
+    // A file, with what was typed as its caption. The body of the request is one line of JSON with the details
+    // { account, to, requestId, name, type, caption } — type is what the browser calls the file — and, after the
+    // end of that line, the file as it is. Nothing of it is in the address, which a proxy writes into its log. The
+    // body is always announced as application/octet-stream, a type a page of another site cannot send here. As
+    // for a text, requestId names one press of the send button and repeating a request never sends twice. What
+    // was sent is kept beside the media that came in, so the page can show it at once.
+    'POST /api/wa/send-file': async req => {
+      employee(req);
+      const config = settings();
+      if (mediaType(req.headers['content-type']) !== 'application/octet-stream') {
+        req.resume();
+        throw problem('invalid-request');
+      }
+      const body = await readRaw(req, SEND_DETAILS_MAX + SEND_FILE_MAX), end = body.subarray(0, SEND_DETAILS_MAX).indexOf(10);
+      let details = null;
+      try {
+        details = JSON.parse(body.subarray(0, Math.max(end, 0)).toString('utf8'));
+      } catch {}
+      if (!details || typeof details !== 'object' || Array.isArray(details)) throw problem('invalid-request');
+      const given = name => (typeof details[name] === 'string' ? details[name] : '');
+      const to = given('to'), requestId = given('requestId'), caption = given('caption').trim(), bytes = body.subarray(end + 1);
+      const name = given('name').replace(/[\u0000-\u001f\\/]/g, ' ').trim().slice(0, SEND_NAME_MAX);
+      if (!CHAT.test(to) || !CLIENT.test(requestId) || caption.length > SEND_CAPTION_MAX || !bytes.length) throw problem('invalid-request');
+      if (bytes.length > SEND_FILE_MAX) throw problem('too-long');
+      const row = store.account(given('account'));
+      if (!row) throw problem('unknown-account');
+      const { type, mime } = sendForm(bytes, mediaType(given('type')));
+      const digest = crypto.createHash('sha256').update(JSON.stringify([row.id, to, crypto.createHash('sha256').update(bytes).digest('hex'), name, caption])).digest('hex');
+      const earlier = store.request(requestId);
+      if (earlier && earlier.digest !== digest) throw problem('request-conflict');
+      if (earlier?.outcome) return JSON.parse(earlier.outcome);
+      if (!earlier) store.addRequest(requestId, digest);
+      const answer = await ask(config, 'POST', `/api/sessions/${row.session}/messages/send-${type}`,
+        { chatId: to, base64: bytes.toString('base64'), mimetype: mime, ...(type === 'document' ? { filename: name || 'file' } : {}), ...(caption ? { caption } : {}) },
+        { 'Idempotency-Key': `${siteId}-${requestId}` }, SEND_FILE_TIMEOUT_MS);
+      if (answer.status === 201 && answer.body?.messageId) {
+        const outcome = { messageId: String(answer.body.messageId), timestamp: Number(answer.body.timestamp) > 0 ? Number(answer.body.timestamp) * 1000 : now(), type, ...(name ? { file: name } : {}) };
+        mediaKeep(mediaKey(row.id, to, outcome.messageId), { mime, name, bytes });
+        store.finishRequest(requestId, outcome);
+        console.log(`wa send ok account=${row.id} file=${type} bytes=${bytes.length}`);
+        return outcome;
+      }
+      const code = answer.status === 422 ? 'request-conflict' : answer.status === 400 || answer.status === 413 ? 'send-refused' : answer.status === 404 ? 'not-connected'
+        : answer.status === 409 && !String(answer.body?.code || '').startsWith('IDEMPOTENCY_') ? 'not-connected' : 'outcome-unknown';
+      console.error(`wa send failed account=${row.id} file=${type} error=${code} upstream=${answer.status}`);
+      throw problem(code);
+    },
     'POST /api/wa/claim': async req => {
       employee(req);
       const { client } = await readJson(req);
@@ -699,4 +771,4 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
   return { handle, store, sync: syncAccount, close: () => { for (const timer of timers) clearTimeout(timer); wake(); store.close(); } };
 }
 
-module.exports = { create, loadConfig, present, signed, mediaKind, EVENTS, STATES };
+module.exports = { create, loadConfig, present, signed, mediaKind, sendForm, EVENTS, STATES };

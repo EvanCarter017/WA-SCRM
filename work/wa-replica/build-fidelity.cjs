@@ -169,8 +169,9 @@ swap("esc(m.time.replace('昨天 ',''))+(m.side==='out'?icon(m.local?'Check':'Ch
 swap("emptyHint='写一条演示消息，或选择快捷回复开始。'", "emptyHint='输入消息，或选择快捷回复开始。'");
 swap("'</strong><time>'+esc(c.last)+'</time>", "'</strong><time>'+esc(openwaLastLabel(c))+'</time>");
 swap('.includes(q));return list}', '.includes(q));return openwaOrder(list)}');
-swap('enabled=online&&(d.text.trim()||ui.attachment);', 'enabled=online&&Boolean(d.text.trim());');
-swap(`<button class="icon-button" data-action="attachment" aria-label="添加演示附件">'+icon('Paperclip')+'</button>`, '');
+// The button that attaches a file (plan 043) stands where the baseline had its made-up one; the baseline's own
+// line above the message box and its send button already reckon with an attached file.
+swap(`<button class="icon-button" data-action="attachment" aria-label="添加演示附件">'+icon('Paperclip')+'</button>`, `'+openwaAttachButton()+'`);
 swap('aria-label="发送演示消息"', 'aria-label="发送消息"');
 swap("(online?'演示会话 · 草稿自动保存':'账号待连接 · 草稿已保留')", "(online?'草稿自动保存':'号码待连接 · 草稿已保留')");
 swap('<span class="sample-label">演示来源</span>', '');
@@ -182,7 +183,8 @@ swap("error('演示数据中已有该号码。重复客户归属/合并规则待
   assert(next !== js, 'Missing the send function of the baseline');
   js = next;
 }
-// The dialog that added a made-up attachment to a message is gone with its button; real files come with the media step.
+// The dialog that added a made-up attachment to a message is gone with its button; a real file is attached by
+// fidelity-openwa.js.
 cut(/^      case 'attachment':\{[^\n]*\n/m, 'demo attachment dialog');
 cut(/^    if\(formId==='attachment-form'\)[^\n]*\n/m, 'demo attachment form');
 assert(!/<span>本地演示<\/span>|演示消息|添加演示附件|模拟扫码|模拟掉线|模拟重连|lcSimLeadOpen|lcSimReply|openwaDemoQr/.test(js), 'the app must not simulate the WhatsApp connection');

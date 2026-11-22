@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-22T20:11:26.788Z",
+  "checkedAt": "2026-11-22T21:34:55.521Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -51,5 +51,6 @@
   "whatsappConnection": "real, through the sub-site's own server: QR code, incoming events, sending; no simulation",
   "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product's price into the message box and sends nothing",
   "messageTranslation": "once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again",
+  "fileSending": "one file per message from the message box (the + button, paste, drop), sent by the server through OpenWA with the typed words as its caption; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "externalNetworkCalls": false
 }
