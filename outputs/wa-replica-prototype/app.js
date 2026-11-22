@@ -1435,7 +1435,7 @@ window.WA_START = () => {
     if (!url) return '';
     if (shown === 'image') return `<a class="openwa-media" href="${url}" target="_blank" rel="noopener" aria-label="在新标签页查看${m.type === 'sticker' ? '贴图' : '图片'}"><img src="${url}" alt="${m.type === 'sticker' ? '贴图' : '图片'}" loading="lazy"></a>`;
     if (shown === 'video') return `<div class="openwa-media"><video src="${url}" controls preload="none" aria-label="视频"></video></div>`;
-    if (shown === 'audio') return `<div class="openwa-media"><audio src="${url}" controls preload="none" aria-label="语音"></audio></div>`;
+    if (shown === 'audio') return `<div class="openwa-media"><audio src="${url}" controls preload="none" aria-label="语音"></audio></div>` + aiTranscriptHTML(c, m);
     return `<a class="openwa-file" href="${url}&amp;download=1" download>${icon('FileDown')}<span>${esc(m.file || '文件')}</span></a>`;
   }
   // The text under the media: the words that only stood for the media ("[图片]") are left out when it is shown.
@@ -3510,12 +3510,13 @@ window.WA_START = () => {
   const AI_CAPABILITIES = [
     { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为所选的译文语言，显示在原文下方。' },
     { id: 'translate.outbound', name: '发送前翻译', description: '把你输入的回复和快捷回复译为客户的语言，发送前可预览。' },
+    { id: 'voice.transcribe', name: '语音转文字', description: '点击语音消息下方的「转文字」，把语音转成文字显示在语音下方；客户发来的语音还会译为所选的译文语言。' },
   ];
   // The provider answers run(capabilityId, input) with a Promise of { text }: the page's own server relays the
   // request to the model service (ai-relay.cjs), so the service key never reaches the browser. Without a server
   // that has a model service configured there is no provider, and no capability runs.
   const AI_PROVIDERS = {
-    server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
+    server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
   // Languages offered for the translation shown below incoming messages.
   const AI_READ_LANGUAGES = ['中文', 'English', 'Español', 'Português', 'Français', 'Deutsch', 'Русский', 'العربية', '日本語', '한국어', 'Tiếng Việt', 'Bahasa Indonesia'];
@@ -3600,6 +3601,15 @@ window.WA_START = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context }),
     }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
+  }
+
+  // The server turns the voice note of a message into text: it holds the file and calls the speech service.
+  function aiRelayTranscribe(input) {
+    return fetch('/api/wa/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account: input.account, chat: input.chat, id: input.id }),
+    }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('transcribe ' + body.error))));
   }
 
   // Ask the page's own server whether a model service is configured, and use the relay if it is.
@@ -3770,6 +3780,7 @@ window.WA_START = () => {
     const settings = aiSettings();
     const capabilityName = id => AI_CAPABILITIES.find(item => item.id === id)?.name || id;
     const relay = aiRuntime.provider === 'server';
+    const voice = Boolean(aiRuntime.status?.voice?.configured);
     const providerNote = relay
       ? '由本站服务器中转调用模型服务，密钥只保存在服务器，不进入浏览器。'
       : aiRuntime.status
@@ -3793,6 +3804,7 @@ window.WA_START = () => {
     return `<section class="fid-page"><div class="fid-panel fid-ai">
       ${fidHead('AI 能力', '翻译等 AI 功能都经由同一个接入点调用，每次调用记录一条用量。')}
       <div class="fid-ai-provider"><strong>当前接入</strong><span class="lc-pill ${relay ? 'ok' : 'warn'}">${esc(relay ? `${aiRuntime.status.provider} · ${aiRuntime.status.model}` : '未连接')}</span><span>${providerNote}</span></div>
+      <div class="fid-ai-provider"><strong>语音服务</strong><span class="lc-pill ${voice ? 'ok' : 'warn'}">${esc(voice ? `${aiRuntime.status.voice.provider} · ${aiRuntime.status.voice.model}` : '未连接')}</span><span>${voice ? '语音消息由本站服务器交给语音服务转成文字，每条语音只转一次。' : '服务器尚未配置语音服务，语音转文字暂不可用。'}</span></div>
       <div class="fid-ai-provider"><strong>译文语言</strong><select class="fid-select" data-ai-setting="readLanguage" aria-label="译文语言">${AI_READ_LANGUAGES.map(language => option(language, language, settings.readLanguage)).join('')}</select><span>客户发来的消息译为这种语言，显示在原文下方；只对之后收到的消息生效。</span></div>
       <div class="fid-ai-provider"><strong>回复语气</strong><select class="fid-select" data-ai-setting="tone" aria-label="回复语气">${AI_TONES.map(([value, label]) => option(value, label, settings.tone)).join('')}</select><span>把你的回复译给客户时采用的语气。</span></div>
       <div class="fid-ai-provider fid-ai-business"><strong>业务说明</strong><textarea class="fid-input" data-ai-setting="business" aria-label="业务说明" maxlength="${AI_BUSINESS_MAX}" rows="2" placeholder="选填，例如：我们向美国和波多黎各的小型餐饮企业销售厨房设备。">${esc(settings.business)}</textarea><span>选填。翻译回复时一并提供给模型，让用词贴合你的业务；同时提供的还有该会话最近 6 条消息。</span></div>
@@ -3839,8 +3851,56 @@ window.WA_START = () => {
     toast(`${capability.name}已${on ? '启用' : '停用'}。`);
   });
 
+  // ---- voice notes into text ----
+  // Messages whose words are being asked for right now.
+  const aiTranscribing = new Set();
+  // Under a voice note or sound file: its words once they are known, otherwise a button that asks for them.
+  // c is the customer, or a record of the chat archive, which only shows words that were known when it was made.
+  function aiTranscriptHTML(c, m) {
+    if (m.transcript) return `<div class="message-translation ai-transcript"><span class="translation-label">${icon('FileText')}转写</span><div>${esc(m.transcript)}</div></div>`;
+    if (!c.waChat || !aiSettings().enabled['voice.transcribe'] || !aiRuntime.provider || !aiRuntime.status?.voice?.configured) return '';
+    const busy = aiTranscribing.has(m.id);
+    return `<button type="button" class="fid-link ai-transcribe" data-ai-transcribe="${esc(m.id)}" ${busy ? 'disabled' : ''}>${icon('FileText')}${busy ? '正在转文字…' : '转文字'}</button>`;
+  }
+  // Draws the open conversation again when it is this customer's.
+  function aiRedraw(c) {
+    const box = $('#messages');
+    if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
+    const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
+    openwaKeepPlaying(() => {
+      box.innerHTML = messagesHTML(c);
+    });
+    paintIcons(box);
+    if (atBottom) scrollMessages();
+  }
+  // Turns a voice note of the open conversation into text and keeps the text on the message. The words of a
+  // voice note the customer sent are then translated like an incoming text.
+  function aiTranscribe(messageId) {
+    const c = selectedCustomer(), message = c && (data.messages[c.id] || []).find(m => m.id === messageId);
+    if (!message || !message.wa || !c.waChat || aiTranscribing.has(messageId)) return;
+    aiTranscribing.add(messageId);
+    aiRedraw(c);
+    aiRun('voice.transcribe', { account: c.account, chat: c.waChat, id: message.wa }, { customerId: c.id }).then(result => {
+      aiTranscribing.delete(messageId);
+      if (result.ok) {
+        message.transcript = result.text;
+        persist();
+      } else if (!result.skipped) toast('这条语音未能转成文字，请稍后再试。');
+      aiRedraw(c);
+      if (!result.ok || message.side !== 'in') return;
+      aiRun('translate.inbound', { text: result.text, to: aiSettings().readLanguage }, { customerId: c.id }).then(translated => {
+        if (!translated.ok || translated.text.trim() === result.text.trim()) return;
+        message.translated = translated.text;
+        persist();
+        aiRedraw(c);
+      });
+    });
+  }
+
   document.addEventListener('click', event => {
     if (event.target.closest?.('[data-ai-guard]')) aiSetGuard(!aiGuardOn());
+    const ask = event.target.closest?.('[data-ai-transcribe]');
+    if (ask) aiTranscribe(ask.dataset.aiTranscribe);
   });
 
   aiDetectRelay();

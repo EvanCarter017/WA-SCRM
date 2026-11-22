@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-22T11:24:21.635Z",
+  "checkedAt": "2026-11-22T11:52:11.231Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -35,10 +35,11 @@
   "chatHistory": "archive of moved-in snapshots, no rating",
   "aiCapabilities": [
     "translate.inbound",
-    "translate.outbound"
+    "translate.outbound",
+    "voice.transcribe"
   ],
   "aiProvider": "server relay to an OpenAI-compatible model service (key stays on the server); without it no AI capability runs",
-  "pageNetworkCalls": "own server only: /api/ai/status, /api/ai/translate, /api/ai/reply",
+  "pageNetworkCalls": "own server only: /api/ai/status, /api/ai/translate, /api/ai/reply, /api/wa/transcribe",
   "replyTranslation": "typed replies and quick replies go to /api/ai/reply with tone, business description and the last six messages; send guard on by default: first Enter translates, second Enter sends",
   "conversationCardTags": "first 3 visible tags, then +N; no follow-up status chip",
   "chatStripFollowLink": "status and next-follow-up labels open the follow-up centre on the customer row",

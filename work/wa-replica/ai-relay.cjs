@@ -1,6 +1,8 @@
 // AI relay of the preview server. The browser calls /api/ai/*; this module calls the configured model
 // service through its OpenAI-compatible chat-completions endpoint. It is the only code that reads the
 // service key. It never returns or logs the key, and it never logs message text.
+// It also turns speech into text for the WhatsApp link (openwa-link.cjs), through the speech service the same
+// settings file names with VOICE_PROVIDER, VOICE_API_KEY and, optionally, VOICE_BASE_URL and VOICE_MODEL.
 const fs = require('node:fs');
 
 // Services that speak the OpenAI chat-completions format. limitField is the name each one uses for the
@@ -18,6 +20,17 @@ const MAX_CONTEXT_MESSAGES = 6;
 const MAX_CONTEXT_TEXT = 300;
 const MAX_OUTPUT_TOKENS = 4096;
 const TIMEOUT_MS = Number(process.env.WA_SCRM_AI_TIMEOUT_MS) || 30000;
+// Services with an OpenAI-compatible /audio/transcriptions endpoint, and the model each one is asked for when
+// the settings name none.
+const VOICE_PROVIDERS = {
+  openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini-transcribe' },
+  groq: { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'whisper-large-v3-turbo' },
+  other: { name: '自定义服务', baseUrl: '', model: '' },
+};
+// The kinds of sound the speech services take, and the file name each is sent under.
+const VOICE_FILES = { 'audio/ogg': 'voice.ogg', 'audio/mpeg': 'voice.mp3', 'audio/mp4': 'voice.m4a', 'audio/wav': 'voice.wav', 'audio/webm': 'voice.webm' };
+const MAX_VOICE_BYTES = 24 * 1024 * 1024;
+const VOICE_TIMEOUT_MS = Number(process.env.WA_SCRM_AI_VOICE_TIMEOUT_MS) || 60000;
 // A language name: letters of any script, spaces and a few separators.
 const LANGUAGE = /^[\p{L}\p{M} ()·-]{1,40}$/u;
 // How a reply should sound. The keys are what the page sends.
@@ -59,6 +72,58 @@ function loadConfig() {
   if (!values.AI_API_KEY) return { configured: false, reason: 'missing-key' };
   if (!values.AI_MODEL) return { configured: false, reason: 'missing-model' };
   return { configured: true, name: preset.name, baseUrl, model: values.AI_MODEL, key: values.AI_API_KEY, limitField: preset.limitField };
+}
+
+// The speech service of the same settings file.
+// Returns { configured: true, name, baseUrl, model, key } or { configured: false, reason }.
+function loadVoiceConfig() {
+  const file = process.env.WA_SCRM_AI_ENV;
+  if (!file) return { configured: false, reason: 'no-settings-file' };
+  let values;
+  try {
+    values = parseEnv(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return { configured: false, reason: 'no-settings-file' };
+  }
+  const provider = (values.VOICE_PROVIDER || '').toLowerCase();
+  if (!provider) return { configured: false, reason: 'no-voice-service' };
+  if (!Object.hasOwn(VOICE_PROVIDERS, provider)) return { configured: false, reason: 'unsupported-provider' };
+  const preset = VOICE_PROVIDERS[provider];
+  const baseUrl = (values.VOICE_BASE_URL || preset.baseUrl).replace(/\/+$/, '');
+  if (!/^https?:\/\/\S+$/.test(baseUrl)) return { configured: false, reason: 'missing-address' };
+  if (!values.VOICE_API_KEY) return { configured: false, reason: 'missing-key' };
+  const model = values.VOICE_MODEL || preset.model;
+  if (!model) return { configured: false, reason: 'missing-model' };
+  return { configured: true, name: preset.name, baseUrl, model, key: values.VOICE_API_KEY };
+}
+
+// Speech to text for one sound file. kind is what the file is by its first bytes (audio/ogg, …). Returns the
+// text, which is empty when the service heard no speech; every failure becomes a plain error code.
+async function transcribeAudio(bytes, kind) {
+  const config = loadVoiceConfig();
+  if (!config.configured) throw failure(503, 'not-configured', { reason: config.reason });
+  if (!Object.hasOwn(VOICE_FILES, kind)) throw failure(415, 'unsupported-audio');
+  if (bytes.length > MAX_VOICE_BYTES) throw failure(413, 'too-long');
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: kind }), VOICE_FILES[kind]);
+  form.append('model', config.model);
+  form.append('response_format', 'json');
+  const started = Date.now();
+  let response;
+  try {
+    response = await fetch(config.baseUrl + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + config.key }, body: form, signal: AbortSignal.timeout(VOICE_TIMEOUT_MS) });
+  } catch (error) {
+    console.error(`ai transcribe failed error=${error.name === 'TimeoutError' ? 'timeout' : 'provider-unreachable'} ms=${Date.now() - started}`);
+    throw error.name === 'TimeoutError' ? failure(504, 'timeout') : failure(502, 'provider-unreachable');
+  }
+  const body = response.ok ? await response.json().catch(() => null) : null;
+  if (typeof body?.text !== 'string') {
+    console.error(`ai transcribe failed error=${response.ok ? 'empty-result' : 'provider-error upstream=' + response.status} ms=${Date.now() - started}`);
+    throw response.ok ? failure(502, 'empty-result') : failure(502, 'provider-error', { upstream: response.status });
+  }
+  const words = body.text.trim();
+  console.log(`ai transcribe ok bytes=${bytes.length} chars=${words.length} ms=${Date.now() - started}`);
+  return words;
 }
 
 function sendJson(res, status, body) {
@@ -176,10 +241,12 @@ async function handle(req, res, pathname) {
       res.setHeader('Allow', 'GET');
       return sendJson(res, 405, { error: 'method-not-allowed' });
     }
-    const config = loadConfig();
-    return sendJson(res, 200, config.configured
-      ? { configured: true, provider: config.name, model: config.model }
-      : { configured: false, reason: config.reason });
+    const config = loadConfig(), voice = loadVoiceConfig();
+    // voice says whether speech can be turned into text, whatever the state of the model service.
+    return sendJson(res, 200, {
+      ...(config.configured ? { configured: true, provider: config.name, model: config.model } : { configured: false, reason: config.reason }),
+      voice: voice.configured ? { configured: true, provider: voice.name, model: voice.model } : { configured: false, reason: voice.reason },
+    });
   }
   if (Object.hasOwn(ACTIONS, pathname)) {
     const [name, run] = ACTIONS[pathname];
@@ -209,4 +276,4 @@ async function handle(req, res, pathname) {
   return sendJson(res, 404, { error: 'not-found' });
 }
 
-module.exports = { handle, loadConfig, parseEnv, translationPrompt, replyPrompt };
+module.exports = { handle, loadConfig, loadVoiceConfig, parseEnv, transcribeAudio, translationPrompt, replyPrompt };

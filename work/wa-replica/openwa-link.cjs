@@ -17,11 +17,14 @@
 //   POST /api/wa/hook                            deliveries from OpenWA, stored before they are acknowledged
 //   GET  /api/wa/media?account=<id>&chat=<chat>&id=<message>[&download=1]
 //                                                the picture, voice note, video or file of a message
+//   POST /api/wa/transcribe { account, chat, id }
+//                                                the words of a voice note or sound file, by the speech service
 // The link also catches up by itself: when a number comes online it fetches the number's chats with one person
 // and the latest messages of each, and every quarter of an hour it looks for what the hook did not deliver.
 // The media of a message is fetched from OpenWA the first time it is asked for and kept in the folder
 // wa-media-<site> beside the records; that folder may be emptied at any time. A file is shown inside the page
 // only when its first bytes are those of a picture, sound or video a browser plays; anything else is a download.
+// The text of a voice note is kept beside its file, so the speech service is paid once for each voice note.
 // The employee of the sub-site uses all of them; supervisors and administrators read the status and media. The hook
 // takes no cookie: it accepts only a body signed with the hook secret. A delivery is stored as OpenWA sent it
 // and put into this project's own form when a page reads it, so the page never depends on OpenWA's structures.
@@ -31,7 +34,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
-const { parseEnv } = require('./ai-relay.cjs');
+const { parseEnv, transcribeAudio } = require('./ai-relay.cjs');
 
 const MAX_BODY = 16 * 1024;
 const MAX_HOOK_BODY = 4 * 1024 * 1024;
@@ -67,7 +70,7 @@ const STATES = { created: 'starting', initializing: 'starting', qr_ready: 'scan'
 const RECEIPTS = ['sent', 'delivered', 'read', 'played', 'failed'];
 const STATUS = {
   'invalid-request': 400, 'send-refused': 400, 'not-signed-in': 401, 'bad-signature': 401, 'password-change-required': 403, 'forbidden': 403,
-  'read-only': 403, 'unknown-account': 404, 'media-unavailable': 404, 'not-connected': 409, 'request-conflict': 409, 'outcome-unknown': 409, 'taken-over': 409,
+  'read-only': 403, 'unknown-account': 404, 'media-unavailable': 404, 'not-connected': 409, 'not-audio': 415, 'no-speech': 422, 'transcription-failed': 502, 'request-conflict': 409, 'outcome-unknown': 409, 'taken-over': 409,
   'too-long': 413, 'gateway-refused': 502, 'gateway-unreachable': 502, 'gateway-failed': 502, 'not-configured': 503,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
@@ -292,6 +295,10 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
     fs.writeFileSync(path.join(mediaDir, key + '.bin'), bytes, { mode: 0o600 });
     fs.writeFileSync(path.join(mediaDir, key + '.json'), JSON.stringify({ mime, name }), { mode: 0o600 });
   }
+  // The words of a kept voice note go into its note.
+  function mediaKeepText(key, { mime, name }, transcript) {
+    fs.writeFileSync(path.join(mediaDir, key + '.json'), JSON.stringify({ mime, name, transcript }), { mode: 0o600 });
+  }
   async function mediaAsk(config, pathname) {
     let response;
     try {
@@ -350,11 +357,8 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
     await mediaReading.get(reading);
     return mediaKept(key);
   }
-  // Answers with the file itself. Only what mediaKind recognises is shown inside the page; everything else, and
-  // anything asked for with download=1, is handed over as a download under its own name.
-  async function media(req, url, res) {
-    signedIn(req);
-    const account = url.searchParams.get('account') || '', chat = url.searchParams.get('chat') || '', id = url.searchParams.get('id') || '';
+  // The media of one message: what was kept, or what OpenWA has now. Fails with the reason when there is none.
+  async function mediaOf(account, chat, id) {
     if (!ACCOUNT.test(account) || !CHAT.test(chat) || !MESSAGE.test(id)) throw problem('invalid-request');
     const key = mediaKey(account, chat, id);
     let found = mediaKept(key);
@@ -368,6 +372,13 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
         throw problem('media-unavailable');
       }
     }
+    return found;
+  }
+  // Answers with the file itself. Only what mediaKind recognises is shown inside the page; everything else, and
+  // anything asked for with download=1, is handed over as a download under its own name.
+  async function media(req, url, res) {
+    signedIn(req);
+    const found = await mediaOf(url.searchParams.get('account') || '', url.searchParams.get('chat') || '', url.searchParams.get('id') || '');
     const kind = mediaKind(found.bytes, found.mime);
     const shown = Boolean(kind) && url.searchParams.get('download') !== '1';
     const name = found.name || (kind ? 'whatsapp.' + MEDIA_FILE[kind] : 'whatsapp-file');
@@ -381,6 +392,32 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
     });
     res.end(found.bytes);
     return SENT;
+  }
+  // The words of a voice note or sound file. The speech service is asked once for each: the text is kept beside
+  // the file, and two requests for the same voice note at the same time share one call.
+  const transcribing = new Map();
+  async function transcribe(req) {
+    employee(req);
+    const body = await readJson(req);
+    const account = String(body.account || ''), chat = String(body.chat || ''), id = String(body.id || '');
+    const found = await mediaOf(account, chat, id);
+    if (typeof found.transcript === 'string') return { text: found.transcript };
+    const kind = mediaKind(found.bytes, found.mime);
+    if (!kind || !kind.startsWith('audio/')) throw problem('not-audio');
+    const key = mediaKey(account, chat, id);
+    if (!transcribing.has(key)) {
+      transcribing.set(key, transcribeAudio(found.bytes, kind).then(text => {
+        if (text) mediaKeepText(key, found, text);
+        console.log(`wa transcribe ${text ? 'ok' : 'empty'} account=${account} bytes=${found.bytes.length} chars=${text.length}`);
+        return text;
+      }, error => {
+        console.error(`wa transcribe failed account=${account} error=${error.message}`);
+        throw problem(error.message === 'not-configured' ? 'not-configured' : error.message === 'unsupported-audio' ? 'not-audio' : error.message === 'too-long' ? 'too-long' : 'transcription-failed');
+      }).finally(() => transcribing.delete(key)));
+    }
+    const text = await transcribing.get(key);
+    if (!text) throw problem('no-speech');
+    return { text };
   }
 
   // The number's record. When there is none yet, its session and the webhook are made at OpenWA first. An
@@ -545,6 +582,7 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       return found || { events: [], last: after };
     },
     'GET /api/wa/media': media,
+    'POST /api/wa/transcribe': transcribe,
 
     'POST /api/wa/hook': async req => {
       const config = settings();

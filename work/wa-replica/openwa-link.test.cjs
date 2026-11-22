@@ -117,6 +117,21 @@ const gateway = http.createServer((req, res) => {
 });
 const gwSessionOf = account => [...gw.sessions.values()].find(s => s.name === 's1-' + account);
 
+// ---- the stand-in for the speech service (an OpenAI-compatible /audio/transcriptions) ----
+const speech = { mode: 'ok', calls: [] };
+const speechServer = http.createServer((req, res) => {
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', () => {
+    const raw = Buffer.concat(chunks).toString('latin1'), file = /name="file"; filename="([^"]*)"\r\nContent-Type: ([^\r]*)\r\n\r\n/.exec(raw);
+    speech.calls.push({ auth: req.headers.authorization, file: file?.[1], bytes: file ? raw.indexOf('\r\n--', file.index + file[0].length) - file.index - file[0].length : -1 });
+    if (speech.mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    setTimeout(() => res.end(JSON.stringify({ text: speech.mode === 'silent' ? '' : ' Hola, quiero dos cajas. ' })), 30);
+  });
+});
+const voiceFile = path.join(tmp, 'ai.env');
+
 // ---- the sub-site with its link ----
 const site = siteApi.create({ dir: path.join(tmp, 'main'), siteId: 's1', now: () => clock });
 // The link under test catches up only when a test asks for it or a number comes online, and without pauses.
@@ -162,6 +177,7 @@ test.before(async () => {
 test.after(() => {
   server.close(); server.closeAllConnections();
   gateway.close(); gateway.closeAllConnections();
+  speechServer.close(); speechServer.closeAllConnections();
   link.close(); site.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
@@ -558,6 +574,67 @@ test('the media of a message: the stored copy, or the chat read again for a fetc
   assert.deepEqual([kept.filter(f => f.endsWith('.bin')).length, kept.filter(f => f.endsWith('.json')).length], [4, 4]);
   assert.equal(fs.statSync(folder).mode & 0o077, 0);
   assert(kept.every(f => (fs.statSync(path.join(folder, f)).mode & 0o077) === 0 && /^[0-9a-f]{64}\.(bin|json)$/.test(f)));
+});
+
+test('the words of a voice note: the speech service is asked once and the text kept beside the file; only sound is sent; only the employee may ask', async () => {
+  const speechPort = await new Promise(resolve => speechServer.listen(0, '127.0.0.1', () => resolve(speechServer.address().port)));
+  const aiBefore = process.env.WA_SCRM_AI_ENV;
+  await post('/api/wa/link', { account: 'a8' });
+  const session = gwSessionOf('a8'), chat = '15550008899@c.us';
+  Object.assign(session, { status: 'ready', phone: '15550008080' });
+  const ogg = n => Buffer.concat([Buffer.from('OggS'), Buffer.alloc(60 + n, n)]);
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 7)]);
+  for (const n of [1, 3, 4, 5]) gw.media.set(`false_${chat}_S${n}`, { mimetype: 'audio/ogg; codecs=opus', filename: 'ptt.ogg', bytes: ogg(n) });
+  gw.media.set(`false_${chat}_S2`, { mimetype: 'image/jpeg', filename: 'photo.jpg', bytes: jpeg });
+  const ask = (n, cookie = lin) => post('/api/wa/transcribe', { account: 'a8', chat, id: `false_${chat}_S${n}` }, cookie);
+  try {
+    // no speech service in the settings: said so, nothing is sent anywhere
+    delete process.env.WA_SCRM_AI_ENV;
+    const off = await ask(1);
+    assert.deepEqual([off.status, off.json, speech.calls.length], [503, { error: 'not-configured' }, 0]);
+    fs.writeFileSync(voiceFile, `VOICE_PROVIDER=other\nVOICE_API_KEY=voice-key-for-the-link-tests\nVOICE_BASE_URL=http://127.0.0.1:${speechPort}/v1\nVOICE_MODEL=test-voice\n`);
+    process.env.WA_SCRM_AI_ENV = voiceFile;
+    // the voice note goes to the speech service: its bytes, under a name that fits what it is
+    const first = await ask(1);
+    assert.deepEqual([first.status, first.json], [200, { text: 'Hola, quiero dos cajas.' }]);
+    assert.deepEqual(speech.calls, [{ auth: 'Bearer voice-key-for-the-link-tests', file: 'voice.ogg', bytes: ogg(1).length }]);
+    // kept: asked again, the same text without a second call — also after the service has gone
+    speech.mode = 'error';
+    assert.deepEqual([(await ask(1)).json, speech.calls.length], [{ text: 'Hola, quiero dos cajas.' }, 1]);
+    const note = fs.readdirSync(path.join(tmp, 'main', 'wa-media-s1')).filter(name => name.endsWith('.json')).map(name => JSON.parse(fs.readFileSync(path.join(tmp, 'main', 'wa-media-s1', name), 'utf8'))).filter(n => n.transcript);
+    assert.deepEqual(note, [{ mime: 'audio/ogg', name: 'ptt.ogg', transcript: 'Hola, quiero dos cajas.' }]);
+    // the service fails: said so, nothing kept, and it is asked again the next time
+    const failed = await ask(3);
+    assert.deepEqual([failed.status, failed.json, speech.calls.length], [502, { error: 'transcription-failed' }, 2]);
+    speech.mode = 'ok';
+    // two requests for one voice note at the same time: one call
+    const both = await Promise.all([ask(3), ask(3)]);
+    assert.deepEqual([both.map(r => r.json.text), speech.calls.length], [['Hola, quiero dos cajas.', 'Hola, quiero dos cajas.'], 3]);
+    // no speech in it: said so, not kept
+    speech.mode = 'silent';
+    const silent = await ask(4);
+    assert.deepEqual([silent.status, silent.json, speech.calls.length], [422, { error: 'no-speech' }, 4]);
+    speech.mode = 'ok';
+    assert.deepEqual([(await ask(4)).json, speech.calls.length], [{ text: 'Hola, quiero dos cajas.' }, 5]);
+    // a picture is not sent to the speech service; a message without media has nothing to send
+    const picture = await ask(2);
+    assert.deepEqual([picture.status, picture.json, speech.calls.length], [415, { error: 'not-audio' }, 5]);
+    assert.deepEqual((await ask(9)).json, { error: 'media-unavailable' });
+    // who may ask, and for what
+    assert.deepEqual((await post('/api/wa/transcribe', { account: 'a8', chat, id: `false_${chat}_S5` }, '')).json, { error: 'not-signed-in' });
+    assert.deepEqual((await ask(5, await member('rhea', 'supervisor', null))).json, { error: 'read-only' });
+    assert.equal((await ask(5, await member('iris', 'agent', 'elsewhere'))).status, 403);
+    for (const bad of [{ account: 'a8', chat: '1203630299@g.us', id: 'x_1' }, { account: 'a8', chat }, { chat, id: `false_${chat}_S5` }, []]) assert.deepEqual((await post('/api/wa/transcribe', bad)).json, { error: 'invalid-request' }, JSON.stringify(bad));
+    assert.equal((await call('/api/wa/transcribe', { cookie: lin })).status, 405);
+    assert.equal(speech.calls.length, 5);
+    // the log names the number and sizes, never the words
+    const lines = logged.filter(line => /^(wa|ai) transcribe/.test(line));
+    assert(lines.some(line => /^wa transcribe ok account=a8 bytes=\d+ chars=23$/.test(line)) && lines.some(line => line === 'wa transcribe failed account=a8 error=provider-error') && lines.some(line => /^wa transcribe empty account=a8 /.test(line)), lines.join('\n'));
+    assert(!logged.some(line => line.includes('cajas') || line.includes('voice-key-for-the-link-tests')));
+    assert.equal((await post('/api/wa/unlink', { account: 'a8' })).status, 200);
+  } finally {
+    if (aiBefore === undefined) delete process.env.WA_SCRM_AI_ENV; else process.env.WA_SCRM_AI_ENV = aiBefore;
+  }
 });
 
 test('what kind of media some bytes are is told by how they begin', () => {

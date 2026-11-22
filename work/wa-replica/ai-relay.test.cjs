@@ -13,16 +13,29 @@ const relay = require('./ai-relay.cjs');
 
 const KEY = 'test-key-0123456789-never-real';
 const SECRET_TEXT = 'Do you ship the BX20 to Puerto Rico?';
+const VOICE_KEY = 'voice-key-9876543210-never-real';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-ai-'));
 const envFile = path.join(tmp, 'ai.env');
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 
 // The stand-in model service. `upstream.mode` selects how it answers; `upstream.calls` records what it got.
-const upstream = { mode: 'ok', calls: [] };
+// Its speech-to-text endpoint takes a form with the sound file; `upstream.voice` selects how it answers.
+const upstream = { mode: 'ok', voice: 'ok', calls: [] };
 const upstreamServer = http.createServer((req, res) => {
-  let raw = '';
-  req.on('data', chunk => { raw += chunk; });
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
   req.on('end', () => {
+    // The form with the sound file is read byte for byte; everything else is JSON text.
+    const speech = req.url.endsWith('/audio/transcriptions'), raw = Buffer.concat(chunks).toString(speech ? 'latin1' : 'utf8');
+    if (speech) {
+      const field = name => new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)\\r\\n`).exec(raw)?.[1];
+      const file = /name="file"; filename="([^"]*)"\r\nContent-Type: ([^\r]*)\r\n\r\n/.exec(raw);
+      const boundary = '\r\n--' + /boundary=(.*)$/.exec(req.headers['content-type'])[1];
+      upstream.calls.push({ url: req.url, auth: req.headers.authorization, model: field('model'), format: field('response_format'), file: file?.[1], fileType: file?.[2], bytes: file ? raw.indexOf(boundary, file.index + file[0].length) - file.index - file[0].length : -1 });
+      if (upstream.voice === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(upstream.voice === 'odd' ? { usage: {} } : { text: upstream.voice === 'silent' ? '' : '  Hola, quiero dos cajas.  ', usage: { type: 'tokens' } }));
+    }
     upstream.calls.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(raw || '{}') });
     if (upstream.mode === 'hang') return;
     if (upstream.mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
@@ -62,7 +75,7 @@ test('settings file: comments, blank lines and Windows line endings', () => {
 });
 
 test('not configured: every reason is reported and no translation is attempted', async () => {
-  const reasonFor = async lines => { writeEnv(lines); return (await call('/api/ai/status', { method: 'GET' })).json; };
+  const reasonFor = async lines => { writeEnv(lines); const { voice, ...model } = (await call('/api/ai/status', { method: 'GET' })).json; return model; };
   assert.deepEqual(await reasonFor(['AI_PROVIDER=anthropic', 'AI_API_KEY=x', 'AI_MODEL=m']), { configured: false, reason: 'unsupported-provider' });
   assert.deepEqual(await reasonFor(['AI_PROVIDER=other', 'AI_API_KEY=x', 'AI_MODEL=m']), { configured: false, reason: 'missing-address' });
   assert.deepEqual(await reasonFor(['AI_PROVIDER=openai', 'AI_MODEL=m']), { configured: false, reason: 'missing-key' });
@@ -71,17 +84,18 @@ test('not configured: every reason is reported and no translation is attempted',
   const refused = await call('/api/ai/translate', { body: { text: 'hello', to: '中文' } });
   assert.deepEqual([refused.status, refused.json], [503, { error: 'not-configured', reason: 'missing-model' }]);
   assert.equal(upstream.calls.length, calls);
+  const none = { configured: false, reason: 'no-settings-file', voice: { configured: false, reason: 'no-settings-file' } };
   process.env.WA_SCRM_AI_ENV = path.join(tmp, 'absent.env');
-  assert.deepEqual((await call('/api/ai/status', { method: 'GET' })).json, { configured: false, reason: 'no-settings-file' });
+  assert.deepEqual((await call('/api/ai/status', { method: 'GET' })).json, none);
   delete process.env.WA_SCRM_AI_ENV;
-  assert.deepEqual((await call('/api/ai/status', { method: 'GET' })).json, { configured: false, reason: 'no-settings-file' });
+  assert.deepEqual((await call('/api/ai/status', { method: 'GET' })).json, none);
   process.env.WA_SCRM_AI_ENV = envFile;
 });
 
 test('status: names the service and the model, never the key', async () => {
   configure();
   const status = await call('/api/ai/status', { method: 'GET' });
-  assert.deepEqual([status.status, status.json], [200, { configured: true, provider: '自定义服务', model: 'test-model' }]);
+  assert.deepEqual([status.status, status.json], [200, { configured: true, provider: '自定义服务', model: 'test-model', voice: { configured: false, reason: 'no-voice-service' } }]);
   assert(!status.raw.includes(KEY));
   assert.equal((await call('/api/ai/status', { method: 'POST', body: {} })).status, 405);
 });
@@ -233,8 +247,52 @@ test('reply: bad requests are refused before the service is called', async () =>
   assert.deepEqual([off.status, off.json], [503, { error: 'not-configured', reason: 'missing-key' }]);
 });
 
+test('speech to text: the voice settings, what is sent to the service, and its answers as text or plain error codes', async () => {
+  const wav = Buffer.concat([Buffer.from('RIFF\0\0\0\0WAVEfmt '), Buffer.alloc(40, 3)]);
+  const refused = (promise, code, status) => assert.rejects(promise, error => error.message === code && error.status === status);
+  // every reason for "not configured"; the model service's own settings do not stand in for the voice ones
+  const voiceFor = lines => { configure(lines); return relay.loadVoiceConfig(); };
+  assert.deepEqual(voiceFor([]), { configured: false, reason: 'no-voice-service' });
+  await assert.rejects(relay.transcribeAudio(wav, 'audio/wav'), error => error.message === 'not-configured' && error.status === 503 && error.reason === 'no-voice-service');
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=whisperx', 'VOICE_API_KEY=v']), { configured: false, reason: 'unsupported-provider' });
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=other', 'VOICE_API_KEY=v']), { configured: false, reason: 'missing-address' });
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=openai']), { configured: false, reason: 'missing-key' });
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=other', 'VOICE_API_KEY=v', `VOICE_BASE_URL=http://127.0.0.1:${upstreamPort}/v1`]), { configured: false, reason: 'missing-model' });
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=OpenAI', 'VOICE_API_KEY=v']), { configured: true, name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini-transcribe', key: 'v' });
+  assert.deepEqual(voiceFor(['VOICE_PROVIDER=groq', 'VOICE_API_KEY=v', 'VOICE_MODEL=whisper-large-v3']).model, 'whisper-large-v3');
+  // the status names the service and the model, never the key
+  const voice = ['VOICE_PROVIDER=other', `VOICE_API_KEY=${VOICE_KEY}`, `VOICE_BASE_URL=http://127.0.0.1:${upstreamPort}/v1/`, 'VOICE_MODEL=test-voice'];
+  configure(voice);
+  const status = await call('/api/ai/status', { method: 'GET' });
+  assert.deepEqual(status.json.voice, { configured: true, provider: '自定义服务', model: 'test-voice' });
+  assert(!status.raw.includes(VOICE_KEY) && !status.raw.includes(KEY));
+  // one call: the voice key, the model, the file under a name that fits its kind; the answer trimmed
+  upstream.calls.length = 0;
+  assert.equal(await relay.transcribeAudio(wav, 'audio/wav'), 'Hola, quiero dos cajas.');
+  assert.deepEqual(upstream.calls, [{ url: '/v1/audio/transcriptions', auth: 'Bearer ' + VOICE_KEY, model: 'test-voice', format: 'json', file: 'voice.wav', fileType: 'audio/wav', bytes: wav.length }]);
+  // no speech heard: an empty text, not an error
+  upstream.voice = 'silent';
+  assert.equal(await relay.transcribeAudio(wav, 'audio/ogg'), '');
+  assert.deepEqual([upstream.calls[1].file, upstream.calls[1].fileType], ['voice.ogg', 'audio/ogg']);
+  // failures
+  upstream.voice = 'error';
+  await assert.rejects(relay.transcribeAudio(wav, 'audio/wav'), error => error.message === 'provider-error' && error.status === 502 && error.upstream === 500);
+  upstream.voice = 'odd';
+  await refused(relay.transcribeAudio(wav, 'audio/wav'), 'empty-result', 502);
+  upstream.voice = 'ok';
+  const calls = upstream.calls.length;
+  await refused(relay.transcribeAudio(wav, 'audio/aac'), 'unsupported-audio', 415);
+  await refused(relay.transcribeAudio(wav, 'video/mp4'), 'unsupported-audio', 415);
+  await refused(relay.transcribeAudio(Buffer.alloc(24 * 1024 * 1024 + 1), 'audio/wav'), 'too-long', 413);
+  assert.equal(upstream.calls.length, calls, 'refused before the service is called');
+  configure(['VOICE_PROVIDER=other', 'VOICE_API_KEY=v', 'VOICE_BASE_URL=http://127.0.0.1:9/v1', 'VOICE_MODEL=m']);
+  await refused(relay.transcribeAudio(wav, 'audio/wav'), 'provider-unreachable', 502);
+});
+
 test('the log never holds the key or message text', () => {
   const lines = logged.filter(line => line.startsWith('ai '));
+  assert(lines.some(line => /^ai transcribe ok bytes=\d+ chars=23 ms=\d+$/.test(line)) && lines.some(line => line.startsWith('ai transcribe failed error=provider-error upstream=500')), lines.join('\n'));
+  assert(!logged.join('\n').includes(VOICE_KEY) && !logged.join('\n').includes('cajas'));
   assert(lines.some(line => line.startsWith('ai translate ok chars=')) && lines.some(line => line.includes('error=provider-error upstream=500')), lines.join('\n'));
   assert(!logged.join('\n').includes(KEY));
   assert(!logged.join('\n').includes('BX20'));
@@ -253,7 +311,7 @@ test('the preview server routes /api/ai/* to the relay and still serves the page
       child.on('exit', code => reject(new Error('serve.cjs exited early: ' + code)));
       setTimeout(() => reject(new Error('serve.cjs did not start')), 8000);
     });
-    assert.deepEqual((await call('/api/ai/status', { method: 'GET', port })).json, { configured: true, provider: '自定义服务', model: 'test-model' });
+    assert.deepEqual((await call('/api/ai/status', { method: 'GET', port })).json, { configured: true, provider: '自定义服务', model: 'test-model', voice: { configured: false, reason: 'no-voice-service' } });
     assert.deepEqual((await call('/api/ai/translate', { body: { text: 'hi', to: '中文' }, port })).json, { text: '你们可以把 BX20 发到波多黎各吗？' });
     const page = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(page.status, 200);

@@ -158,10 +158,10 @@ assert(appJs.includes('fid-record-translation'), 'the chat-history page keeps it
 // 15. Real translation goes through the server relay; the page falls back to the demo when no relay is configured
 const relaySource = read(path.join(__dirname, 'ai-relay.cjs'));
 const serveSource = read(path.join(__dirname, 'serve.cjs'));
-for (const required of ["server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },", "fetch('/api/ai/translate', {", "fetch('/api/ai/status')", 'const providerId = aiRuntime.provider;', "to: aiSettings().readLanguage }", 'data-ai-setting="readLanguage"', 'aiDetectRelay();']) {
+for (const required of ["server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },", "fetch('/api/ai/translate', {", "fetch('/api/ai/status')", 'const providerId = aiRuntime.provider;', "to: aiSettings().readLanguage }", 'data-ai-setting="readLanguage"', 'aiDetectRelay();']) {
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
 }
-for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' + config.key", 'module.exports = { handle, loadConfig, parseEnv, translationPrompt, replyPrompt };']) {
+for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' + config.key", 'module.exports = { handle, loadConfig, loadVoiceConfig, parseEnv, transcribeAudio, translationPrompt, replyPrompt };']) {
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
 assert(!/console\.(log|error)\([^\n]*(config\.key|\.text\b(?!\.length)|input\b)/.test(relaySource), 'the relay must not log the key or message text');
@@ -249,6 +249,11 @@ for (const file of [path.join(root, 'outputs', 'whatsapp-scrm-lifecycle.html'), 
 }
 assert(!/standalone/.test(read(path.join(__dirname, 'build-fidelity.cjs'))), 'the build must not write single-file bundles');
 
+// The words of a voice note come from the server, on a click; the page keeps them on the message.
+for (const required of ["{ id: 'voice.transcribe', name: '语音转文字',", "fetch('/api/wa/transcribe', {", 'function aiTranscriptHTML(c, m) {', "aiRun('voice.transcribe', { account: c.account, chat: c.waChat, id: message.wa }, { customerId: c.id })", 'message.transcript = result.text;', 'data-ai-transcribe=']) {
+  assert(read(path.join(__dirname, 'fidelity-ai.js')).includes(required), `fidelity-ai.js is missing ${required}`);
+}
+assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("aria-label=\"语音\"></audio></div>` + aiTranscriptHTML(c, m);"), 'a voice note must show its words or the button that asks for them');
 // 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.
 // A message shows its picture, voice note, video or file through the server's media route.
 for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {
@@ -290,9 +295,9 @@ const summary = {
   customerTiers: ['S', 'A', 'B', 'C', 'D'],
   customerStatuses: ['converted', 'abandoned', 'organic'],
   chatHistory: 'archive of moved-in snapshots, no rating',
-  aiCapabilities: ['translate.inbound', 'translate.outbound'],
+  aiCapabilities: ['translate.inbound', 'translate.outbound', 'voice.transcribe'],
   aiProvider: 'server relay to an OpenAI-compatible model service (key stays on the server); without it no AI capability runs',
-  pageNetworkCalls: 'own server only: /api/ai/status, /api/ai/translate, /api/ai/reply',
+  pageNetworkCalls: 'own server only: /api/ai/status, /api/ai/translate, /api/ai/reply, /api/wa/transcribe',
   replyTranslation: 'typed replies and quick replies go to /api/ai/reply with tone, business description and the last six messages; send guard on by default: first Enter translates, second Enter sends',
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
