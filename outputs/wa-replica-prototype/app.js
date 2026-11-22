@@ -110,7 +110,7 @@ window.WA_START = () => {
   }
   function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='输入消息，或选择快捷回复开始。'}={}) {
     if(!list.length)return empty('还没有会话消息',emptyHint);
-    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div>'+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.side==='in'&&m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
+    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.side==='in'&&m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
   }
   function composerHTML(c) {
     const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&Boolean(d.text.trim());
@@ -1419,6 +1419,51 @@ window.WA_START = () => {
   const openwaOrder = list => list.map((c, i) => [c, i]).sort((x, y) => (y[0].lastAt || 0) - (x[0].lastAt || 0) || x[1] - y[1]).map(x => x[0]);
   const openwaMediaText = { image: '[图片]', video: '[视频]', audio: '[语音]', voice: '[语音]', document: '[文件]', sticker: '[贴图]', location: '[位置]', contact: '[名片]', poll: '[投票]', call: '[通话]' };
 
+  // ---- the media of a message ----
+  // How a kind of message shows its media: a picture, a player, or a link to the file.
+  const openwaMediaShown = { image: 'image', sticker: 'image', video: 'video', audio: 'audio', voice: 'audio', document: 'file' };
+  // The address of a message's media at this server; '' when the message has none or its chat is not known.
+  // c is the customer, or a record of the chat archive that names one.
+  function openwaMediaUrl(c, m) {
+    const owner = c.waChat ? c : customer(c.customerId);
+    if (!m.wa || !openwaMediaShown[m.type] || !owner?.waChat || !owner.account) return '';
+    return '/api/wa/media?account=' + encodeURIComponent(owner.account) + '&chat=' + encodeURIComponent(owner.waChat) + '&id=' + encodeURIComponent(m.wa);
+  }
+  // What a message shows above its text. A picture opens in a new tab; a file is a download.
+  function openwaMediaHTML(c, m) {
+    const url = esc(openwaMediaUrl(c, m)), shown = openwaMediaShown[m.type];
+    if (!url) return '';
+    if (shown === 'image') return `<a class="openwa-media" href="${url}" target="_blank" rel="noopener" aria-label="在新标签页查看${m.type === 'sticker' ? '贴图' : '图片'}"><img src="${url}" alt="${m.type === 'sticker' ? '贴图' : '图片'}" loading="lazy"></a>`;
+    if (shown === 'video') return `<div class="openwa-media"><video src="${url}" controls preload="none" aria-label="视频"></video></div>`;
+    if (shown === 'audio') return `<div class="openwa-media"><audio src="${url}" controls preload="none" aria-label="语音"></audio></div>`;
+    return `<a class="openwa-file" href="${url}&amp;download=1" download>${icon('FileDown')}<span>${esc(m.file || '文件')}</span></a>`;
+  }
+  // The text under the media: the words that only stood for the media ("[图片]") are left out when it is shown.
+  const openwaCaption = (c, m) => (openwaMediaUrl(c, m) && m.text === openwaMediaText[m.type] ? '' : m.text);
+  // Media that cannot be had — gone from the phone, or the number is not connected — gives way to a short note.
+  document.addEventListener('error', event => {
+    const el = event.target, holder = el.closest?.('.openwa-media');
+    if (!holder || !['IMG', 'VIDEO', 'AUDIO'].includes(el.tagName)) return;
+    const note = document.createElement('span');
+    note.className = 'openwa-media-missing';
+    note.textContent = (el.tagName === 'IMG' ? '图片' : el.tagName === 'VIDEO' ? '视频' : '语音') + '暂时无法加载';
+    holder.replaceWith(note);
+  }, true);
+  // Drawing a conversation again must not stop a voice note or a video that is playing: its element takes the
+  // place of its redrawn twin. Every full redraw goes through here; so does the AI module's own redraw.
+  function openwaKeepPlaying(draw) {
+    const playing = [...document.querySelectorAll('#messages audio, #messages video')].filter(media => !media.paused && !media.ended);
+    draw();
+    for (const media of playing) {
+      const twin = [...document.querySelectorAll('#messages ' + media.tagName.toLowerCase())].find(x => x.getAttribute('src') === media.getAttribute('src'));
+      if (twin) twin.replaceWith(media);
+    }
+  }
+  const openwaDraw = render;
+  render = function() {
+    openwaKeepPlaying(openwaDraw);
+  };
+
   // The mark after the time of a message the employee sent.
   function openwaMessageMark(m) {
     if (m.status === 'sending') return icon('Clock3') + '<span>发送中</span>';
@@ -1826,7 +1871,7 @@ window.WA_START = () => {
         return true;
       }
     }
-    const message = { id: nextId('m'), side: e.fromMe ? 'out' : 'in', text, time: openwaClock(e.at), at: e.at, wa: e.id, type: e.type, ...(e.fromMe ? { status: 'sent' } : {}) };
+    const message = { id: nextId('m'), side: e.fromMe ? 'out' : 'in', text, time: openwaClock(e.at), at: e.at, wa: e.id, type: e.type, ...(e.media?.name ? { file: e.media.name } : {}), ...(e.fromMe ? { status: 'sent' } : {}) };
     list.push(message);
     list.sort((x, y) => (x.at || 0) - (y.at || 0));
     if (list.at(-1) === message) Object.assign(c, { preview: text, translation: '', last: message.time, lastAt: e.at });
@@ -3579,7 +3624,9 @@ window.WA_START = () => {
       const box = $('#messages');
       if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
       const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
-      box.innerHTML = messagesHTML(c);
+      openwaKeepPlaying(() => {
+        box.innerHTML = messagesHTML(c);
+      });
       paintIcons(box);
       if (atBottom) scrollMessages();
     });

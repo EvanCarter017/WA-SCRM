@@ -26,6 +26,8 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 #### 接入 OpenWA（WhatsApp 连接，可选）
 服务带有子站与其专属 OpenWA 之间的连接接口（`/api/wa/*`，需要已设置 `WA_SCRM_DATA_DIR`）：为号码创建并启动会话、返回扫码二维码、接收 OpenWA 的事件通知并在落库后应答、按顺序提供给页面，以及发送文本消息。把 `work/wa-replica/openwa.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_OPENWA_ENV` 指向它启动服务。OpenWA 的密钥只保存在服务器；OpenWA 的通知必须带有效签名才会被接收。页面通过这些接口扫码绑定号码、接收消息并发送文本消息。号码上线时，服务器会自动取回该号码上已有的一对一会话及每个会话最近的 50 条消息，之后每 15 分钟补取一次通知没有送达的内容（逐个会话读取，中间留有间隔）；未设置时，号码管理会提示服务器尚未接入 WhatsApp 连接。
 
+消息里的图片、语音、视频和文件由服务器按需从 OpenWA 取回（`/api/wa/media`，只对已登录用户开放），首次取回后保存在数据目录的 `wa-media-<子站>` 文件夹中，之后直接读取；这个文件夹可以随时清空，需要时会重新取回。只有内容确实是图片、音频或视频的文件才会在页面内显示，其余一律作为下载提供。
+
 ### 重新编译与完整性校验
 ```bash
 node work/wa-replica/build-fidelity.cjs
@@ -92,12 +94,12 @@ flowchart LR
 │       ├── fidelity-base/                             # 基础工作台底座源码
 │       ├── fidelity-lifecycle.js / .css               # 跟进闭环引擎：跟进状态、待处理信号、跟进闭环中心与客户档案（文件名沿用）
 │       ├── fidelity-dashboard.js / .css               # 首页经营概览与跟进闭环概览
-│       ├── fidelity-openwa.js                         # 真实 WhatsApp 连接：扫码绑定、事件流（来信、回执、号码状态）、发送与重试
+│       ├── fidelity-openwa.js                         # 真实 WhatsApp 连接：扫码绑定、事件流（来信、回执、号码状态）、发送与重试、消息中的图片/语音/视频/文件
 │       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
 │       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务）及其测试
 │       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
-│       ├── openwa-link.cjs / openwa-link.test.cjs     # 子站与其专属 OpenWA 的连接接口（会话、二维码、事件通知、发送）及其测试
+│       ├── openwa-link.cjs / openwa-link.test.cjs     # 子站与其专属 OpenWA 的连接接口（会话、二维码、事件通知、发送、消息媒体）及其测试
 │       ├── openwa.env.example                         # OpenWA 连接设置文件示例（填写后的副本放在仓库之外）
 │       ├── site-auth.cjs / site-data.cjs              # 账号与登录会话；子站数据文档（内置 SQLite）
 │       ├── site-api.cjs / site-api.test.cjs           # 登录与数据接口及其测试

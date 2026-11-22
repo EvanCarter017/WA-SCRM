@@ -119,7 +119,9 @@
       const box = $('#messages');
       if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
       const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
-      box.innerHTML = messagesHTML(c);
+      openwaKeepPlaying(() => {
+        box.innerHTML = messagesHTML(c);
+      });
       paintIcons(box);
       if (atBottom) scrollMessages();
     });

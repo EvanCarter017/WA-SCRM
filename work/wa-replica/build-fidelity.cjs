@@ -227,6 +227,9 @@ for (const [from, to] of [
 swap("materials:'素材管理',", '');
 swap('materials:renderMaterials,', '');
 assert(!/演示|原型|评审|本机|示例|体验/.test(js), 'the app must not speak of a demonstration, a prototype or a review');
+// A message shows its picture, voice note, video or file (plan 033): fidelity-openwa.js gives the bubble its
+// media and the text under it.
+swap(`<div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div>'`, `<div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')`);
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));

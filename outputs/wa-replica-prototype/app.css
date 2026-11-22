@@ -961,6 +961,18 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-ops-preview { line-height:1.65; }
 [id^="fid-ops-"]>.modal-body>.field { margin-bottom:var(--fid-px-9); }
 
+/* The media of a message (plan 033): a picture, a player or a link to the file, above the message's text. */
+.openwa-media { display:block; max-width:var(--fid-px-280); margin:0 0 var(--fid-px-6); }
+.openwa-media img { display:block; max-width:100%; max-height:var(--fid-px-320); border-radius:var(--fid-px-8); object-fit:contain; }
+.openwa-media video { display:block; width:var(--fid-px-280); max-width:100%; max-height:var(--fid-px-320); border-radius:var(--fid-px-8); background:var(--color-surface); }
+.openwa-media audio { display:block; width:var(--fid-px-260); max-width:100%; height:var(--fid-px-40); }
+.openwa-file { display:inline-flex; align-items:center; gap:var(--fid-px-8); max-width:var(--fid-px-280); margin:0 0 var(--fid-px-6); padding:var(--fid-px-8) var(--fid-px-10); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface); color:inherit; text-decoration:none; }
+.openwa-file:hover { border-color:var(--color-accent); }
+.openwa-file span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.openwa-file svg { flex:none; width:var(--fid-px-18); height:var(--fid-px-18); }
+.openwa-media-missing { display:block; margin:0 0 var(--fid-px-6); color:var(--color-text-muted); font-size:var(--fid-px-12); }
+.message-bubble>.openwa-media:last-child,.message-bubble>.openwa-file:last-child,.message-bubble>.openwa-media-missing:last-child { margin-bottom:0; }
+
 .dash {
   --dash-ink: var(--color-text);
   --dash-muted: var(--color-text-muted);

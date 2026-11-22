@@ -27,7 +27,7 @@ for (const level of ['log', 'error']) {
 }
 
 // ---- the stand-in for OpenWA ----
-const gw = { sessions: new Map(), hooks: new Map(), sends: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map() };
+const gw = { sessions: new Map(), hooks: new Map(), sends: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map(), media: new Map() };
 const uuid = () => crypto.randomUUID();
 const gwSession = name => ({ id: uuid(), name, status: 'created', phone: null, pushName: null, connectedAt: null, lastActive: null, createdAt: new Date(clock).toISOString(), updatedAt: new Date(clock).toISOString(), lastError: null, restriction: null, engineLoaded: false });
 const publicHook = ({ secret, ...hook }) => hook;
@@ -40,7 +40,7 @@ const gateway = http.createServer((req, res) => {
     const fail = (status, error, message) => answer(status, { message, error, statusCode: status });
     gw.calls.push(`${req.method} ${req.url}`);
     if (req.headers['x-api-key'] !== KEY) return fail(401, 'Unauthorized', 'API key is required');
-    const [, , , sessionId, action, third, fourth] = req.url.split('?')[0].split('/');
+    const [, , , sessionId, action, third, fourth, fifth] = req.url.split('?')[0].split('/');
     if (!sessionId) {
       if (req.method === 'GET') return answer(200, [...gw.sessions.values()]);
       if ([...gw.sessions.values()].some(s => s.name === body.name)) return fail(409, 'Conflict', `Session with name '${body.name}' already exists`);
@@ -85,6 +85,13 @@ const gateway = http.createServer((req, res) => {
       const hook = { id: uuid(), sessionId, url: body.url, events: body.events, filters: null, active: true, retryCount: body.retryCount, lastTriggeredAt: null, secret: body.secret };
       hooks.push(hook);
       return answer(201, publicHook(hook));
+    }
+    // The media of a message: the copy OpenWA stored when the message came in or went out, as an attachment.
+    if (action === 'messages' && fifth === 'media') {
+      const stored = gw.media.get(decodeURIComponent(fourth));
+      if (!stored) return fail(404, 'Not Found', 'No stored media for this message');
+      res.writeHead(200, { 'Content-Type': stored.mimetype, 'Content-Disposition': `attachment; filename="${stored.filename}"` });
+      return res.end(stored.bytes);
     }
     // What is on the number: its chats, the latest messages of one chat, and the contact behind a privacy id.
     if (action === 'chats' || (action === 'messages' && fourth === 'history')) {
@@ -471,6 +478,97 @@ test('catching up again fetches only what is new; what the hook delivered is not
   session.status = 'ready';
   assert.equal((await post('/api/wa/unlink', { account: 'a6' })).status, 200);
   assert.equal(link.store.chat('a6', ana), undefined, 'unlinking forgets what was known about the number\'s chats');
+});
+
+test('the media of a message: the stored copy, or the chat read again for a fetched message; kept after the first time; shown inside the page only when its bytes say what it is', async () => {
+  await post('/api/wa/link', { account: 'a7' });
+  const session = gwSessionOf('a7'), chat = '15550008888@c.us', lid = '222333444555666@lid';
+  Object.assign(session, { status: 'ready', phone: '15550007070' });
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 7)]);
+  const ogg = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(64, 1)]);
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(64, 2)]);
+  const page = Buffer.from('<!doctype html><script>alert(1)</script>' + ' '.repeat(40));
+  const media = (query, cookie = lin) => fetch(`http://127.0.0.1:${port}/api/wa/media?${query}`, { headers: cookie ? { Cookie: cookie } : {} })
+    .then(async r => ({ status: r.status, type: r.headers.get('content-type'), disposition: r.headers.get('content-disposition'), nosniff: r.headers.get('x-content-type-options'), csp: r.headers.get('content-security-policy'), cache: r.headers.get('cache-control'), bytes: Buffer.from(await r.arrayBuffer()) }));
+  const q = (c, id, extra = '') => `account=a7&chat=${encodeURIComponent(c)}&id=${encodeURIComponent(id)}${extra}`;
+  const storedCalls = () => gw.calls.filter(c => c.endsWith('/media')).length, readCalls = () => gw.calls.filter(c => c.includes('includeMedia=true')).length;
+  gw.calls.length = 0;
+
+  // a message that came in while the number was linked: OpenWA has its copy
+  gw.media.set(`false_${chat}_M1`, { mimetype: 'image/jpeg', filename: 'photo.jpg', bytes: jpeg });
+  const first = await media(q(chat, `false_${chat}_M1`));
+  assert.deepEqual([first.status, first.type, first.disposition, first.nosniff, first.csp, first.cache], [200, 'image/jpeg', 'inline', 'nosniff', "sandbox; default-src 'none'", 'private, max-age=31536000, immutable']);
+  assert(first.bytes.equals(jpeg));
+  assert.deepEqual([storedCalls(), readCalls()], [1, 0]);
+  // kept: the second time OpenWA is not asked; as a download it is the same bytes under the file's name
+  const again = await media(q(chat, `false_${chat}_M1`, '&download=1'));
+  assert.deepEqual([again.status, again.type, again.disposition, storedCalls()], [200, 'application/octet-stream', "attachment; filename*=UTF-8''photo.jpg", 1]);
+  assert(again.bytes.equals(jpeg));
+
+  // messages fetched while catching up: OpenWA has no copy; the chat is read once with its media, for all of them
+  gw.history.set(lid, [
+    { id: `false_${lid}_V1`, chatId: lid, type: 'voice', body: '', timestamp: 1795200001, fromMe: false, media: { mimetype: 'audio/ogg; codecs=opus', data: ogg.toString('base64') } },
+    { id: `true_${lid}_D1`, chatId: lid, type: 'document', body: 'the offer', timestamp: 1795200002, fromMe: true, media: { mimetype: 'application/pdf', filename: '报价 2026.pdf', data: pdf.toString('base64') } },
+    { id: `false_${lid}_X1`, chatId: lid, type: 'image', body: '', timestamp: 1795200003, fromMe: false, media: { mimetype: 'image/png', filename: 'picture.png', data: page.toString('base64') } },
+    { id: `false_${lid}_T1`, chatId: lid, type: 'text', body: 'no media here', timestamp: 1795200004, fromMe: false },
+  ]);
+  const [voice, doc] = await Promise.all([media(q(lid, `false_${lid}_V1`)), media(q(lid, `true_${lid}_D1`))]);
+  assert.deepEqual([voice.status, voice.type, voice.disposition], [200, 'audio/ogg', 'inline']);
+  assert(voice.bytes.equals(ogg));
+  assert.deepEqual([doc.status, doc.type, doc.disposition], [200, 'application/octet-stream', `attachment; filename*=UTF-8''${encodeURIComponent('报价 2026.pdf')}`], 'a document is a download under its own name');
+  assert(doc.bytes.equals(pdf));
+  assert.equal(readCalls(), 1, 'two files of one chat asked for at the same time: one read');
+  // a file that is not what it is called is never shown inside the page
+  const fake = await media(q(lid, `false_${lid}_X1`));
+  assert.deepEqual([fake.status, fake.type, fake.disposition, fake.nosniff, readCalls()], [200, 'application/octet-stream', "attachment; filename*=UTF-8''picture.png", 'nosniff', 1]);
+  assert(fake.bytes.equals(page));
+
+  // nothing to be had: said so, and OpenWA is not asked again for a while
+  const none = await call('/api/wa/media?' + q(lid, `false_${lid}_T1`), { cookie: lin });
+  assert.deepEqual([none.status, none.json, readCalls()], [404, { error: 'media-unavailable' }, 2]);
+  const calls = gw.calls.length;
+  assert.equal((await call('/api/wa/media?' + q(lid, `false_${lid}_T1`), { cookie: lin })).status, 404);
+  assert.equal(gw.calls.length, calls, 'not asked again at once');
+  clock += 11 * 60 * 1000;
+  assert.equal((await call('/api/wa/media?' + q(lid, `false_${lid}_T1`), { cookie: lin })).status, 404);
+  assert(gw.calls.length > calls, 'asked again later');
+
+  // who may ask, and for what
+  assert.deepEqual((await call('/api/wa/media?' + q(chat, `false_${chat}_M1`))).json, { error: 'not-signed-in' });
+  const outsider = await member('ines', 'agent', 'elsewhere'), reader = await member('rita', 'supervisor', null);
+  assert.equal((await call('/api/wa/media?' + q(chat, `false_${chat}_M1`), { cookie: outsider })).status, 403);
+  assert.equal((await media(q(chat, `false_${chat}_M1`), reader)).status, 200, 'a supervisor may look at media');
+  for (const bad of ['account=a7&chat=120363000000000000%40g.us&id=x_1', `account=a%2F7&chat=${chat}&id=false_1`, `account=a7&chat=${chat}`, `account=a7&chat=${chat}&id=..%2F..%2Fetc%2Fpasswd`]) {
+    assert.deepEqual((await call('/api/wa/media?' + bad, { cookie: lin })).json, { error: 'invalid-request' }, bad);
+  }
+  assert.deepEqual((await call(`/api/wa/media?account=a9&chat=${chat}&id=false_${chat}_M9`, { cookie: lin })).json, { error: 'unknown-account' });
+
+  // OpenWA out of reach: said so; what was kept is still handed out, also after the number is unlinked
+  useSettings({ ...good(), OPENWA_BASE_URL: 'http://127.0.0.1:9/' });
+  const down = await call('/api/wa/media?' + q(chat, `false_${chat}_M2`), { cookie: lin });
+  assert.deepEqual([down.status, down.json], [502, { error: 'gateway-unreachable' }]);
+  assert.equal((await media(q(chat, `false_${chat}_M1`))).status, 200);
+  useSettings(good());
+  assert.equal((await post('/api/wa/unlink', { account: 'a7' })).status, 200);
+  assert.equal((await media(q(lid, `false_${lid}_V1`))).status, 200, 'kept media outlives the link');
+  assert.deepEqual((await call('/api/wa/media?' + q(chat, `false_${chat}_M2`), { cookie: lin })).json, { error: 'unknown-account' });
+
+  // the folder of kept files is private
+  const folder = path.join(tmp, 'main', 'wa-media-s1'), kept = fs.readdirSync(folder);
+  assert.deepEqual([kept.filter(f => f.endsWith('.bin')).length, kept.filter(f => f.endsWith('.json')).length], [4, 4]);
+  assert.equal(fs.statSync(folder).mode & 0o077, 0);
+  assert(kept.every(f => (fs.statSync(path.join(folder, f)).mode & 0o077) === 0 && /^[0-9a-f]{64}\.(bin|json)$/.test(f)));
+});
+
+test('what kind of media some bytes are is told by how they begin', () => {
+  const kind = (head, declared) => openwaLink.mediaKind(Buffer.concat([Buffer.from(head), Buffer.alloc(32)]), declared);
+  assert.deepEqual([
+    kind([0xff, 0xd8, 0xff, 0xe1]), kind([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kind('GIF89a'), kind('RIFF\0\0\0\0WEBPVP8 '), kind('RIFF\0\0\0\0WAVEfmt '),
+    kind('OggS'), kind('ID3\x04'), kind([0xff, 0xfb, 0x90]), kind([0xff, 0xf1, 0x50]), kind('\0\0\0\x20ftypisom'), kind('\0\0\0\x20ftypisom', 'audio/mp4'), kind('\0\0\0\x20ftypM4A '),
+    kind([0x1a, 0x45, 0xdf, 0xa3]), kind([0x1a, 0x45, 0xdf, 0xa3], 'audio/webm'),
+  ], ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/wav', 'audio/ogg', 'audio/mpeg', 'audio/mpeg', 'audio/aac', 'video/mp4', 'audio/mp4', 'audio/mp4', 'video/webm', 'audio/webm']);
+  for (const other of ['%PDF-1.7', '<!doctype html>', '<svg xmlns="http://www.w3.org/2000/svg">', 'PK\x03\x04', 'MZ\x90\0']) assert.equal(kind(other, 'image/png'), null, other);
+  assert.equal(openwaLink.mediaKind(Buffer.from([0xff, 0xd8, 0xff])), null, 'too short to tell');
 });
 
 test('unlinking removes the session at OpenWA and the record; later deliveries of it are dropped', async () => {

@@ -249,7 +249,13 @@ for (const file of [path.join(root, 'outputs', 'whatsapp-scrm-lifecycle.html'), 
 }
 assert(!/standalone/.test(read(path.join(__dirname, 'build-fidelity.cjs'))), 'the build must not write single-file bundles');
 
-// 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more
+// 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.
+// A message shows its picture, voice note, video or file through the server's media route.
+for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
+assert(appJs.includes("<div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?"), 'a message bubble must show its media and the text under it');
+assert(read(path.join(__dirname, 'fidelity-ai.js')).includes('openwaKeepPlaying(() => {'), 'the redraw after a translation must keep a playing voice note');
 for (const required of ["fetch('/api/wa/' + path, {", "openwaCall('POST', 'link', pair.expired ? { account: pair.accountId, fresh: true } : { account: pair.accountId })", 'const openwaQrLife = 90000;', "openwaCall('POST', 'claim', { client: openwaClient })", 'events?after=${Number(data.waCursor) || 0}&client=${openwaClient}&wait=${caughtUp ? 25 : 0}', "openwaCall('POST', 'send', {", "requestId: message.request", "window.WA_SITE.halt('已在其他页面打开'", "if (e.kind === 'chat') {", 'function openwaJoinTwins() {', "if (!c && e.kind === 'message' && e.fromMe) {", 'if (!e.fromMe && !e.history) {', 'send = function() {', "document.addEventListener('compositionstart'"]) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }

@@ -15,9 +15,14 @@
 //   POST /api/wa/claim   { client }              this page takes the event feed over from any other page
 //   GET  /api/wa/events?after=<seq>&client=<id>&wait=<seconds>
 //   POST /api/wa/hook                            deliveries from OpenWA, stored before they are acknowledged
+//   GET  /api/wa/media?account=<id>&chat=<chat>&id=<message>[&download=1]
+//                                                the picture, voice note, video or file of a message
 // The link also catches up by itself: when a number comes online it fetches the number's chats with one person
 // and the latest messages of each, and every quarter of an hour it looks for what the hook did not deliver.
-// The employee of the sub-site uses all of them; supervisors and administrators read the status. The hook
+// The media of a message is fetched from OpenWA the first time it is asked for and kept in the folder
+// wa-media-<site> beside the records; that folder may be emptied at any time. A file is shown inside the page
+// only when its first bytes are those of a picture, sound or video a browser plays; anything else is a download.
+// The employee of the sub-site uses all of them; supervisors and administrators read the status and media. The hook
 // takes no cookie: it accepts only a body signed with the hook secret. A delivery is stored as OpenWA sent it
 // and put into this project's own form when a page reads it, so the page never depends on OpenWA's structures.
 // A log line carries the action, the number's id and the outcome; never a key, a phone number or message text.
@@ -41,7 +46,17 @@ const SYNC_EVERY_MS = Number(process.env.WA_SCRM_OPENWA_SYNC_MS) || 15 * 60 * 10
 const SYNC_PAUSE_MS = process.env.WA_SCRM_OPENWA_SYNC_PAUSE_MS === undefined ? 1000 : Number(process.env.WA_SCRM_OPENWA_SYNC_PAUSE_MS);
 const SYNC_MESSAGES = 50;
 const SYNC_SKIP = ['unknown', 'masked', 'revoked'];
+// Media: the largest file taken over, how long OpenWA may take, how many of a chat's latest messages are read
+// again for the media of one that OpenWA holds no copy of, and how long a file that could not be had is not
+// asked for again.
+const MEDIA_MAX = 50 * 1024 * 1024;
+const MEDIA_TIMEOUT_MS = Number(process.env.WA_SCRM_OPENWA_MEDIA_TIMEOUT_MS) || 60000;
+const MEDIA_MESSAGES = 50;
+const MEDIA_RETRY_MS = 10 * 60 * 1000;
+const MEDIA_FILE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+const SENT = Symbol('answered');
 const ACCOUNT = /^[A-Za-z0-9]{1,24}$/;
+const MESSAGE = /^[A-Za-z0-9_@.:-]{3,160}$/;
 const CLIENT = /^[A-Za-z0-9_-]{8,64}$/;
 // A chat with one person: a phone number, or the privacy id WhatsApp shows instead of it.
 const CHAT = /^[0-9]{5,20}@(c\.us|lid)$/;
@@ -52,7 +67,7 @@ const STATES = { created: 'starting', initializing: 'starting', qr_ready: 'scan'
 const RECEIPTS = ['sent', 'delivered', 'read', 'played', 'failed'];
 const STATUS = {
   'invalid-request': 400, 'send-refused': 400, 'not-signed-in': 401, 'bad-signature': 401, 'password-change-required': 403, 'forbidden': 403,
-  'read-only': 403, 'unknown-account': 404, 'not-connected': 409, 'request-conflict': 409, 'outcome-unknown': 409, 'taken-over': 409,
+  'read-only': 403, 'unknown-account': 404, 'media-unavailable': 404, 'not-connected': 409, 'request-conflict': 409, 'outcome-unknown': 409, 'taken-over': 409,
   'too-long': 413, 'gateway-refused': 502, 'gateway-unreachable': 502, 'gateway-failed': 502, 'not-configured': 503,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
@@ -135,6 +150,25 @@ async function ask(config, method, pathname, body, headers = {}) {
     json = await response.json();
   } catch {}
   return { status: response.status, body: json };
+}
+
+// What kind of picture, sound or video these bytes are, told by how they begin — never by a name or a declared
+// type, because the answer decides whether a browser shows the file inside the page. Null for anything else.
+function mediaKind(bytes, declared = '') {
+  const text = (from, to) => bytes.subarray(from, to).toString('latin1');
+  const sound = declared.startsWith('audio/');
+  if (bytes.length < 12) return null;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (text(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png';
+  if (text(0, 6) === 'GIF87a' || text(0, 6) === 'GIF89a') return 'image/gif';
+  if (text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP') return 'image/webp';
+  if (text(0, 4) === 'RIFF' && text(8, 12) === 'WAVE') return 'audio/wav';
+  if (text(0, 4) === 'OggS') return 'audio/ogg';
+  if (text(0, 3) === 'ID3' || (bytes[0] === 0xff && [0xfb, 0xf3, 0xf2].includes(bytes[1]))) return 'audio/mpeg';
+  if (bytes[0] === 0xff && [0xf1, 0xf9].includes(bytes[1])) return 'audio/aac';
+  if (text(4, 8) === 'ftyp') return sound || text(8, 11) === 'M4A' ? 'audio/mp4' : 'video/mp4';
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return sound ? 'audio/webm' : 'video/webm';
+  return null;
 }
 
 // One stored delivery in this project's own form, or null when the page has no use for it.
@@ -240,6 +274,114 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
     account, state: session ? STATES[session.status] || 'offline' : missing, phone: digits(session?.phone), name: String(session?.pushName || ''),
     error: String(session?.lastError || ''), restricted: Boolean(session?.restriction),
   });
+
+  // ---- the media of a message ----
+  const mediaDir = path.join(dir, `wa-media-${siteId}`);
+  const mediaKey = (account, chat, id) => crypto.createHash('sha256').update(`${account}\n${chat}\n${id}`).digest('hex');
+  const mediaType = value => String(value || '').split(';')[0].trim().toLowerCase();
+  function mediaKept(key) {
+    try {
+      return { ...JSON.parse(fs.readFileSync(path.join(mediaDir, key + '.json'), 'utf8')), bytes: fs.readFileSync(path.join(mediaDir, key + '.bin')) };
+    } catch {
+      return null;
+    }
+  }
+  // The note is written last: a file without its note counts as not kept and is fetched again.
+  function mediaKeep(key, { mime, name, bytes }) {
+    fs.mkdirSync(mediaDir, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(path.join(mediaDir, key + '.bin'), bytes, { mode: 0o600 });
+    fs.writeFileSync(path.join(mediaDir, key + '.json'), JSON.stringify({ mime, name }), { mode: 0o600 });
+  }
+  async function mediaAsk(config, pathname) {
+    let response;
+    try {
+      response = await fetch(config.baseUrl + pathname, { headers: { 'X-API-Key': config.key }, signal: AbortSignal.timeout(MEDIA_TIMEOUT_MS) });
+    } catch {
+      throw problem('gateway-unreachable');
+    }
+    if (response.status === 401 || response.status === 403) throw problem('gateway-refused');
+    return response;
+  }
+  const mediaMissing = new Map();
+  const mediaReading = new Map();
+  // Fetches the media of one message and keeps it. OpenWA holds a copy of what came in or went out while it was
+  // linked. For a message that was fetched while catching up there is no such copy: the latest messages of the
+  // chat are read again with their media, and everything that comes with that answer is kept, so that one read
+  // serves the whole conversation. Returns what was kept, or null when the media cannot be had.
+  async function mediaFetch(config, row, chat, id) {
+    const base = `/api/sessions/${row.session}/messages/${encodeURIComponent(chat)}`;
+    const key = mediaKey(row.id, chat, id);
+    const stored = await mediaAsk(config, `${base}/${encodeURIComponent(id)}/media`);
+    if (stored.status === 200) {
+      const bytes = Buffer.from(await stored.arrayBuffer());
+      if (!bytes.length || bytes.length > MEDIA_MAX) return null;
+      let name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(stored.headers.get('content-disposition') || '')?.[1] || '';
+      try {
+        name = decodeURIComponent(name);
+      } catch {}
+      mediaKeep(key, { mime: mediaType(stored.headers.get('content-type')), name, bytes });
+      console.log(`wa media ok account=${row.id} source=stored bytes=${bytes.length}`);
+      return mediaKept(key);
+    }
+    await stored.arrayBuffer().catch(() => {});
+    if (stored.status !== 404) throw problem('gateway-failed');
+    const reading = row.id + ' ' + chat;
+    if (!mediaReading.has(reading)) {
+      mediaReading.set(reading, (async () => {
+        const answer = await mediaAsk(config, `${base}/history?limit=${MEDIA_MESSAGES}&includeMedia=true`);
+        if (answer.status !== 200) {
+          await answer.arrayBuffer().catch(() => {});
+          if (answer.status === 409) throw problem('not-connected');
+          throw problem('gateway-failed');
+        }
+        const list = await answer.json().catch(() => null);
+        let files = 0, total = 0;
+        for (const m of Array.isArray(list) ? list : []) {
+          if (!m || typeof m.id !== 'string' || !MESSAGE.test(m.id) || typeof m.media?.data !== 'string') continue;
+          const bytes = Buffer.from(m.media.data, 'base64');
+          if (!bytes.length || bytes.length > MEDIA_MAX) continue;
+          mediaKeep(mediaKey(row.id, chat, m.id), { mime: mediaType(m.media.mimetype), name: String(m.media.filename || ''), bytes });
+          files += 1;
+          total += bytes.length;
+        }
+        console.log(`wa media ok account=${row.id} source=history files=${files} bytes=${total}`);
+      })().finally(() => mediaReading.delete(reading)));
+    }
+    await mediaReading.get(reading);
+    return mediaKept(key);
+  }
+  // Answers with the file itself. Only what mediaKind recognises is shown inside the page; everything else, and
+  // anything asked for with download=1, is handed over as a download under its own name.
+  async function media(req, url, res) {
+    signedIn(req);
+    const account = url.searchParams.get('account') || '', chat = url.searchParams.get('chat') || '', id = url.searchParams.get('id') || '';
+    if (!ACCOUNT.test(account) || !CHAT.test(chat) || !MESSAGE.test(id)) throw problem('invalid-request');
+    const key = mediaKey(account, chat, id);
+    let found = mediaKept(key);
+    if (!found) {
+      if ((mediaMissing.get(key) || 0) > now()) throw problem('media-unavailable');
+      const row = store.account(account);
+      if (!row) throw problem('unknown-account');
+      found = await mediaFetch(settings(), row, chat, id);
+      if (!found) {
+        mediaMissing.set(key, now() + MEDIA_RETRY_MS);
+        throw problem('media-unavailable');
+      }
+    }
+    const kind = mediaKind(found.bytes, found.mime);
+    const shown = Boolean(kind) && url.searchParams.get('download') !== '1';
+    const name = found.name || (kind ? 'whatsapp.' + MEDIA_FILE[kind] : 'whatsapp-file');
+    res.writeHead(200, {
+      'Content-Type': shown ? kind : 'application/octet-stream',
+      'Content-Length': found.bytes.length,
+      'Content-Disposition': shown ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "sandbox; default-src 'none'",
+      'Cache-Control': 'private, max-age=31536000, immutable',
+    });
+    res.end(found.bytes);
+    return SENT;
+  }
 
   // The number's record. When there is none yet, its session and the webhook are made at OpenWA first. An
   // earlier attempt that stopped half-way is completed: a session of that name is taken over, and a webhook
@@ -402,6 +544,8 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       }
       return found || { events: [], last: after };
     },
+    'GET /api/wa/media': media,
+
     'POST /api/wa/hook': async req => {
       const config = settings();
       const raw = await readRaw(req, MAX_HOOK_BODY);
@@ -441,7 +585,8 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       return sendJson(res, 403, { error: 'forbidden' });
     }
     try {
-      return sendJson(res, 200, await route(req, new URL(req.url, 'http://localhost')));
+      const answer = await route(req, new URL(req.url, 'http://localhost'), res);
+      return answer === SENT ? undefined : sendJson(res, 200, answer);
     } catch (error) {
       if (!error.code || !Object.hasOwn(STATUS, error.code)) {
         console.error(`wa request failed route=${req.method} ${pathname} error=${error.code || error.name}`);
@@ -516,4 +661,4 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
   return { handle, store, sync: syncAccount, close: () => { for (const timer of timers) clearTimeout(timer); wake(); store.close(); } };
 }
 
-module.exports = { create, loadConfig, present, signed, EVENTS, STATES };
+module.exports = { create, loadConfig, present, signed, mediaKind, EVENTS, STATES };
