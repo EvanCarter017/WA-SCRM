@@ -321,6 +321,8 @@ for (const required of ['function priceQuoteButton() {', 'function renderPriceLi
 for (const required of ["+priceQuoteButton()+'<span class=\"language-hint\">'", "ai:'AI 能力',prices:'价格表'}", 'ai:renderAiPage,prices:renderPriceList}', "renderItem('prices', views.prices)"]) {
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
+// At the top of a conversation the state of the number is said only when the number is not connected.
+assert(openwaSource.includes("const state = a.state === 'online' ? '' : `<span class=\"state-text ${a.state==='reconnect'?'warn':''}\" role=\"status\">"), 'a connected number must not show "online" beside a conversation');
 // 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.
 // A message shows its picture, voice note, video or file through the server's media route.
 for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {

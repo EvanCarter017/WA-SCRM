@@ -349,8 +349,11 @@
     let chat = openwaBaseChat(c);
     if (!a) return chat;
     chat = chat.replace('<div class="chat-person"><h2>', '<div class="chat-person"><h2 tabindex="-1">');
+    // Beside a conversation, "online" reads as if the customer were online — which WhatsApp does not tell this
+    // number. So the state of the employee's number is said here only when it is not connected.
+    const state = a.state === 'online' ? '' : `<span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':'offline'}"></span>${openwaState(a)}</span>`;
     chat = chat.replace('<div class="source-strip">', `<div class="openwa-chat-status">
-      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span><span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':a.state==='pending'?'offline':''}"></span>${openwaState(a)}</span>
+      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span>${state}
     </div><div class="source-strip">`);
     if (a.state !== 'online') {
       chat = chat.replace(`${esc(a.name)} 待连接`, '发送已暂停')
