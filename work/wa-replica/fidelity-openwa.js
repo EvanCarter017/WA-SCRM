@@ -325,8 +325,8 @@
       country: a.country || '', city: '', timezone: '', language: '其他', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
       source: '未知来源', campaign: '', ad: '', unread: 0, star: false, last: '', preview: '', translation: '', followup: null, notes: '',
       contactRefs: [{ account: a.id, owner: a.owner || ui.persona }], createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', reactivatedCount: 0 };
-    // The engagement module creates the first-reply to-do on the next render. Not for what was fetched while
-    // catching up: those conversations are not new.
+    // The engagement module notes the first message in the customer's history on the next render. Not for what
+    // was fetched while catching up: those conversations are not new.
     if (!e.fromMe && !e.history) c.needsFirstReply = true;
     data.customers.unshift(c);
     data.messages[c.id] = [];

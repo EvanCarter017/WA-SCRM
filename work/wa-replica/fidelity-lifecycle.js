@@ -1246,17 +1246,11 @@
         qualification: { demand: v('demand'), volume: '', deliveryRegion: country({ country: v('country') }), objection: '', commWindow: v('language') + '沟通' },
       };
       data.customers.unshift(c);
-      lcCreateTask({
-        customerId: id,
-        title: `首次主动触达 ${c.name} 确认需求`,
-        dueIso: new Date(Date.now() + 4 * 3600000).toISOString(),
-        priority: 'normal',
-      });
-      lcLog(id, 'profile', '手动建档并自动建立首次跟进待办');
+      lcLog(id, 'profile', '手动建档');
       persist();
       close();
       render();
-      toast(`客户 ${c.name} 已创建并纳入跟进闭环。`);
+      toast(`客户 ${c.name} 已创建，尚未安排跟进。`);
     },
   });
 
@@ -1271,15 +1265,11 @@
         objection: '',
         commWindow: (c.language || '英语') + '沟通',
       };
+      // Follow-up to-dos are made by hand only. A first message is noted in the customer's history; the customer
+      // shows under the signal "客户待回复" until the message is read.
       if (c.needsFirstReply) {
         delete c.needsFirstReply;
-        lcCreateTask({
-          customerId: c.id,
-          title: `首响回复 ${c.name} 并确认咨询需求`,
-          dueIso: new Date(Date.now() + 2 * 3600000).toISOString(),
-          priority: 'high',
-        });
-        lcLog(c.id, 'inbound', '客户首次来信，已自动建立首响待办');
+        lcLog(c.id, 'inbound', '客户首次来信');
       }
     }
   }

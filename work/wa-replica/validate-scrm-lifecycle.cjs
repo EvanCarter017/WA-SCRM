@@ -256,7 +256,7 @@ for (const required of ["fetch('/api/wa/' + path, {", "openwaCall('POST', 'link'
 assert(!/openwaDemoQr|openwaScan|openwaDrop|openwaRestore|openwaAddSampleChat|openwaNextNumber|模拟|演示/.test(openwaSource), 'fidelity-openwa.js must not simulate linking, losing or restoring a connection');
 assert(!/lcSimLeadOpen|lcSimReply|openSimLeadModal|lcSimulateCustomerReply|lc-sim-lead|模拟/.test(moduleSource), 'fidelity-lifecycle.js must not simulate leads or replies');
 assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop };'), 'fidelity-boot.js must let the app stop the page with a notice');
-for (const gone of ['<span>本地演示</span>', '演示消息', '模拟扫码', '模拟掉线', '模拟新客进线', '模拟对方回复', '模拟客户复联', '添加演示附件', '演示来源']) {
+for (const gone of ['<span>本地演示</span>', '演示消息', '模拟扫码', '模拟掉线', '模拟新客进线', '模拟对方回复', '模拟客户复联', '添加演示附件', '演示来源', '首响回复', '首次主动触达', '自动建立']) {
   assert(!appJs.includes(gone), `app.js still contains ${gone}`);
 }
 for (const required of ['const day=openwaDayLabel(m),separator=', "(m.side==='out'?openwaMessageMark(m):'')", 'return openwaOrder(list)}', '  function send() {}\n']) {
