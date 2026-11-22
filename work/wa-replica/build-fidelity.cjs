@@ -230,6 +230,12 @@ assert(!/演示|原型|评审|本机|示例|体验/.test(js), 'the app must not 
 // A message shows its picture, voice note, video or file (plan 033): fidelity-openwa.js gives the bubble its
 // media and the text under it.
 swap(`<div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div>'`, `<div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')`);
+// The customer's language is chosen in the conversation and nothing presets it (plan 038): the baseline's chat
+// head, the words beside the message box and the strip above the conversation use what fidelity-ai.js gives.
+swap("<span>'+esc(c.language)+'</span></div></div><div class=\"chat-heading-acti", "<span>'+esc(aiLanguageLabel(c))+'</span></div></div><div class=\"chat-heading-acti");
+swap("<span class=\"language-hint\">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'", "<span class=\"language-hint\">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'");
+swap("hint.innerHTML=icon('Languages')+esc(c.language)+' · '+aiDraftHint(c);", "hint.innerHTML=icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c);");
+swap("<span>'+esc(c.campaign||'客户来源')+'</span></div>'", "<span>'+esc(c.campaign||'客户来源')+'</span>'+aiLanguagePicker(c)+'</div>'");
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));

@@ -103,7 +103,7 @@ window.WA_START = () => {
     return '<section class="inbox-page"><div class="workspace-switch" aria-label="WhatsApp 工作区"><a class="active" href="#inbox" data-nav="inbox">'+icon('MessagesSquare')+'聚合会话</a><a href="#accounts" data-nav="accounts">'+icon('PanelsTopLeft')+'账号列表</a></div><div class="inbox-layout '+(ui.mobileChat?'mobile-chat':'mobile-list')+'"><section class="conversation-pane" aria-label="会话列表"><div class="conversation-top"><div class="conversation-title"><h1>客户会话 <span>'+myCustomers().filter(c=>ui.account==='all'||c.account===ui.account).length+'</span></h1><button class="icon-button" data-action="addCustomer" aria-label="新增客户">'+icon('SquarePen')+'</button></div><div class="account-select">'+icon('MessageCircle')+'<select id="account-filter" aria-label="按 WhatsApp 账号查看">'+option('all',manager()?'全部团队账号':'我的全部账号',ui.account)+myAccounts().map(a=>option(a.id,a.name+(a.state!=='online'?' · 待连接':''),ui.account)).join('')+'</select>'+icon('ChevronDown')+'</div><label class="search-field">'+icon('Search')+'<input id="conversation-search" aria-label="搜索会话" placeholder="搜索客户或号码…" value="'+esc(ui.query)+'"></label><div class="chips" role="group" aria-label="会话筛选">'+[['all','全部'],['unread','未读'],['reply','待回复'],['star','星标']].map(([id,title])=>'<button class="chip '+(ui.conversationFilter===id?'active':'')+'" data-action="conversationFilter" data-id="'+id+'" aria-pressed="'+(ui.conversationFilter===id)+'">'+title+'</button>').join('')+'</div></div><div class="conversation-list" id="conversation-list">'+conversationRows()+'</div><div class="conversation-footer">'+icon('ShieldCheck')+(manager()?'当前为团队视角':'当前为我的工作范围')+'</div></section>'+(c?chatHTML(c):'<section class="chat-pane"><div class="chat-empty">'+empty('选择客户后继续沟通','也可以新建一位客户。')+'</div></section>')+toolsRailHTML(c)+'</div></section>';
   }
   function chatHTML(c) {
-    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(c.language)+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span></div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
+    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(aiLanguageLabel(c))+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span>'+aiLanguagePicker(c)+'</div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
   }
   function conversationMessages(c) {
     return data.messages[c.id]||(c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]);
@@ -114,7 +114,7 @@ window.WA_START = () => {
   }
   function composerHTML(c) {
     const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&Boolean(d.text.trim());
-    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-input"><textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><div class="composer-controls"><div class="composer-tools"><button class="icon-button" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'</button><span class="language-hint">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class="composer-foot"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'草稿自动保存':'号码待连接 · 草稿已保留')+'</span></div></div>';
+    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-input"><textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><div class="composer-controls"><div class="composer-tools"><button class="icon-button" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'</button><span class="language-hint">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class="composer-foot"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'草稿自动保存':'号码待连接 · 草稿已保留')+'</span></div></div>';
   }
   function previewHTML(c){const d=draft(c);if(!d.translated&&!ui.attachment)return '';return (d.translated?'<div class="translation-preview"><small>发送前预览 · '+esc(c.language)+'译文</small>'+esc(d.translated)+'</div>':'')+(ui.attachment?'<div class="translation-preview"><small>附件</small>'+esc(ui.attachment)+' <button class="link" data-action="removeAttachment">移除</button></div>':'')}
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
@@ -264,7 +264,7 @@ window.WA_START = () => {
     const t=e.target;
     if(t.id==='conversation-search'){ui.query=t.value;$('#conversation-list').innerHTML=conversationRows();paintIcons($('#conversation-list'))}
     if(t.id==='customer-search'&&!t.closest('.fid-customer-filter')){ui.customerQuery=t.value;ui.selected.clear();updateCustomerRows()}
-    if(t.id==='composer-text'){const c=selectedCustomer();const old=draft(c);ui.drafts[c.id]={text:t.value,translated:old.source===t.value?old.translated:'',source:old.source};$('#translation-preview').innerHTML=previewHTML(c);paintIcons($('#translation-preview'));persist();updateSendState(c);const hint=$('.language-hint');if(hint){hint.innerHTML=icon('Languages')+esc(c.language)+' · '+aiDraftHint(c);paintIcons(hint)}}
+    if(t.id==='composer-text'){const c=selectedCustomer();const old=draft(c);ui.drafts[c.id]={text:t.value,translated:old.source===t.value?old.translated:'',source:old.source};$('#translation-preview').innerHTML=previewHTML(c);paintIcons($('#translation-preview'));persist();updateSendState(c);const hint=$('.language-hint');if(hint){hint.innerHTML=icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c);paintIcons(hint)}}
     if(t.dataset.noteCustomer){ui.noteDrafts[t.dataset.noteCustomer]=t.value;persist();t.closest('.customer-profile').querySelector('.note-save span').textContent='未保存的修改'}
   });
   function updateCustomerRows() {
@@ -1745,7 +1745,7 @@ window.WA_START = () => {
   function openwaNewCustomer(a, e) {
     const name = e.name || (e.phone ? '+' + e.phone : 'WhatsApp 客户'), nowIso = new Date().toISOString();
     const c = { id: nextId('c'), name, initials: initial(name), color: 'blue', phone: e.phone ? '+' + e.phone : '', waChat: e.chat,
-      country: a.country || '', city: '', timezone: '', language: '其他', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
+      country: a.country || '', city: '', timezone: '', language: '', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
       source: '未知来源', campaign: '', ad: '', unread: 0, star: false, last: '', preview: '', translation: '', followup: null, notes: '',
       contactRefs: [{ account: a.id, owner: a.owner || ui.persona }], createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', reactivatedCount: 0 };
     // The engagement module notes the first message in the customer's history on the next render. Not for what
@@ -1889,8 +1889,29 @@ window.WA_START = () => {
   let openwaComposing = false, openwaStale = false;
   document.addEventListener('compositionstart', () => { openwaComposing = true; });
   document.addEventListener('compositionend', () => { openwaComposing = false; if (openwaStale) openwaRefresh(); });
+  // A list box in the strips above a conversation (the customer's language, grade, status) that has the focus is
+  // being chosen from: drawing the page again would close it under the pointer. A refresh is put off until the
+  // choice is made or the list box is left — and for ten seconds at most, so that a list box that merely kept
+  // the focus cannot hold new messages back.
+  const OPENWA_HOLD_MS = 10000;
+  let openwaHold = 0;
+  for (const type of ['change', 'focusout']) {
+    document.addEventListener(type, event => {
+      if (event.target?.tagName === 'SELECT') setTimeout(() => { if (openwaStale) openwaRefresh(); }, 0);
+    });
+  }
   function openwaRefresh() {
     if (openwaComposing) return void (openwaStale = true);
+    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');
+    if (chosenFrom && openwaHold !== -1) {
+      openwaHold ||= setTimeout(() => {
+        openwaHold = -1;
+        if (openwaStale) openwaRefresh();
+      }, OPENWA_HOLD_MS);
+      return void (openwaStale = true);
+    }
+    clearTimeout(openwaHold);
+    openwaHold = 0;
     openwaStale = false;
     const el = document.activeElement, id = $('#view').contains(el) ? el.id : '';
     const range = id && typeof el.selectionStart === 'number' ? [el.selectionStart, el.selectionEnd] : null;
@@ -2254,7 +2275,7 @@ window.WA_START = () => {
         volume: '',
         deliveryRegion: `${country(c)}${c.city && c.city !== '待补充' ? ' · ' + c.city : ''}`,
         objection: '',
-        commWindow: `${c.language || '英语'}沟通`,
+        commWindow: aiCustomerLanguage(c) ? `${aiCustomerLanguage(c)}沟通` : '',
         ...(c.qualification || {}),
       };
       c.attribution ||= {
@@ -2652,7 +2673,7 @@ window.WA_START = () => {
                 <span>·</span>
                 <span>${esc(country(c))} ${esc(c.city !== '待补充' ? c.city : '')}（当地 ${esc(localTime(c))}）</span>
                 <span>·</span>
-                <span>${esc(c.language)}</span>
+                <span>${esc(aiLanguageLabel(c))}</span>
               </div>
             </div>
           </div>
@@ -2803,7 +2824,7 @@ window.WA_START = () => {
       if (!c) return '';
       const isOverdue = !t.done && beforeToday(t.due);
       return `<tr${focus?.task === t.id ? ' class="lc-row-focus"' : ''}>
-        <td style="text-align:left"><button type="button" class="fid-link" data-action="profile" ${fidActionID(c.id)}><strong>${esc(c.name)}</strong></button><span class="fid-cell-detail">${esc(account(c.account)?.name || '')} · ${esc(c.language)}</span></td>
+        <td style="text-align:left"><button type="button" class="fid-link" data-action="profile" ${fidActionID(c.id)}><strong>${esc(c.name)}</strong></button><span class="fid-cell-detail">${esc(account(c.account)?.name || '')} · ${esc(aiLanguageLabel(c))}</span></td>
         <td style="text-align:left">${tagCell(c)}</td>
         <td style="text-align:left"><span class="task-title ${t.done ? 'completed' : ''}"><strong>${esc(t.title)}</strong></span>${t.outcome ? `<span class="fid-cell-detail">结果：${esc(t.outcome)}</span>` : ''}</td>
         <td><span class="${isOverdue ? 'overdue' : ''}" style="font-weight:${isOverdue ? '700' : '400'}">${esc(dateLabel(t.due))}${isOverdue ? ' · 已逾期' : ''}</span></td>
@@ -2874,7 +2895,7 @@ window.WA_START = () => {
         <td>${lcTierBadge(c)}</td>
         <td>${lcCustomerStatusPill(c)}</td>
         <td><button type="button" class="fid-link fid-tag-cell" data-action="fidViewCustomerTags" ${fidActionID(c.id)} aria-label="查看${esc(c.name)}的标签，共 ${assigned.length} 个">${tagPreview}${tagDetail}</button></td>
-        <td>${esc(c.phone)}<span class="fid-cell-detail">${esc(country(c))} · ${esc(c.language)}</span></td>
+        <td>${esc(c.phone)}<span class="fid-cell-detail">${esc(country(c))} · ${esc(aiLanguageLabel(c))}</span></td>
         <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span></td>
         <td>${esc(c.last || '—')}${c.unread ? `<span class="fid-cell-detail">${c.unread} 条未读</span>` : ''}</td>
         <td>${esc(fidDate(c.createdAt))}<span class="fid-cell-detail">更新 ${esc(fidDate(c.updatedAt))}</span></td>
@@ -3007,7 +3028,7 @@ window.WA_START = () => {
           <span class="conversation-line"><strong>${esc(c.name)}${lcTier(c) ? ' ' + lcTierBadge(c) : ''}</strong><time>${esc(c.last)}</time></span>
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
-            <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : c.language)}</span>
+            <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : aiLanguageLabel(c))}</span>
           </span>
           ${lcConversationTags(c)}
         </span>
@@ -3148,7 +3169,7 @@ window.WA_START = () => {
       `${fidFormRow('客户称呼', `<input class="fid-input" style="width:100%" name="name" required maxlength="50" placeholder="客户姓名或备注称呼">`, '', true)}
        ${fidFormRow('WhatsApp号', `<input class="fid-input" style="width:100%" name="phone" required placeholder="含国家区号，如 +1 (512) 555-0192">`, '', true)}
        ${fidFormRow('归属接待号', `<select class="fid-select" style="width:100%" name="account">${accounts.map(a => option(a.id, a.name, accounts[0].id)).join('')}</select>`)}
-       ${fidFormRow('沟通语言', `<select class="fid-select" style="width:100%" name="language">${fidOption(['英语', '西班牙语', '其他'], '英语')}</select>`)}
+       ${fidFormRow('沟通语言', `<select class="fid-select" style="width:100%" name="language">${fidOption([['', '未选择'], ...AI_CUSTOMER_LANGUAGES.map(language => [language, language])], '')}</select>`)}
        ${fidFormRow('国家地区', `<select class="fid-select" style="width:100%" name="country">${fidOption([['US', '美国'], ['PR', '波多黎各'], ['OTHER', '其他地区']], 'US')}</select>`)}
        ${fidFormRow('来源渠道', `<select class="fid-select" style="width:100%" name="source">${fidOption(['Facebook 广告', 'Instagram 广告', '客户转介绍', '网站咨询', '手动添加'], 'Facebook 广告')}</select>`)}
        ${fidFormRow('初步需求', `<input class="fid-input" style="width:100%" name="demand" placeholder="记录客户首句来意或咨询重点">`)}`,
@@ -3421,7 +3442,7 @@ window.WA_START = () => {
         followup: null, notes: v('demand'), contactRefs: [{ account: a?.id, owner: a?.owner || ui.persona }],
         createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-补录', intentLevel: '中意向',
         reactivatedCount: 0,
-        qualification: { demand: v('demand'), volume: '', deliveryRegion: country({ country: v('country') }), objection: '', commWindow: v('language') + '沟通' },
+        qualification: { demand: v('demand'), volume: '', deliveryRegion: country({ country: v('country') }), objection: '', commWindow: v('language') ? v('language') + '沟通' : '' },
       };
       data.customers.unshift(c);
       lcLog(id, 'profile', '手动建档');
@@ -3441,7 +3462,7 @@ window.WA_START = () => {
         volume: '待确认',
         deliveryRegion: country(c),
         objection: '',
-        commWindow: (c.language || '英语') + '沟通',
+        commWindow: aiCustomerLanguage(c) ? aiCustomerLanguage(c) + '沟通' : '',
       };
       // Follow-up to-dos are made by hand only. A first message is noted in the customer's history; the customer
       // shows under the signal "客户待回复" until the message is read.
@@ -3507,6 +3528,20 @@ window.WA_START = () => {
   const AI_PROVIDERS = {
     server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
+  // Languages offered for a customer: the language replies are put into. Any other language can be typed in.
+  const AI_CUSTOMER_LANGUAGES = ['英语', '西班牙语', '葡萄牙语', '法语', '德语', '意大利语', '荷兰语', '波兰语', '俄语', '土耳其语', '阿拉伯语', '印地语', '印尼语', '马来语', '越南语', '泰语', '菲律宾语', '日语', '韩语', '中文'];
+  // A language name as the relay accepts it: letters of any script, spaces and a few separators.
+  const AI_LANGUAGE_NAME = /^[\p{L}\p{M} ()·-]{1,40}$/u;
+  // The customer's language, or '' while none is chosen. Nothing presets it: a customer made from a WhatsApp
+  // chat has none until someone chooses one in the conversation. ('其他' is how older records say "none".)
+  // Function declarations, because the follow-up module, which comes first in the page, reads a language while
+  // it starts up.
+  function aiCustomerLanguage(c) {
+    return c?.language && c.language !== '其他' ? c.language : '';
+  }
+  function aiLanguageLabel(c) {
+    return aiCustomerLanguage(c) || '未选语言';
+  }
   // Languages offered for the translation shown below incoming messages.
   const AI_READ_LANGUAGES = ['中文', 'English', 'Español', 'Português', 'Français', 'Deutsch', 'Русский', 'العربية', '日本語', '한국어', 'Tiếng Việt', 'Bahasa Indonesia'];
   // How a reply should sound when it is translated: [value sent to the relay, label].
@@ -3639,7 +3674,7 @@ window.WA_START = () => {
     paintIcons(preview);
     const hint = $('.language-hint');
     if (!hint) return;
-    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + aiDraftHint(c);
+    hint.innerHTML = icon('Languages') + esc(aiLanguageLabel(c)) + ' · ' + aiDraftHint(c);
     paintIcons(hint);
   }
 
@@ -3650,15 +3685,15 @@ window.WA_START = () => {
     const context = (data.messages[c.id] || []).slice(-6)
       .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
       .filter(message => message.text.trim());
-    return { text, to: c.language, tone: settings.tone, business: settings.business, context };
+    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context };
   }
 
   // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first
-  // and sent only after a second Enter. A customer whose language is '其他' (other) is not guarded.
+  // and sent only after a second Enter. A customer without a chosen language is not guarded.
   // These helpers run while the page is drawn, so they read the saved settings without creating them.
   const aiGuardOn = () => data.ai?.sendGuard !== false;
   function aiGuardActive(c) {
-    return aiRuntime.provider === 'server' && aiGuardOn() && data.ai?.enabled?.['translate.outbound'] !== false && c.language !== '其他';
+    return aiRuntime.provider === 'server' && aiGuardOn() && data.ai?.enabled?.['translate.outbound'] !== false && Boolean(aiCustomerLanguage(c));
   }
   // Text that needs no translation in any language: no letters at all (numbers, emoji, links), or ok / no.
   function aiGuardNeutral(text) {
@@ -3681,7 +3716,7 @@ window.WA_START = () => {
   }
   // The switch of the send guard, beside the message box. Shown only while the relay is in use.
   function aiGuardHTML(c) {
-    if (aiRuntime.provider !== 'server' || c.language === '其他') return '';
+    if (aiRuntime.provider !== 'server' || !aiCustomerLanguage(c)) return '';
     const on = aiGuardOn();
     return `<button class="ai-guard${on ? ' on' : ''}" type="button" data-ai-guard aria-pressed="${on}" title="${on ? '发送保护已开启：不是客户语言的回复先翻译，确认后再发送' : '发送保护已关闭：回复按原文直接发送'}">${icon('ShieldCheck')}发送保护${on ? '开' : '关'}</button>`;
   }
@@ -3711,8 +3746,8 @@ window.WA_START = () => {
     if (!q || !filled || filled.source !== q.zh) return;
     filled.translated = '';
     persist();
-    // Without a model service, or for a customer whose language is '其他' (other), the original is sent.
-    if (!aiRuntime.provider || c.language === '其他') return aiRefreshDraftPreview(c);
+    // Without a model service, or for a customer without a chosen language, the original is sent.
+    if (!aiRuntime.provider || !aiCustomerLanguage(c)) return aiRefreshDraftPreview(c);
     const request = {};
     aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
@@ -3807,7 +3842,44 @@ window.WA_START = () => {
     </div></section>`;
   }
 
+  // ---- the customer's language ----
+  // The choice in the strip above a conversation: none, one of the listed languages, or any other by name.
+  function aiLanguagePicker(c) {
+    const current = aiCustomerLanguage(c);
+    const listed = !current || AI_CUSTOMER_LANGUAGES.includes(current) ? AI_CUSTOMER_LANGUAGES : [current, ...AI_CUSTOMER_LANGUAGES];
+    return `<label class="ai-language-pick">${icon('Languages')}<span>客户语言</span><select class="fid-select" data-ai-language="${esc(c.id)}" aria-label="客户语言">${option('', '未选择（发送原文）', current)}${listed.map(language => option(language, language, current)).join('')}${option('__other', '其他语言…', current)}</select></label>`;
+  }
+  // Sets the customer's language ('' for none). A translation made for another language no longer fits the
+  // draft, so the draft goes back to what was typed.
+  function aiSetLanguage(c, language) {
+    if (aiCustomerLanguage(c) === language) return;
+    c.language = language;
+    const d = ui.drafts[c.id];
+    if (d) Object.assign(d, { translated: '', source: '' });
+    aiDraftPending.delete(c.id);
+    lcLog(c.id, 'profile', language ? `客户语言设为${language}` : '取消客户语言');
+    persist();
+    render();
+    toast(language ? `客户语言已设为${language}，回复会先译为${language}。` : '已取消客户语言，回复按原文发送。');
+  }
+  fidForms['ai-language-form'] = (f, v) => {
+    const c = customer(v('customer')), language = v('language').replace(/\s+/g, ' ').trim();
+    if (!c) return;
+    if (!AI_LANGUAGE_NAME.test(language) || language === '其他') return error('请填写语言的名称，例如 希腊语；只能包含文字、空格和括号。');
+    close();
+    aiSetLanguage(c, language);
+  };
+
   document.addEventListener('change', event => {
+    if (event.target.dataset?.aiLanguage) {
+      const c = customer(event.target.dataset.aiLanguage), value = event.target.value;
+      if (!c) return;
+      if (value !== '__other') return aiSetLanguage(c, value);
+      // Another language: asked for by name; the choice shows the current language again until it is given.
+      event.target.value = aiCustomerLanguage(c);
+      fidForm('其他语言', 'ai-language', `<input type="hidden" name="customer" value="${esc(c.id)}">${fidFormRow('语言名称', `<input class="fid-input" style="width:100%" name="language" maxlength="40" placeholder="例如 希腊语">`)}<p class="fid-field-help">回复会先译为这种语言，确认后再发送。</p>`);
+      return;
+    }
     if (event.target.dataset?.aiSetting === 'readLanguage') {
       aiSettings().readLanguage = event.target.value;
       persist();

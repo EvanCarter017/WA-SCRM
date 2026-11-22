@@ -267,6 +267,15 @@ for (const required of ["{ id: 'voice.transcribe', name: '语音转文字',", "f
   assert(read(path.join(__dirname, 'fidelity-ai.js')).includes(required), `fidelity-ai.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("aria-label=\"语音\"></audio></div>` + aiTranscriptHTML(c, m);"), 'a voice note must show its words or the button that asks for them');
+// The customer's language is chosen in the conversation; nothing presets it, and the helpers that read it exist
+// from the start of the page (the follow-up module reads a language while it starts up).
+for (const required of ['function aiCustomerLanguage(c) {', 'function aiLanguageLabel(c) {', 'function aiLanguagePicker(c) {', "fidForms['ai-language-form'] = (f, v) => {", 'data-ai-language=', "to: aiCustomerLanguage(c),"]) {
+  assert(read(path.join(__dirname, 'fidelity-ai.js')).includes(required), `fidelity-ai.js is missing ${required}`);
+}
+assert(!/language: '其他'/.test(read(path.join(__dirname, 'fidelity-openwa.js'))), 'a customer made from a WhatsApp chat must not get a preset language');
+assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');"), 'a refresh must not draw the page again under a list box that is being chosen from');
+assert.equal((appJs.match(/\.language (===|!==) '其他'/g) || []).length, 1, 'whether a customer has a language is asked through aiCustomerLanguage, the only place that knows the old value');
+assert(appJs.includes("+aiLanguagePicker(c)+'</div>'") && appJs.includes("esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)"), 'the conversation must offer the choice of the customer\'s language and show it beside the message box');
 // 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.
 // A message shows its picture, voice note, video or file through the server's media route.
 for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {

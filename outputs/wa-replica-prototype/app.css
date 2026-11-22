@@ -979,6 +979,13 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .ai-transcribe[disabled] { color:var(--color-text-muted); cursor:default; }
 .ai-transcript { margin:0 0 var(--fid-px-6); }
 
+/* The choice of a customer's language, at the right of the strip above a conversation (plan 038). Where the
+   conversation is narrow, the list box of the choice narrows before anything sticks out of the strip. */
+.source-strip .ai-language-pick { margin-left:auto; display:inline-flex; align-items:center; gap:var(--fid-px-6); min-width:0; color:var(--color-text-muted); font-size:var(--fid-px-12); white-space:nowrap; }
+.ai-language-pick svg { width:var(--fid-px-14); height:var(--fid-px-14); flex:none; }
+.ai-language-pick span { flex:none; }
+.ai-language-pick .fid-select { height:var(--fid-px-28); min-width:0; flex:0 1 auto; padding:0 var(--fid-px-8); font-size:var(--fid-px-12); }
+
 .dash {
   --dash-ink: var(--color-text);
   --dash-muted: var(--color-text-muted);

@@ -23,6 +23,8 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 #### 接入 AI 翻译（可选）
 服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
+回复译成哪种语言由每位客户的「客户语言」决定：在聊天界面会话上方右侧选择（常用语言列表，或选「其他语言…」填写任意语言名称）。系统不预设客户语言——从 WhatsApp 同步或新来信生成的客户没有语言，未选择时回复按原文发送。
+
 同一个设置文件里的 `VOICE_PROVIDER`、`VOICE_API_KEY`（以及可选的 `VOICE_BASE_URL`、`VOICE_MODEL`）指定语音转文字服务：员工点击语音消息下方的「转文字」时，服务器把这条语音交给语音服务（`/api/wa/transcribe`），文字显示在语音下方并保存在服务器上，同一条语音只转一次。未填写时不显示「转文字」。
 
 #### 接入 OpenWA（WhatsApp 连接，可选）

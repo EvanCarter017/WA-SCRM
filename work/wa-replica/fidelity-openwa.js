@@ -367,7 +367,7 @@
   function openwaNewCustomer(a, e) {
     const name = e.name || (e.phone ? '+' + e.phone : 'WhatsApp 客户'), nowIso = new Date().toISOString();
     const c = { id: nextId('c'), name, initials: initial(name), color: 'blue', phone: e.phone ? '+' + e.phone : '', waChat: e.chat,
-      country: a.country || '', city: '', timezone: '', language: '其他', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
+      country: a.country || '', city: '', timezone: '', language: '', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
       source: '未知来源', campaign: '', ad: '', unread: 0, star: false, last: '', preview: '', translation: '', followup: null, notes: '',
       contactRefs: [{ account: a.id, owner: a.owner || ui.persona }], createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', reactivatedCount: 0 };
     // The engagement module notes the first message in the customer's history on the next render. Not for what
@@ -511,8 +511,29 @@
   let openwaComposing = false, openwaStale = false;
   document.addEventListener('compositionstart', () => { openwaComposing = true; });
   document.addEventListener('compositionend', () => { openwaComposing = false; if (openwaStale) openwaRefresh(); });
+  // A list box in the strips above a conversation (the customer's language, grade, status) that has the focus is
+  // being chosen from: drawing the page again would close it under the pointer. A refresh is put off until the
+  // choice is made or the list box is left — and for ten seconds at most, so that a list box that merely kept
+  // the focus cannot hold new messages back.
+  const OPENWA_HOLD_MS = 10000;
+  let openwaHold = 0;
+  for (const type of ['change', 'focusout']) {
+    document.addEventListener(type, event => {
+      if (event.target?.tagName === 'SELECT') setTimeout(() => { if (openwaStale) openwaRefresh(); }, 0);
+    });
+  }
   function openwaRefresh() {
     if (openwaComposing) return void (openwaStale = true);
+    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');
+    if (chosenFrom && openwaHold !== -1) {
+      openwaHold ||= setTimeout(() => {
+        openwaHold = -1;
+        if (openwaStale) openwaRefresh();
+      }, OPENWA_HOLD_MS);
+      return void (openwaStale = true);
+    }
+    clearTimeout(openwaHold);
+    openwaHold = 0;
     openwaStale = false;
     const el = document.activeElement, id = $('#view').contains(el) ? el.id : '';
     const range = id && typeof el.selectionStart === 'number' ? [el.selectionStart, el.selectionEnd] : null;

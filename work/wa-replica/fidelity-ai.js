@@ -13,6 +13,20 @@
   const AI_PROVIDERS = {
     server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
+  // Languages offered for a customer: the language replies are put into. Any other language can be typed in.
+  const AI_CUSTOMER_LANGUAGES = ['英语', '西班牙语', '葡萄牙语', '法语', '德语', '意大利语', '荷兰语', '波兰语', '俄语', '土耳其语', '阿拉伯语', '印地语', '印尼语', '马来语', '越南语', '泰语', '菲律宾语', '日语', '韩语', '中文'];
+  // A language name as the relay accepts it: letters of any script, spaces and a few separators.
+  const AI_LANGUAGE_NAME = /^[\p{L}\p{M} ()·-]{1,40}$/u;
+  // The customer's language, or '' while none is chosen. Nothing presets it: a customer made from a WhatsApp
+  // chat has none until someone chooses one in the conversation. ('其他' is how older records say "none".)
+  // Function declarations, because the follow-up module, which comes first in the page, reads a language while
+  // it starts up.
+  function aiCustomerLanguage(c) {
+    return c?.language && c.language !== '其他' ? c.language : '';
+  }
+  function aiLanguageLabel(c) {
+    return aiCustomerLanguage(c) || '未选语言';
+  }
   // Languages offered for the translation shown below incoming messages.
   const AI_READ_LANGUAGES = ['中文', 'English', 'Español', 'Português', 'Français', 'Deutsch', 'Русский', 'العربية', '日本語', '한국어', 'Tiếng Việt', 'Bahasa Indonesia'];
   // How a reply should sound when it is translated: [value sent to the relay, label].
@@ -145,7 +159,7 @@
     paintIcons(preview);
     const hint = $('.language-hint');
     if (!hint) return;
-    hint.innerHTML = icon('Languages') + esc(c.language) + ' · ' + aiDraftHint(c);
+    hint.innerHTML = icon('Languages') + esc(aiLanguageLabel(c)) + ' · ' + aiDraftHint(c);
     paintIcons(hint);
   }
 
@@ -156,15 +170,15 @@
     const context = (data.messages[c.id] || []).slice(-6)
       .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
       .filter(message => message.text.trim());
-    return { text, to: c.language, tone: settings.tone, business: settings.business, context };
+    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context };
   }
 
   // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first
-  // and sent only after a second Enter. A customer whose language is '其他' (other) is not guarded.
+  // and sent only after a second Enter. A customer without a chosen language is not guarded.
   // These helpers run while the page is drawn, so they read the saved settings without creating them.
   const aiGuardOn = () => data.ai?.sendGuard !== false;
   function aiGuardActive(c) {
-    return aiRuntime.provider === 'server' && aiGuardOn() && data.ai?.enabled?.['translate.outbound'] !== false && c.language !== '其他';
+    return aiRuntime.provider === 'server' && aiGuardOn() && data.ai?.enabled?.['translate.outbound'] !== false && Boolean(aiCustomerLanguage(c));
   }
   // Text that needs no translation in any language: no letters at all (numbers, emoji, links), or ok / no.
   function aiGuardNeutral(text) {
@@ -187,7 +201,7 @@
   }
   // The switch of the send guard, beside the message box. Shown only while the relay is in use.
   function aiGuardHTML(c) {
-    if (aiRuntime.provider !== 'server' || c.language === '其他') return '';
+    if (aiRuntime.provider !== 'server' || !aiCustomerLanguage(c)) return '';
     const on = aiGuardOn();
     return `<button class="ai-guard${on ? ' on' : ''}" type="button" data-ai-guard aria-pressed="${on}" title="${on ? '发送保护已开启：不是客户语言的回复先翻译，确认后再发送' : '发送保护已关闭：回复按原文直接发送'}">${icon('ShieldCheck')}发送保护${on ? '开' : '关'}</button>`;
   }
@@ -217,8 +231,8 @@
     if (!q || !filled || filled.source !== q.zh) return;
     filled.translated = '';
     persist();
-    // Without a model service, or for a customer whose language is '其他' (other), the original is sent.
-    if (!aiRuntime.provider || c.language === '其他') return aiRefreshDraftPreview(c);
+    // Without a model service, or for a customer without a chosen language, the original is sent.
+    if (!aiRuntime.provider || !aiCustomerLanguage(c)) return aiRefreshDraftPreview(c);
     const request = {};
     aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
@@ -313,7 +327,44 @@
     </div></section>`;
   }
 
+  // ---- the customer's language ----
+  // The choice in the strip above a conversation: none, one of the listed languages, or any other by name.
+  function aiLanguagePicker(c) {
+    const current = aiCustomerLanguage(c);
+    const listed = !current || AI_CUSTOMER_LANGUAGES.includes(current) ? AI_CUSTOMER_LANGUAGES : [current, ...AI_CUSTOMER_LANGUAGES];
+    return `<label class="ai-language-pick">${icon('Languages')}<span>客户语言</span><select class="fid-select" data-ai-language="${esc(c.id)}" aria-label="客户语言">${option('', '未选择（发送原文）', current)}${listed.map(language => option(language, language, current)).join('')}${option('__other', '其他语言…', current)}</select></label>`;
+  }
+  // Sets the customer's language ('' for none). A translation made for another language no longer fits the
+  // draft, so the draft goes back to what was typed.
+  function aiSetLanguage(c, language) {
+    if (aiCustomerLanguage(c) === language) return;
+    c.language = language;
+    const d = ui.drafts[c.id];
+    if (d) Object.assign(d, { translated: '', source: '' });
+    aiDraftPending.delete(c.id);
+    lcLog(c.id, 'profile', language ? `客户语言设为${language}` : '取消客户语言');
+    persist();
+    render();
+    toast(language ? `客户语言已设为${language}，回复会先译为${language}。` : '已取消客户语言，回复按原文发送。');
+  }
+  fidForms['ai-language-form'] = (f, v) => {
+    const c = customer(v('customer')), language = v('language').replace(/\s+/g, ' ').trim();
+    if (!c) return;
+    if (!AI_LANGUAGE_NAME.test(language) || language === '其他') return error('请填写语言的名称，例如 希腊语；只能包含文字、空格和括号。');
+    close();
+    aiSetLanguage(c, language);
+  };
+
   document.addEventListener('change', event => {
+    if (event.target.dataset?.aiLanguage) {
+      const c = customer(event.target.dataset.aiLanguage), value = event.target.value;
+      if (!c) return;
+      if (value !== '__other') return aiSetLanguage(c, value);
+      // Another language: asked for by name; the choice shows the current language again until it is given.
+      event.target.value = aiCustomerLanguage(c);
+      fidForm('其他语言', 'ai-language', `<input type="hidden" name="customer" value="${esc(c.id)}">${fidFormRow('语言名称', `<input class="fid-input" style="width:100%" name="language" maxlength="40" placeholder="例如 希腊语">`)}<p class="fid-field-help">回复会先译为这种语言，确认后再发送。</p>`);
+      return;
+    }
     if (event.target.dataset?.aiSetting === 'readLanguage') {
       aiSettings().readLanguage = event.target.value;
       persist();

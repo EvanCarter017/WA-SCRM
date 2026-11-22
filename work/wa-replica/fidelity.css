@@ -537,3 +537,10 @@
 .ai-transcribe svg { width:14px; height:14px; }
 .ai-transcribe[disabled] { color:var(--color-text-muted); cursor:default; }
 .ai-transcript { margin:0 0 6px; }
+
+/* The choice of a customer's language, at the right of the strip above a conversation (plan 038). Where the
+   conversation is narrow, the list box of the choice narrows before anything sticks out of the strip. */
+.source-strip .ai-language-pick { margin-left:auto; display:inline-flex; align-items:center; gap:6px; min-width:0; color:var(--color-text-muted); font-size:12px; white-space:nowrap; }
+.ai-language-pick svg { width:14px; height:14px; flex:none; }
+.ai-language-pick span { flex:none; }
+.ai-language-pick .fid-select { height:28px; min-width:0; flex:0 1 auto; padding:0 8px; font-size:12px; }
