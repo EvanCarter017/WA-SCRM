@@ -88,6 +88,9 @@ const EVENTS = ['message.received', 'message.sent', 'message.ack', 'message.revo
 // OpenWA's session states in this project's words.
 const STATES = { created: 'starting', initializing: 'starting', qr_ready: 'scan', authenticating: 'verifying', ready: 'online', disconnected: 'offline', action_required: 'attention', failed: 'failed' };
 const RECEIPTS = ['sent', 'delivered', 'read', 'played', 'failed'];
+// The receipts that say more than "sent", from the least to the most. A message of the number is given the best
+// of them that reached the link before the message itself did.
+const RECEIPTS_BEFORE = ['delivered', 'read', 'played'];
 const STATUS = {
   'invalid-request': 400, 'send-refused': 400, 'not-signed-in': 401, 'bad-signature': 401, 'password-change-required': 403, 'forbidden': 403,
   'read-only': 403, 'unknown-account': 404, 'media-unavailable': 404, 'not-connected': 409, 'not-audio': 415, 'no-speech': 422, 'transcription-failed': 502, 'request-conflict': 409, 'outcome-unknown': 409, 'taken-over': 409,
@@ -267,6 +270,12 @@ function openStore(file, now) {
       return true;
     },
     eventsAfter: (seq, limit) => db.prepare('SELECT seq, account, name, at, body FROM event WHERE seq > ? ORDER BY seq LIMIT ?').all(seq, limit),
+    // The receipts among the deliveries before seq that are about one of these messages: [{ seq, account, id, status }].
+    receiptsBefore(seq, ids) {
+      if (!ids.length) return [];
+      const about = "COALESCE(json_extract(body, '$.messageId'), json_extract(body, '$.id'))";
+      return db.prepare(`SELECT seq, account, ${about} AS id, json_extract(body, '$.status') AS status FROM event WHERE name = 'message.ack' AND seq < ? AND ${about} IN (${ids.map(() => '?').join(', ')})`).all(seq, ...ids);
+    },
     lastEvent: () => db.prepare('SELECT COALESCE(MAX(seq), 0) AS seq FROM event').get().seq,
     request: id => db.prepare('SELECT request, digest, outcome FROM sent WHERE request = ?').get(id),
     addRequest: (id, digest) => db.prepare('INSERT INTO sent (request, digest, at) VALUES (?, ?, ?)').run(id, digest, stamp()),
@@ -724,7 +733,18 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       const read = () => {
         if (holder !== client) throw problem('taken-over');
         const rows = store.eventsAfter(after, FEED_PAGE);
-        return rows.length ? { events: rows.map(present).filter(Boolean), last: rows.at(-1).seq } : null;
+        if (!rows.length) return null;
+        // A receipt can reach the link before the message it is about — a message that was on the phone already
+        // and is fetched while catching up, or a delivery that was late. The page did not know the message then
+        // and could do nothing with the receipt. So a message of the number says the best receipt the link holds
+        // for it from before.
+        const events = rows.map(present).filter(Boolean), own = events.filter(e => e.kind === 'message' && e.fromMe && e.id);
+        const receipts = store.receiptsBefore(rows.at(-1).seq, own.map(e => e.id));
+        for (const e of own) {
+          const status = RECEIPTS_BEFORE.findLast(s => receipts.some(r => r.account === e.account && r.id === e.id && r.seq < e.seq && r.status === s));
+          if (status) e.status = status;
+        }
+        return { events, last: rows.at(-1).seq };
       };
       let found = read();
       if (!found && wait > 0) {

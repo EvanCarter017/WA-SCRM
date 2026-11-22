@@ -732,17 +732,25 @@
     }
     c ||= openwaNewCustomer(a, e);
     const list = data.messages[c.id] ??= conversationMessages(c);
-    if (e.id && list.some(m => m.wa === e.id)) return named;
+    // e.status is the receipt the server holds for a message of the number from before the message itself: a
+    // receipt that came first found no message here and was left aside.
+    const known = e.id && list.find(m => m.wa === e.id);
+    if (known) {
+      const order = ['sending', 'unknown', 'sent', 'delivered', 'read', 'played'];
+      if (known.side !== 'out' || !e.status || order.indexOf(e.status) <= order.indexOf(known.status)) return named;
+      known.status = e.status;
+      return true;
+    }
     const text = e.text || openwaMediaText[e.type] || '[消息]';
     if (e.fromMe) {
       // What this page sent comes back through the feed: it is the message that is still waiting for its answer.
       const mine = list.find(m => m.side === 'out' && !m.wa && m.status === 'sending' && m.text === e.text);
       if (mine) {
-        Object.assign(mine, { wa: e.id, status: 'sent' });
+        Object.assign(mine, { wa: e.id, status: e.status || 'sent' });
         return true;
       }
     }
-    const message = { id: nextId('m'), side: e.fromMe ? 'out' : 'in', text, time: openwaClock(e.at), at: e.at, wa: e.id, type: e.type, ...(e.media?.name ? { file: e.media.name } : {}), ...(e.fromMe ? { status: 'sent' } : {}) };
+    const message = { id: nextId('m'), side: e.fromMe ? 'out' : 'in', text, time: openwaClock(e.at), at: e.at, wa: e.id, type: e.type, ...(e.media?.name ? { file: e.media.name } : {}), ...(e.fromMe ? { status: e.status || 'sent' } : {}) };
     // A file this page is sending comes through the feed before the server has answered: it is the page's own
     // message, marked like everything the page sends.
     if (e.fromMe && openwaFiles.get(c.id)?.sending) message.translatedTo = aiSettings().readLanguage;

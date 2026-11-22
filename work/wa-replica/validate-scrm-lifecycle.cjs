@@ -353,6 +353,14 @@ assert(appJs.includes("+esc(c.initials||c.initial||initial(c.name))+openwaAvatar
 for (const required of ["'GET /api/wa/avatar': avatar,", 'const AVATAR_FRESH_MS = 24 * 60 * 60 * 1000;', "if (address.origin !== new URL(config.baseUrl).origin && !(address.protocol === 'https:' && AVATAR_HOSTS.test(address.hostname))) throw problem('gateway-failed');", "response = await fetch(address, { redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS) });"]) {
   assert(read(path.join(__dirname, 'openwa-link.cjs')).includes(required), `openwa-link.cjs is missing ${required}`);
 }
+// A receipt that reached the link before its message is not lost: the feed gives the message the best receipt
+// from before, and the page takes it — for a new message and for one it has already.
+for (const required of ["const RECEIPTS_BEFORE = ['delivered', 'read', 'played'];", 'const receipts = store.receiptsBefore(rows.at(-1).seq, own.map(e => e.id));', 'const status = RECEIPTS_BEFORE.findLast(s => receipts.some(r => r.account === e.account && r.id === e.id && r.seq < e.seq && r.status === s));']) {
+  assert(read(path.join(__dirname, 'openwa-link.cjs')).includes(required), `openwa-link.cjs is missing ${required}`);
+}
+for (const required of ["...(e.fromMe ? { status: e.status || 'sent' } : {}) };", "Object.assign(mine, { wa: e.id, status: e.status || 'sent' });", "if (known.side !== 'out' || !e.status || order.indexOf(e.status) <= order.indexOf(known.status)) return named;"]) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
 // The list of conversations keeps its place when the page is drawn again.
 for (const required of ["const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\\n');", "if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });", 'else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);

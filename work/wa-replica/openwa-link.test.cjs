@@ -360,6 +360,35 @@ test('the feed gives the deliveries in this project\'s own form, in order', asyn
   assert.equal((await post('/api/wa/claim', { client: 'no' })).status, 400);
 });
 
+test('a receipt that came before its message: the message of the number says the best one; a receipt after the message, or about a customer\'s message, changes nothing', async () => {
+  const id = gwSessionOf('a1').id, start = link.store.lastEvent(), chat = '15550001111@c.us';
+  const send = (event, data) => deliver(id, event, data).then(r => assert.deepEqual(r.json, { ok: true, stored: true }));
+  const own = (name, at) => ({ id: `true_${chat}_${name}`, from: '15550009999@c.us', to: chat, chatId: chat, body: 'text ' + name, type: 'text', timestamp: at, fromMe: true, isGroup: false, kind: 'individual' });
+  const ack = (name, status) => send('message.ack', { id: `true_${chat}_${name}`, messageId: `true_${chat}_${name}`, status, ack: 0, chatId: chat });
+  // E1: delivered and read before the message. E2: only "sent" before it. E3: its receipt comes after it.
+  // E4: a customer's message whose id had a receipt. E5: played, then read (the lesser one later) before the message.
+  await ack('E1', 'delivered');
+  await ack('E1', 'read');
+  await ack('E2', 'sent');
+  await ack('E4', 'read');
+  await ack('E5', 'played');
+  await ack('E5', 'read');
+  await send('message.sent', own('E1', 1795000201));
+  await send('message.sent', own('E2', 1795000202));
+  await send('message.sent', own('E3', 1795000203));
+  await ack('E3', 'delivered');
+  await send('message.received', { ...own('E4', 1795000204), from: chat, to: '15550009999@c.us', fromMe: false, senderPhone: '15550001111' });
+  await send('message.sent', own('E5', 1795000205));
+  await post('/api/wa/claim', { client: 'client-feed-2' });
+  const events = (await feed('client-feed-2', start)).json.events;
+  assert.deepEqual(events.filter(e => e.kind === 'message').map(e => [e.id.slice(-2), e.fromMe, e.status]), [['E1', true, 'read'], ['E2', true, undefined], ['E3', true, undefined], ['E4', false, undefined], ['E5', true, 'played']]);
+  assert.deepEqual(events.filter(e => e.kind === 'receipt').map(e => [e.id.slice(-2), e.status]), [['E1', 'delivered'], ['E1', 'read'], ['E2', 'sent'], ['E4', 'read'], ['E5', 'played'], ['E5', 'read'], ['E3', 'delivered']], 'the receipts themselves are delivered as before');
+  assert.equal(Object.hasOwn(events.find(e => e.kind === 'message' && e.id.endsWith('E2')), 'status'), false, 'a message without such a receipt says nothing');
+  // a page that reads on from a later position: what came before that position still counts
+  const later = (await feed('client-feed-2', start + 6)).json.events;
+  assert.deepEqual(later.filter(e => e.kind === 'message').map(e => [e.id.slice(-2), e.status]), [['E1', 'read'], ['E2', undefined], ['E3', undefined], ['E4', undefined], ['E5', 'played']]);
+});
+
 test('one page reads the feed: a page that claims it takes it over, also from a page that is waiting', async () => {
   const last = (await post('/api/wa/claim', { client: 'client-page-A' })).json.last;
   assert.equal((await feed('client-page-A', last)).status, 200);
