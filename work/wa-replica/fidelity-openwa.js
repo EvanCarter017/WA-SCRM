@@ -374,7 +374,9 @@
     const text = el.value.trim();
     if (!text) return;
     const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
-    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending' };
+    // What the employee sends from here is never asked for: it is marked as read in the reading language, and a
+    // reply that was put into the customer's language keeps what was typed as its translation.
+    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };
     (data.messages[c.id] ??= conversationMessages(c)).push(message);
     Object.assign(c, { preview: outgoing, last: message.time, lastAt: message.at, unread: 0 });
     ui.drafts[c.id] = { text: '', translated: '', source: '' };
@@ -478,8 +480,9 @@
       const [c, m] = openwaFindMessage(a.id, e.id);
       if (!m) return false;
       Object.assign(m, e.kind === 'revoked' ? { text: '此消息已撤回', revoked: true, translated: '' } : { text: e.text, edited: true, translated: '' });
+      delete m.translatedTo;
       if ((data.messages[c.id] || []).at(-1) === m) c.preview = m.text;
-      if (e.kind === 'edited' && m.side === 'in') aiTranslateInbound(c, m);
+      if (e.kind === 'edited') aiTranslateInbound(c, m);
       return true;
     }
     if ((e.kind !== 'message' && e.kind !== 'chat') || !e.chat) return false;
@@ -522,8 +525,8 @@
       const closed = lcIsClosed(c);
       c.unread = (Number(c.unread) || 0) + 1;
       if (closed) lcLog(c.id, 'inbound', '已结束跟进的客户主动发来新消息（触发复联信号）');
-      if (e.type === 'text' && e.text) aiTranslateInbound(c, message);
     }
+    if (!e.history && e.type === 'text' && e.text) aiTranslateInbound(c, message);
     return true;
   }
 

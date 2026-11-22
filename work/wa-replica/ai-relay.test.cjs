@@ -289,6 +289,58 @@ test('speech to text: the voice settings, what is sent to the service, and its a
   await refused(relay.transcribeAudio(wav, 'audio/wav'), 'provider-unreachable', 502);
 });
 
+test('translate: a translation made once is kept and given again without asking the service; another language or text asks again; a failure is not kept; replies are never kept; without a data folder nothing is kept', async () => {
+  configure();
+  const dir = fs.mkdtempSync(path.join(tmp, 'kept-'));
+  const translation = '你们可以把 BX20 发到波多黎各吗？';
+  const ask = (text, to = '中文') => call('/api/ai/translate', { body: { text, to } });
+  process.env.WA_SCRM_DATA_DIR = dir;
+  try {
+    upstream.mode = 'ok';
+    upstream.calls.length = 0;
+    const first = await ask('Kept once: do you ship to Ponce?');
+    assert.deepEqual([first.status, first.json], [200, { text: translation }]);
+    assert.equal(upstream.calls.length, 1);
+    // the same text again, also with spaces around it: from the store
+    for (const text of ['Kept once: do you ship to Ponce?', '  Kept once: do you ship to Ponce?\n']) {
+      const again = await ask(text);
+      assert.deepEqual([again.status, again.json], [200, { text: translation, cached: true }]);
+    }
+    assert.equal(upstream.calls.length, 1, 'the service was not asked again');
+    // another language and another text are other translations
+    assert.equal((await ask('Kept once: do you ship to Ponce?', 'English')).json.cached, undefined);
+    assert.equal((await ask('Kept once: do you ship to Ponce')).json.cached, undefined);
+    assert.equal(upstream.calls.length, 3);
+    // a failure is not kept: the next request asks the service again
+    upstream.mode = 'error';
+    assert.equal((await ask('Fails the first time')).status, 502);
+    upstream.mode = 'ok';
+    assert.deepEqual((await ask('Fails the first time')).json, { text: translation });
+    assert.equal(upstream.calls.length, 5);
+    // a kept translation is given even while the service is down
+    upstream.mode = 'error';
+    assert.deepEqual((await ask('Kept once: do you ship to Ponce?')).json, { text: translation, cached: true });
+    upstream.mode = 'ok';
+    // the file holds the translation under a fingerprint, never the text that was translated
+    const files = fs.readdirSync(dir).filter(name => name.startsWith('ai-translations.db'));
+    assert(files.includes('ai-translations.db'), 'the store is a file of the data folder: ' + files);
+    const bytes = Buffer.concat(files.map(name => fs.readFileSync(path.join(dir, name)))).toString('utf8');
+    assert(bytes.includes(translation) && !bytes.includes('Kept once') && !bytes.includes('Ponce'), 'the store holds no text that was translated');
+    // a reply depends on tone and chat: never kept
+    upstream.calls.length = 0;
+    for (let i = 0; i < 2; i++) assert.equal((await call('/api/ai/reply', { body: { text: '请问需要几箱？', to: 'English' } })).json.cached, undefined);
+    assert.equal(upstream.calls.length, 2);
+    // the log says that an answer came from the store, without the text
+    assert(logged.some(line => /^ai translate ok chars=\d+->\d+ ms=\d+ kept$/.test(line)), 'a kept answer is marked in the log');
+  } finally {
+    delete process.env.WA_SCRM_DATA_DIR;
+  }
+  // without a data folder nothing is kept
+  upstream.calls.length = 0;
+  for (let i = 0; i < 2; i++) assert.deepEqual((await ask('Kept once: do you ship to Ponce?')).json, { text: translation });
+  assert.equal(upstream.calls.length, 2);
+});
+
 test('the log never holds the key or message text', () => {
   const lines = logged.filter(line => line.startsWith('ai '));
   assert(lines.some(line => /^ai transcribe ok bytes=\d+ chars=23 ms=\d+$/.test(line)) && lines.some(line => line.startsWith('ai transcribe failed error=provider-error upstream=500')), lines.join('\n'));

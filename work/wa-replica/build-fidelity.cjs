@@ -79,7 +79,8 @@ swap("case 'confirmReset':data=clone(window.WA_DEMO);", "case 'confirmReset':dat
 swap("if(t.id==='customer-search'){ui.customerQuery=t.value;ui.selected.clear();updateCustomerRows()}", "if(t.id==='customer-search'&&!t.closest('.fid-customer-filter')){ui.customerQuery=t.value;ui.selected.clear();updateCustomerRows()}");
 swap("(c.id===ui.customer?'selected':'')", "(fid.chatOpen&&c.id===ui.customer?'selected':'')");
 swap("  function messagesHTML(c) {\n    const list=data.messages[c.id]||(c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]);\n    if(!list.length)return empty('还没有会话消息','写一条演示消息，或选择快捷回复开始。');", "  function conversationMessages(c) {\n    return data.messages[c.id]||(c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]);\n  }\n  function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='写一条演示消息，或选择快捷回复开始。'}={}) {\n    if(!list.length)return empty('还没有会话消息',emptyHint);");
-swap("m.side==='in'&&m.translated&&ui.receiveTranslation?", "m.side==='in'&&m.translated&&showTranslation?");
+// A translation is shown below a message of either side (plan 042).
+swap("m.side==='in'&&m.translated&&ui.receiveTranslation?", "m.translated&&showTranslation?");
 swap(
   `<div class="composer-shortcuts">'+data.quickReplies.filter(q=>!q.owner||manager()||q.owner===ui.persona).slice(0,3).map(q=>'<button class="shortcut" data-action="quick" data-id="'+q.id+'">'+icon('Zap')+esc(q.title)+'</button>').join('')+'<button class="link" data-action="quickAll">快捷回复 '+icon('ChevronRight')+'</button></div>`,
   '',

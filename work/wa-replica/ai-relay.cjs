@@ -3,7 +3,10 @@
 // service key. It never returns or logs the key, and it never logs message text.
 // It also turns speech into text for the WhatsApp link (openwa-link.cjs), through the speech service the same
 // settings file names with VOICE_PROVIDER, VOICE_API_KEY and, optionally, VOICE_BASE_URL and VOICE_MODEL.
+// A translation that was made once is kept in the server's data folder and given again: see translationStore.
 const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
 
 // Services that speak the OpenAI chat-completions format. limitField is the name each one uses for the
 // ceiling on output tokens.
@@ -40,6 +43,37 @@ const TONES = {
 };
 
 const failure = (status, code, extra = {}) => Object.assign(new Error(code), { status, ...extra });
+
+// Translations that were made once are kept and given again, so the same text is not sent to the model service a
+// second time for the same language. They are kept in the file ai-translations.db of the server's data folder
+// (WA_SCRM_DATA_DIR; built-in SQLite, Node 22.13 or newer); without that folder, or when the file cannot be
+// used, nothing is kept and every request goes to the service. A row holds a fingerprint of the language and
+// the text — never the text itself — and the translation.
+let kept = null;
+function translationStore() {
+  const dir = process.env.WA_SCRM_DATA_DIR;
+  if (!dir) return null;
+  if (kept?.dir === dir) return kept;
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(path.join(dir, 'ai-translations.db'));
+    db.exec(`
+      PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS translations (key TEXT PRIMARY KEY, text TEXT NOT NULL, at TEXT NOT NULL);
+    `);
+    const get = db.prepare('SELECT text FROM translations WHERE key = ?');
+    const put = db.prepare('INSERT INTO translations (key, text, at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET text = excluded.text, at = excluded.at');
+    kept = {
+      dir,
+      get(key) { try { return get.get(key)?.text; } catch { return undefined; } },
+      put(key, text) { try { put.run(key, text, new Date().toISOString()); } catch {} },
+    };
+  } catch {
+    kept = { dir, get: () => undefined, put: () => {} };
+  }
+  return kept;
+}
+const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\n' + text).digest('hex');
 
 // KEY=VALUE lines. Blank lines and lines starting with # are ignored; Windows line endings are accepted.
 function parseEnv(text) {
@@ -213,7 +247,12 @@ async function translate(input, config) {
   const to = typeof input.to === 'string' ? input.to.trim() : '';
   if (!text || !LANGUAGE.test(to)) throw failure(400, 'invalid-request');
   if (text.length > MAX_TEXT) throw failure(413, 'too-long');
-  return { text: await askModel(config, translationPrompt(to), text), inputChars: text.length };
+  // A translation made before is given again without asking the service.
+  const store = translationStore(), key = translationKey(to, text), known = store?.get(key);
+  if (typeof known === 'string') return { text: known, inputChars: text.length, cached: true };
+  const translated = await askModel(config, translationPrompt(to), text);
+  store?.put(key, translated);
+  return { text: translated, inputChars: text.length };
 }
 
 // A reply the seller typed, put into the customer's language. tone, business and context are optional.
@@ -265,8 +304,8 @@ async function handle(req, res, pathname) {
     }
     try {
       const result = await run(await readJson(req), config);
-      console.log(`ai ${name} ok chars=${result.inputChars}->${result.text.length} ms=${Date.now() - started}`);
-      return sendJson(res, 200, { text: result.text });
+      console.log(`ai ${name} ok chars=${result.inputChars}->${result.text.length} ms=${Date.now() - started}${result.cached ? ' kept' : ''}`);
+      return sendJson(res, 200, result.cached ? { text: result.text, cached: true } : { text: result.text });
     } catch (error) {
       const code = error.status ? error.message : 'internal';
       console.error(`ai ${name} failed error=${code}${error.upstream ? ' upstream=' + error.upstream : ''} ms=${Date.now() - started}`);

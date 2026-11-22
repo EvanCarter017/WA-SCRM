@@ -110,7 +110,7 @@ window.WA_START = () => {
   }
   function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='输入消息，或选择快捷回复开始。'}={}) {
     if(!list.length)return empty('还没有会话消息',emptyHint);
-    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.side==='in'&&m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
+    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
   }
   function composerHTML(c) {
     const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&Boolean(d.text.trim());
@@ -1752,7 +1752,9 @@ window.WA_START = () => {
     const text = el.value.trim();
     if (!text) return;
     const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
-    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending' };
+    // What the employee sends from here is never asked for: it is marked as read in the reading language, and a
+    // reply that was put into the customer's language keeps what was typed as its translation.
+    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };
     (data.messages[c.id] ??= conversationMessages(c)).push(message);
     Object.assign(c, { preview: outgoing, last: message.time, lastAt: message.at, unread: 0 });
     ui.drafts[c.id] = { text: '', translated: '', source: '' };
@@ -1856,8 +1858,9 @@ window.WA_START = () => {
       const [c, m] = openwaFindMessage(a.id, e.id);
       if (!m) return false;
       Object.assign(m, e.kind === 'revoked' ? { text: '此消息已撤回', revoked: true, translated: '' } : { text: e.text, edited: true, translated: '' });
+      delete m.translatedTo;
       if ((data.messages[c.id] || []).at(-1) === m) c.preview = m.text;
-      if (e.kind === 'edited' && m.side === 'in') aiTranslateInbound(c, m);
+      if (e.kind === 'edited') aiTranslateInbound(c, m);
       return true;
     }
     if ((e.kind !== 'message' && e.kind !== 'chat') || !e.chat) return false;
@@ -1900,8 +1903,8 @@ window.WA_START = () => {
       const closed = lcIsClosed(c);
       c.unread = (Number(c.unread) || 0) + 1;
       if (closed) lcLog(c.id, 'inbound', '已结束跟进的客户主动发来新消息（触发复联信号）');
-      if (e.type === 'text' && e.text) aiTranslateInbound(c, message);
     }
+    if (!e.history && e.type === 'text' && e.text) aiTranslateInbound(c, message);
     return true;
   }
 
@@ -3552,7 +3555,7 @@ window.WA_START = () => {
   // needed and apply the result in .then(); 3) teach the provider to answer it.
   // Every provider call leaves one usage record in data.ai.usage and adds to the totals of its capability.
   const AI_CAPABILITIES = [
-    { id: 'translate.inbound', name: '接收消息翻译', description: '把客户发来的消息译为所选的译文语言，显示在原文下方。' },
+    { id: 'translate.inbound', name: '会话消息翻译', description: '把会话里的消息译为所选的译文语言，显示在原文下方。每条消息只翻译一次，译文保存后不再重复翻译；打开会话时补译还没有译文的消息。' },
     { id: 'translate.outbound', name: '发送前翻译', description: '把你输入的回复和快捷回复译为客户的语言，发送前可预览。' },
     { id: 'voice.transcribe', name: '语音转文字', description: '点击语音消息下方的「转文字」，把语音转成文字显示在语音下方；客户发来的语音还会译为所选的译文语言。' },
   ];
@@ -3633,10 +3636,11 @@ window.WA_START = () => {
     const providerId = aiRuntime.provider;
     return Promise.resolve()
       .then(() => AI_PROVIDERS[providerId].run(capabilityId, input))
-      .then(output => String(output?.text || ''), () => '')
-      .then(text => {
+      .then(output => ({ text: String(output?.text || ''), kept: output?.cached === true }), () => ({ text: '', kept: false }))
+      .then(({ text, kept }) => {
         const result = { ok: Boolean(text), text };
-        aiRecordUsage(capabilityId, providerId, input, result, meta);
+        // A translation the server had kept was not made again: it is no call to the model service.
+        if (!kept) aiRecordUsage(capabilityId, providerId, input, result, meta);
         return result;
       });
   }
@@ -3648,7 +3652,7 @@ window.WA_START = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: input.text, to: input.to }),
-    }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
+    }).then(response => response.json().then(body => response.ok ? { text: body.text, cached: body.cached === true } : Promise.reject(new Error('relay ' + body.error))));
   }
 
   // The server relay for a reply: the text is put into the customer's language with the chosen tone, with the
@@ -3680,24 +3684,73 @@ window.WA_START = () => {
     }).catch(() => {});
   }
 
-  // Translate one incoming message into the reading language chosen on the AI page. The translation is stored
-  // on the message when it arrives, and the open conversation is refreshed if it is the one on screen.
-  // A message that is already in the reading language comes back unchanged and gets no translation.
-  function aiTranslateInbound(c, message) {
-    return aiRun('translate.inbound', { text: message.text, to: aiSettings().readLanguage }, { customerId: c.id }).then(result => {
-      if (!result.ok || result.text.trim() === message.text.trim()) return;
-      message.translated = result.text;
-      if (c.preview === message.text) c.translation = result.text;
-      persist();
-      const box = $('#messages');
-      if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
-      const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
-      openwaKeepPlaying(() => {
-        box.innerHTML = messagesHTML(c);
+  // ---- translation of the messages of a conversation ----
+  // A message is translated at most once for a reading language. Its translation is kept on the message with
+  // the language it was made for (translatedTo) and saved with the conversation; a message that is already in
+  // the reading language is marked the same way and carries no translation. What is marked is never asked for
+  // again: opening a conversation asks only for its messages that are not marked yet, the newest first, and a
+  // message that arrives is asked for once. (A translation made before this marking existed carries no
+  // language; it is left as it is.) The server keeps every translation too, so equal texts cost one request.
+  const AI_TRANSLATE_AT_ONCE = 2;        // requests on their way at the same time
+  const AI_TRANSLATE_GIVE_UP = 3;        // failures in a row after which the waiting messages are let go …
+  const AI_TRANSLATE_PAUSE_MS = 60000;   // … and nothing more is asked for this long
+  const aiWaiting = [];                  // [customer, message] pairs waiting for their turn
+  const aiAsked = new Set();             // ids of the messages that wait or are on their way
+  let aiOnTheWay = 0, aiFailuresInARow = 0, aiPausedUntil = 0;
+
+  // Whether a message has words to translate: not the note that stands for a picture or a file, not a
+  // withdrawn message, not a text without letters.
+  function aiTranslatable(message) {
+    const text = String(message.text || '').trim();
+    return Boolean(text) && !message.revoked && text !== openwaMediaText[message.type] && text !== '[消息]' && !aiGuardNeutral(text);
+  }
+  const aiWantsTranslation = (message, language) => aiTranslatable(message) && !aiAsked.has(message.id)
+    && (message.translatedTo ? message.translatedTo !== language : !message.translated);
+
+  // Puts messages of a customer in the line. `first` puts them in front of what waits already: the conversation
+  // on screen comes before messages that arrive elsewhere.
+  function aiTranslateSoon(c, messages, first = false) {
+    const settings = aiSettings();
+    if (!settings.enabled['translate.inbound'] || !aiRuntime.provider || Date.now() < aiPausedUntil) return;
+    const pairs = messages.filter(message => aiWantsTranslation(message, settings.readLanguage)).map(message => [c, message]);
+    for (const [, message] of pairs) aiAsked.add(message.id);
+    if (first) aiWaiting.unshift(...pairs);
+    else aiWaiting.push(...pairs);
+    aiTranslateNext();
+  }
+  function aiTranslateNext() {
+    while (aiOnTheWay < AI_TRANSLATE_AT_ONCE && aiWaiting.length) {
+      const [c, message] = aiWaiting.shift(), text = message.text, language = aiSettings().readLanguage;
+      aiOnTheWay += 1;
+      aiRun('translate.inbound', { text, to: language }, { customerId: c.id }).then(result => {
+        aiOnTheWay -= 1;
+        aiAsked.delete(message.id);
+        if (result.ok && message.text === text) {
+          aiFailuresInARow = 0;
+          message.translatedTo = language;
+          if (result.text.trim() === text.trim()) delete message.translated;
+          else message.translated = result.text;
+          if (message.translated && c.preview === text) c.translation = message.translated;
+          persist();
+          aiRedraw(c);
+        } else if (!result.ok && !result.skipped && ++aiFailuresInARow >= AI_TRANSLATE_GIVE_UP) {
+          // The service does not answer: what waits is let go, and asked for again when its conversation is
+          // drawn after the pause.
+          for (const [, waiting] of aiWaiting.splice(0)) aiAsked.delete(waiting.id);
+          aiFailuresInARow = 0;
+          aiPausedUntil = Date.now() + AI_TRANSLATE_PAUSE_MS;
+        }
+        aiTranslateNext();
       });
-      paintIcons(box);
-      if (atBottom) scrollMessages();
-    });
+    }
+  }
+  // One message that has just arrived or was changed.
+  function aiTranslateInbound(c, message) {
+    aiTranslateSoon(c, [message]);
+  }
+  // The conversation on screen: its messages that carry no translation yet, the newest first.
+  function aiTranslateConversation(c) {
+    aiTranslateSoon(c, (data.messages[c.id] || []).slice().reverse(), true);
   }
 
   // Redraw the translation preview above the composer and the language hint beside it.
@@ -3961,12 +4014,15 @@ window.WA_START = () => {
   function aiRedraw(c) {
     const box = $('#messages');
     if (ui.view !== 'inbox' || !box || box.dataset.customer !== c.id) return;
-    const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40;
+    const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop <= 40, fromEnd = box.scrollHeight - box.scrollTop;
     openwaKeepPlaying(() => {
       box.innerHTML = messagesHTML(c);
     });
     paintIcons(box);
+    // At its end the conversation stays at its end; further up, what is being read stays where it is while
+    // translations come in above it.
     if (atBottom) scrollMessages();
+    else box.scrollTop = box.scrollHeight - fromEnd;
   }
   // Turns a voice note of the open conversation into text and keeps the text on the message. The words of a
   // voice note the customer sent are then translated like an incoming text.
@@ -3997,6 +4053,16 @@ window.WA_START = () => {
     const ask = event.target.closest?.('[data-ai-transcribe]');
     if (ask) aiTranscribe(ask.dataset.aiTranscribe);
   });
+
+  // Every time the page is drawn with a conversation on screen, the messages of that conversation that carry no
+  // translation yet are put in the line. What is marked or already in the line is passed over, so a redraw
+  // costs nothing.
+  const aiDraw = render;
+  render = function() {
+    aiDraw();
+    const box = $('#messages'), c = ui.view === 'inbox' && box ? customer(box.dataset.customer) : null;
+    if (c) aiTranslateConversation(c);
+  };
 
   aiDetectRelay();
 

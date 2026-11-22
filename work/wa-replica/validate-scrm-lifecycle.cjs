@@ -247,6 +247,20 @@ for (const [name, source] of Object.entries(siteSources)) {
 }
 assert(serveSource.includes("if (site && !site.allows(req)) {") && serveSource.includes('process.env.WA_SCRM_DATA_DIR'), 'the preview server must put the relay behind sign-in when it keeps accounts');
 // The page's start-up script talks to the account and data routes only (the app itself to the AI relay only, section 3).
+// A message is translated once. The page keeps the translation on the message with the language it was made
+// for and asks only for the messages of the conversation on screen that are not marked; the relay keeps every
+// translation it has made and gives it again; an answer from that store is no call to the model service.
+for (const required of ['const aiWantsTranslation = (message, language) => aiTranslatable(message) && !aiAsked.has(message.id)', '&& (message.translatedTo ? message.translatedTo !== language : !message.translated);', 'message.translatedTo = language;', 'function aiTranslateConversation(c) {', 'if (c) aiTranslateConversation(c);', 'if (!kept) aiRecordUsage(capabilityId, providerId, input, result, meta);', 'const AI_TRANSLATE_AT_ONCE = 2;']) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+}
+assert.equal((aiSource.match(/aiRun\('translate\.inbound'/g) || []).length, 2, 'messages are translated in one place (the line), the words of a voice note in another');
+for (const required of ["translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };", "if (!e.history && e.type === 'text' && e.text) aiTranslateInbound(c, message);", 'delete m.translatedTo;']) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
+for (const required of ["new DatabaseSync(path.join(dir, 'ai-translations.db'))", "const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\\n' + text).digest('hex');", "if (typeof known === 'string') return { text: known, inputChars: text.length, cached: true };", 'store?.put(key, translated);']) {
+  assert(read(path.join(__dirname, 'ai-relay.cjs')).includes(required), `ai-relay.cjs is missing ${required}`);
+}
+assert(appJs.includes('m.translated&&showTranslation?') && !appJs.includes("m.side==='in'&&m.translated"), 'a translation must be shown below a message of either side');
 const bootSource = read(path.join(__dirname, 'fidelity-boot.js'));
 for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/status|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
 assert(!/\bfetch\s*\(\s*['"`]/.test(bootSource), 'fidelity-boot.js must send every request through its request helper');
@@ -366,6 +380,7 @@ const summary = {
   leftovers: 'removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview',
   whatsappConnection: 'real, through the sub-site\'s own server: QR code, incoming events, sending; no simulation',
   priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing',
+  messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');
