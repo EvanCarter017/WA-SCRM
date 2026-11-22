@@ -1710,6 +1710,44 @@ window.WA_START = () => {
     return c;
   }
 
+  // Two records of one person on one number: one made by hand and known by its phone number, one made from a
+  // message and known by the chat id WhatsApp uses (often a privacy id). The one made by hand stays: it takes
+  // over the conversation, the to-dos and the history of the other.
+  function openwaJoin(keep, drop) {
+    const order = ['sending', 'unknown', 'failed', 'sent', 'delivered', 'read', 'played'];
+    const list = data.messages[keep.id] ??= conversationMessages(keep);
+    for (const m of data.messages[drop.id] || []) {
+      const same = m.wa && list.find(x => x.wa === m.wa);
+      if (!same) list.push(m);
+      else if (order.indexOf(m.status) > order.indexOf(same.status)) same.status = m.status;
+    }
+    list.sort((x, y) => (x.at || 0) - (y.at || 0));
+    const last = list.at(-1);
+    Object.assign(keep, { waChat: drop.waChat, unread: Math.max(Number(keep.unread) || 0, Number(drop.unread) || 0), star: keep.star || drop.star,
+      tags: [...new Set([...keep.tags, ...drop.tags])], notes: keep.notes || drop.notes, ...(last?.at ? { preview: last.text, translation: '', last: last.time, lastAt: last.at } : {}) });
+    for (const t of data.tasks) if (t.customer === drop.id) t.customer = keep.id;
+    for (const record of data.chatArchives || []) if (record.customerId === drop.id) record.customerId = keep.id;
+    if (data.activities[drop.id]) data.activities[keep.id] = [...data.activities[drop.id], ...(data.activities[keep.id] || [])];
+    delete data.activities[drop.id];
+    delete data.messages[drop.id];
+    data.customers = data.customers.filter(c => c !== drop);
+    if (ui.customer === drop.id) ui.customer = keep.id;
+  }
+  // Joins such pairs wherever the phone number of a chat has become known. Returns true when it joined any.
+  function openwaJoinTwins() {
+    const byPhone = new Map();
+    for (const c of data.customers) if (!c.waChat && fidPhoneDigits(c.phone).length >= 7) byPhone.set(c.account + ' ' + fidPhoneDigits(c.phone), c);
+    let joined = false;
+    for (const drop of [...data.customers]) {
+      const key = drop.account + ' ' + fidPhoneDigits(drop.phone), keep = drop.waChat ? byPhone.get(key) : null;
+      if (!keep) continue;
+      openwaJoin(keep, drop);
+      byPhone.delete(key);
+      joined = true;
+    }
+    return joined;
+  }
+
   const openwaFindMessage = (accountId, wa) => {
     for (const c of data.customers) {
       if (c.account !== accountId) continue;
@@ -1759,7 +1797,13 @@ window.WA_START = () => {
     if ((e.kind !== 'message' && e.kind !== 'chat') || !e.chat) return false;
     let c = data.customers.find(c => c.account === a.id && c.waChat === e.chat)
       || (e.phone ? data.customers.find(c => c.account === a.id && !c.waChat && fidPhoneDigits(c.phone) === e.phone) : null);
+    // A message this page sent to a customer who was known by phone number only comes back under the chat id
+    // WhatsApp uses for that person: the customer who holds that message is the one of this chat.
+    if (!c && e.kind === 'message' && e.fromMe) {
+      c = data.customers.find(x => x.account === a.id && !x.waChat && (data.messages[x.id] || []).some(m => m.side === 'out' && (m.wa ? m.wa === e.id : m.status === 'sending' && m.text === e.text)));
+    }
     if (c && !c.waChat) c.waChat = e.chat;
+    if (c && !c.phone && e.phone) c.phone = '+' + e.phone;
     if (e.kind === 'chat') {
       // A chat that is on the number, found while catching up: its customer, the number where WhatsApp tells it,
       // and how many messages are unread there.
@@ -1841,6 +1885,10 @@ window.WA_START = () => {
       failures = 0;
       let applied = false;
       for (const e of answer.body.events) applied = openwaApply(e) || applied;
+      if (openwaJoinTwins()) {
+        applied = true;
+        persist();
+      }
       if (answer.body.last > (Number(data.waCursor) || 0)) {
         data.waCursor = answer.body.last;
         persist();

@@ -297,11 +297,12 @@ test('the feed gives the deliveries in this project\'s own form, in order', asyn
   await send('session.disconnected', { sessionId: id, reason: 'LOGOUT' });
   await send('session.restriction', { sessionId: id, active: true, kind: 'temporary', code: 'TEMP_BAN', expiresAt: null });
   await send('message.received', { id: 'status_B5', from: 'status@broadcast', to: '15550009999@c.us', chatId: 'status@broadcast', body: 'a status', type: 'text', timestamp: 1795000105, fromMe: false, isGroup: false, kind: 'status', isStatusBroadcast: true });
+  await send('message.edited', { messageId: 'false_15550001111@c.us_B2', chatId: '15550001111@c.us', body: '', senderId: '15550001111@c.us', fromMe: false, isGroup: false, type: 'image', hasMedia: true });
   const claimed = await post('/api/wa/claim', { client: 'client-feed-1' });
-  assert.deepEqual(claimed.json, { ok: true, last: start + 13 });
+  assert.deepEqual(claimed.json, { ok: true, last: start + 14 });
   const read = await feed('client-feed-1', start);
   const at = seconds => seconds * 1000;
-  assert.deepEqual(read.json, { last: start + 13, events: [
+  assert.deepEqual(read.json, { last: start + 14, events: [
     { seq: start + 1, account: 'a1', kind: 'message', id: 'false_22334455667788@lid_B1', chat: '22334455667788@lid', fromMe: false, type: 'text', text: 'Hola', at: at(1795000100), name: 'Ana', phone: '34600111222', media: null },
     { seq: start + 2, account: 'a1', kind: 'message', id: 'false_15550001111@c.us_B2', chat: '15550001111@c.us', fromMe: false, type: 'voice', text: '', at: at(1795000101), name: 'Bo Saved', phone: '15550001111', media: { mime: 'audio/ogg; codecs=opus', name: '', size: 4321 } },
     { seq: start + 3, account: 'a1', kind: 'message', id: 'true_15550001111@c.us_B3', chat: '15550001111@c.us', fromMe: true, type: 'text', text: 'On my way', at: at(1795000102), name: '', phone: '15550001111', media: null },
@@ -312,8 +313,9 @@ test('the feed gives the deliveries in this project\'s own form, in order', asyn
     { seq: start + 10, account: 'a1', kind: 'state', state: 'online', phone: '15550009999', name: 'Lin Shop' },
     { seq: start + 11, account: 'a1', kind: 'state', state: 'offline', reason: 'LOGOUT' },
     { seq: start + 12, account: 'a1', kind: 'restriction', active: true, code: 'TEMP_BAN' },
-  ] }, 'group, status and unknown-receipt deliveries are left out, and the position still moves past them');
-  assert.deepEqual((await feed('client-feed-1', start + 13)).json, { events: [], last: start + 13 });
+  ] }, 'group, status and unknown-receipt deliveries and an edit without text are left out, and the position still moves past them');
+  assert.deepEqual((await feed('client-feed-1', start + 14)).json, { events: [], last: start + 14 });
+  assert.deepEqual((await feed('client-feed-1', start + 13)).json, { events: [], last: start + 14 });
   assert.deepEqual((await feed('client-feed-1', start + 10)).json.events.map(e => e.seq), [start + 11, start + 12]);
   for (const query of ['after=-1&client=client-feed-1', 'after=1.5&client=client-feed-1', 'after=0&client=short', 'after=0&client=client-feed-1&wait=abc']) assert.equal((await call('/api/wa/events?' + query, { cookie: lin })).status, 400, query);
   assert.equal((await post('/api/wa/claim', { client: 'no' })).status, 400);

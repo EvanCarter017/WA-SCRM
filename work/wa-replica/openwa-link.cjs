@@ -160,7 +160,8 @@ function present({ seq, account, name, at, body }) {
   }
   if (name === 'message.ack') return RECEIPTS.includes(d.status) ? { ...event, kind: 'receipt', id: String(d.messageId || d.id || ''), status: d.status } : null;
   if (name === 'message.revoked') return { ...event, kind: 'revoked', id: String(d.revokedId || d.id || ''), chat: String(d.chatId || '') };
-  if (name === 'message.edited') return { ...event, kind: 'edited', id: String(d.messageId || ''), chat: String(d.chatId || ''), text: String(d.body || '') };
+  // An edit that leaves no text (WhatsApp sends one for some pictures) says nothing the page could show.
+  if (name === 'message.edited') return d.body ? { ...event, kind: 'edited', id: String(d.messageId || ''), chat: String(d.chatId || ''), text: String(d.body) } : null;
   if (name === 'session.status') return { ...event, kind: 'state', state: STATES[d.status] || 'offline' };
   if (name === 'session.authenticated') return { ...event, kind: 'state', state: 'online', phone: digits(d.phone), name: String(d.pushName || '') };
   if (name === 'session.disconnected') return { ...event, kind: 'state', state: 'offline', reason: String(d.reason || '') };
