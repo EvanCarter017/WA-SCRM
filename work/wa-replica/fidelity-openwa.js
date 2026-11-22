@@ -81,9 +81,29 @@
       if (twin) twin.replaceWith(media);
     }
   }
+  // Drawing the page again must not move the list of conversations either: choosing a conversation far down the
+  // list draws the page again, and the list used to jump back to its top. Where the list stands is noted whenever
+  // it is scrolled and given back after every redraw, for as long as the list shows the same choice of
+  // conversations — also when the list was out of sight in between, as it is on a narrow screen while a
+  // conversation is open. Another number, filter or search shows its list from the top.
+  const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\n');
+  const openwaListPlace = { key: openwaListKey(), top: 0 };
+  document.addEventListener('scroll', event => {
+    if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });
+  }, true);
+  document.addEventListener('input', event => {
+    const list = $('#conversation-list');
+    if (event.target.id !== 'conversation-search' || !list) return;
+    list.scrollTop = 0;
+    Object.assign(openwaListPlace, { key: openwaListKey(), top: 0 });
+  });
   const openwaDraw = render;
   render = function() {
     openwaKeepPlaying(openwaDraw);
+    const list = $('#conversation-list');
+    if (!list) return;
+    if (openwaListPlace.key !== openwaListKey()) Object.assign(openwaListPlace, { key: openwaListKey(), top: 0 });
+    else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;
   };
 
   // The mark after the time of a message the employee sent.
