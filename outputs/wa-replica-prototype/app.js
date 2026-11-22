@@ -2804,10 +2804,11 @@ window.WA_START = () => {
           <td><div class="fid-icon-actions">
             ${fidButton('重新跟进', 'followup', 'RotateCcw', h.recontact ? 'slim blue' : 'slim tint', fidActionID(c.id))}
             ${fidButton('去聊天', 'openConversation', 'MessageCircle', 'slim', fidActionID(c.id))}
+            ${fidIcon('移除已结束的跟进：' + c.name, 'lcClosedRemove', 'Trash2', c.id)}
           </div></td>
         </tr>`;
       }).join('');
-      return page('已结束跟进的客户不再产生提醒；客户再次来信时会提示「复联待处理」，可随时重新跟进并保留全部历史。', `${tagBar}
+      return page('已结束跟进的客户不再产生提醒；客户再次来信时会提示「复联待处理」，可随时重新跟进并保留全部历史。不再需要的记录可以移除。', `${tagBar}
         <div class="fid-table-card">${fidTable('lc-closed-table', ['客户', '结束原因', '标签', '当前信号', '重新跟进次数', '操作'], rows, '暂无已结束跟进的客户', true, 'Archive')}</div>`);
     }
 
@@ -3315,6 +3316,27 @@ window.WA_START = () => {
       close();
       render();
       toast('待办已删除。');
+    },
+    // A follow-up that was ended by hand is removed by hand, after a confirmation: the customer leaves the list of
+    // ended follow-ups and shows no follow-up information again, as if none had been made. To-dos that were
+    // finished stay among the finished to-dos, and the removal is noted in the customer's history.
+    lcClosedRemove: id => {
+      const c = customer(id);
+      if (!c || !lcIsClosed(c) || !myCustomers().includes(c)) return;
+      fidConfirm('移除已结束的跟进', `把 ${c.name} 从「已结束跟进」中移除？移除后该客户不再显示跟进信息，之后仍可重新安排跟进。`, 'lcClosedRemoveDo', id);
+    },
+    lcClosedRemoveDo: id => {
+      const c = customer(id);
+      if (!c || !lcIsClosed(c) || !myCustomers().includes(c)) return;
+      const reason = c.closedReason;
+      c.engagement = 'open';
+      delete c.closedReason;
+      delete c.closedAt;
+      lcLog(c.id, 'followup', `移除已结束的跟进${reason ? `（结束原因：${reason}）` : ''}`);
+      persist();
+      close();
+      render();
+      toast('已移除，该客户不再显示跟进信息。');
     },
     followup: id => openFollowup(id),
     newTask: () => openFollowup(),

@@ -81,6 +81,11 @@ for (const required of ["${fidIcon('删除待办：' + t.title, 'lcTaskDelete', 
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 
+// A follow-up that was ended by hand can be removed by hand from the list of ended follow-ups.
+for (const required of ["${fidIcon('移除已结束的跟进：' + c.name, 'lcClosedRemove', 'Trash2', c.id)}", "'lcClosedRemoveDo', id);", "c.engagement = 'open';\n      delete c.closedReason;\n      delete c.closedAt;", "toast('已移除，该客户不再显示跟进信息。');"]) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+}
+
 // A customer has a follow-up status only where a person made one (an unfinished to-do, or a follow-up ended by
 // hand). Nothing works out a status for the other customers, and the status "no to-do planned" is gone.
 for (const gone of ['跟进断档', 'noPlan', "'noplan'", '尚未安排跟进', '立即补排跟进', "let primary = { key: 'healthy'"]) {
