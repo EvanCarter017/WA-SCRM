@@ -7,6 +7,9 @@
   // Fields that are maps by customer id; each entry is saved on its own.
   const SPLIT = ['messages', 'activities'];
   const SAVE_DELAY = 400;
+  // One save request carries at most this many characters (one value that is larger goes alone); a larger change
+  // goes in several requests, one after another. Small enough for a proxy that allows 1 MB a request.
+  const SAVE_PART = 256 * 1024;
   const screen = { title: $('#subsite-login-title'), notice: $('#site-notice'), signIn: $('#site-sign-in'), password: $('#site-password'), leave: $('#site-leave') };
 
   const request = (path, { method = 'GET', body, keepalive = false } = {}) =>
@@ -88,6 +91,9 @@
     }
     return list;
   }
+  // The order in which changed parts are sent: whole fields, then the entries of split fields, and the position in
+  // the WhatsApp feed last — a page that is closed halfway reads the feed again from the position that was saved.
+  const order = key => (key === 'waCursor' ? 2 : key.includes('/') ? 1 : 0);
 
   function start(user, site, { version, data }) {
     // What the server holds, as text per key; a save sends what differs from it.
@@ -114,8 +120,17 @@
       if (saving || stopped || !pending) return;
       const current = new Map(parts(pending).map(([key, value]) => [key, JSON.stringify(value)]));
       const set = {}, remove = [...synced.keys()].filter(key => !current.has(key));
-      for (const [key, json] of current) if (synced.get(key) !== json) set[key] = JSON.parse(json);
-      pending = null;
+      const changed = [...current].filter(([key, json]) => synced.get(key) !== json).sort(([a], [b]) => order(a) - order(b));
+      let size = 0, rest = false;
+      for (const [key, json] of changed) {
+        if (size && size + json.length > SAVE_PART) {
+          rest = true;
+          break;
+        }
+        set[key] = JSON.parse(json);
+        size += json.length;
+      }
+      if (!rest) pending = null;
       if (!Object.keys(set).length && !remove.length) return;
       saving = true;
       let answer;
@@ -131,7 +146,7 @@
         for (const key of remove) synced.delete(key);
         if (failures) note('');
         failures = 0;
-        if (pending) timer = setTimeout(flush, SAVE_DELAY);
+        if (pending) timer = setTimeout(flush, rest ? 0 : SAVE_DELAY);
       } else if (answer.status === 409) {
         stop('数据已在别处更新', '这个子站的数据刚刚在另一个页面或设备上被修改。请刷新后继续；本页最近一次修改没有保存。');
       } else if (answer.status === 401) {
@@ -140,7 +155,9 @@
         // The server could not be reached or had trouble: keep the changes and try again, more slowly each time.
         pending ??= window.WA_SITE.data;
         failures += 1;
-        note('修改暂未保存到服务器，正在重试…');
+        // Refused as too large (by this server or by a proxy in front of it): trying again only helps once an
+        // administrator has raised the limit, so the notice says what is wrong.
+        note(answer.status === 413 ? '修改未能保存：内容超过服务器允许的大小，请联系管理员。' : '修改暂未保存到服务器，正在重试…');
         timer = setTimeout(flush, Math.min(30000, 1000 * 2 ** failures));
       }
     }

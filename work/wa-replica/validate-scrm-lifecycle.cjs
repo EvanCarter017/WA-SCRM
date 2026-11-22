@@ -233,7 +233,7 @@ for (const required of ['id="site-sign-in"', 'id="site-password"', '<script src=
 }
 assert(!indexHtml.includes('demo-data.js') && !indexHtml.includes('进入演示工作台') && !fs.existsSync(path.join(out, 'demo-data.js')), 'the page must not ship the fictional data set');
 assert.equal(read(path.join(out, 'boot.js')), bootSource, 'boot.js must be the built copy of fidelity-boot.js');
-for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START();']) {
+for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START();', 'const SAVE_PART = 256 * 1024;', 'if (size && size + json.length > SAVE_PART) {', "const order = key => (key === 'waCursor' ? 2 : key.includes('/') ? 1 : 0);", 'answer.status === 413 ?']) {
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
