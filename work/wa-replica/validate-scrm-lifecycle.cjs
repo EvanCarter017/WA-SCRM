@@ -321,6 +321,8 @@ for (const required of ['function priceQuoteButton() {', 'function renderPriceLi
 for (const required of ["+priceQuoteButton()+'<span class=\"language-hint\">'", "ai:'AI 能力',prices:'价格表'}", 'ai:renderAiPage,prices:renderPriceList}', "renderItem('prices', views.prices)"]) {
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
+// In the rows of the list of conversations the dot of the number is drawn only when the number is not connected.
+assert(moduleSource.includes("const lcNumberDot = a => (a?.state === 'online' ? '' : `<span class=\"state-dot ${a?.state === 'pending' ? 'offline' : 'warning'}\"></span>`);") && moduleSource.includes('<span>${lcNumberDot(a)}${esc(ui.account === \'all\' ? a?.name : aiLanguageLabel(c))}</span>'), 'a connected number must not put a green dot into the rows of the list of conversations');
 // At the top of a conversation the state of the number is said only when the number is not connected.
 assert(openwaSource.includes("const state = a.state === 'online' ? '' : `<span class=\"state-text ${a.state==='reconnect'?'warn':''}\" role=\"status\">"), 'a connected number must not show "online" beside a conversation');
 // 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.

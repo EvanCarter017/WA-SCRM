@@ -801,6 +801,9 @@
     return `<span class="conversation-tags" title="${esc('标签：' + names.join('、'))}">${tagsHTML(c, LC_CARD_TAGS)}${more > 0 ? `<span class="conversation-tags-more">+${more}</span>` : ''}</span>`;
   }
 
+  // A green dot in every row of the list read as "this customer is online", which WhatsApp does not tell this
+  // number. The dot is about the employee's number: it is drawn only when that number is not connected.
+  const lcNumberDot = a => (a?.state === 'online' ? '' : `<span class="state-dot ${a?.state === 'pending' ? 'offline' : 'warning'}"></span>`);
   conversationRows = function() {
     return filteredConversations().map(c => {
       const a = account(c.account);
@@ -811,7 +814,7 @@
           <span class="conversation-line"><strong>${esc(c.name)}${lcTier(c) ? ' ' + lcTierBadge(c) : ''}</strong><time>${esc(c.last)}</time></span>
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
-            <span><span class="state-dot ${a?.state === 'online' ? '' : a?.state === 'pending' ? 'offline' : 'warning'}"></span>${esc(ui.account === 'all' ? a?.name : aiLanguageLabel(c))}</span>
+            <span>${lcNumberDot(a)}${esc(ui.account === 'all' ? a?.name : aiLanguageLabel(c))}</span>
           </span>
           ${lcConversationTags(c)}
         </span>
