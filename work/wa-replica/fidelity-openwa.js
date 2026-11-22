@@ -177,7 +177,7 @@
 
   function openwaBeginPairing(mode, a) {
     if (openwaServer && !openwaServer.configured) return toast('服务器尚未接入 WhatsApp 连接，请联系管理员。');
-    const pair = openwaPairing = { mode, accountId: a?.id || nextId('a'), label: a ? a.name + (fidPhoneDigits(a.number).length >= 7 ? ' · ' + a.number : '') : '', phase: 'starting', qr: '', error: '' };
+    const pair = openwaPairing = { mode, accountId: a?.id || nextId('a'), label: a ? a.name + (fidPhoneDigits(a.number).length >= 7 ? ' · ' + a.number : '') : '', phase: 'starting', qr: '', error: '', held: [] };
     openwaShowPairing();
     openwaRequestLink(pair);
   }
@@ -199,6 +199,8 @@
       data.accounts.push(a);
     }
     openwaSetState(a, link);
+    // What the feed brought for this number before it was recorded here.
+    for (const e of pair.held) openwaApply(e);
     persist();
     render();
     const bind = pair.mode === 'bind';
@@ -323,8 +325,9 @@
       country: a.country || '', city: '', timezone: '', language: '其他', owner: a.owner || ui.persona, account: a.id, tags: [], engagement: 'open',
       source: '未知来源', campaign: '', ad: '', unread: 0, star: false, last: '', preview: '', translation: '', followup: null, notes: '',
       contactRefs: [{ account: a.id, owner: a.owner || ui.persona }], createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-实时', reactivatedCount: 0 };
-    // The engagement module creates the first-reply to-do on the next render.
-    if (!e.fromMe) c.needsFirstReply = true;
+    // The engagement module creates the first-reply to-do on the next render. Not for what was fetched while
+    // catching up: those conversations are not new.
+    if (!e.fromMe && !e.history) c.needsFirstReply = true;
     data.customers.unshift(c);
     data.messages[c.id] = [];
     return c;
@@ -342,7 +345,19 @@
   // Applies one event of the feed to the data. Returns true when something changed.
   function openwaApply(e) {
     const a = data.accounts.find(a => a.id === e.account);
-    if (!a) return false;
+    if (!a) {
+      // The number that is being linked right now is recorded when its dialog sees it online. What the feed
+      // brings for it before that moment is kept and applied then; the dialog is told to look at once.
+      const pair = openwaPairing;
+      if (pair?.accountId !== e.account) return false;
+      pair.held.push(e);
+      if (e.kind === 'state' && e.state === 'online' && pair.timer) {
+        clearTimeout(pair.timer);
+        pair.timer = 0;
+        openwaPoll(pair);
+      }
+      return false;
+    }
     if (e.kind === 'state') return openwaSetState(a, e);
     if (e.kind === 'restriction') {
       a.restricted = e.active;
@@ -364,10 +379,19 @@
       if (e.kind === 'edited' && m.side === 'in') aiTranslateInbound(c, m);
       return true;
     }
-    if (e.kind !== 'message' || !e.chat) return false;
+    if ((e.kind !== 'message' && e.kind !== 'chat') || !e.chat) return false;
     let c = data.customers.find(c => c.account === a.id && c.waChat === e.chat)
       || (e.phone ? data.customers.find(c => c.account === a.id && !c.waChat && fidPhoneDigits(c.phone) === e.phone) : null);
     if (c && !c.waChat) c.waChat = e.chat;
+    if (e.kind === 'chat') {
+      // A chat that is on the number, found while catching up: its customer, the number where WhatsApp tells it,
+      // and how many messages are unread there.
+      const before = c ? c.phone + '|' + c.unread : '';
+      c ||= openwaNewCustomer(a, { ...e, history: true });
+      if (!c.phone && e.phone) c.phone = '+' + e.phone;
+      c.unread = Math.max(Number(c.unread) || 0, e.unread);
+      return before !== c.phone + '|' + c.unread;
+    }
     c ||= openwaNewCustomer(a, e);
     const list = data.messages[c.id] ??= conversationMessages(c);
     if (e.id && list.some(m => m.wa === e.id)) return false;
@@ -384,7 +408,8 @@
     list.push(message);
     list.sort((x, y) => (x.at || 0) - (y.at || 0));
     if (list.at(-1) === message) Object.assign(c, { preview: text, translation: '', last: message.time, lastAt: e.at });
-    if (!e.fromMe) {
+    // What was fetched while catching up is not news: no unread count of its own, no signal, no translation.
+    if (!e.fromMe && !e.history) {
       const closed = lcIsClosed(c);
       c.unread = (Number(c.unread) || 0) + 1;
       if (closed) lcLog(c.id, 'inbound', '已结束跟进的客户主动发来新消息（触发复联信号）');

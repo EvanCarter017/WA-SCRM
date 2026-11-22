@@ -27,7 +27,7 @@ for (const level of ['log', 'error']) {
 }
 
 // ---- the stand-in for OpenWA ----
-const gw = { sessions: new Map(), hooks: new Map(), sends: [], calls: [], sendMode: 'ok', replies: new Map() };
+const gw = { sessions: new Map(), hooks: new Map(), sends: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map() };
 const uuid = () => crypto.randomUUID();
 const gwSession = name => ({ id: uuid(), name, status: 'created', phone: null, pushName: null, connectedAt: null, lastActive: null, createdAt: new Date(clock).toISOString(), updatedAt: new Date(clock).toISOString(), lastError: null, restriction: null, engineLoaded: false });
 const publicHook = ({ secret, ...hook }) => hook;
@@ -86,6 +86,14 @@ const gateway = http.createServer((req, res) => {
       hooks.push(hook);
       return answer(201, publicHook(hook));
     }
+    // What is on the number: its chats, the latest messages of one chat, and the contact behind a privacy id.
+    if (action === 'chats' || (action === 'messages' && fourth === 'history')) {
+      if (session.status !== 'ready') return fail(409, 'Conflict', 'Session is not connected. The WhatsApp client is not ready.');
+      if (action === 'chats') return answer(200, gw.chats.get(sessionId) || []);
+      const limit = Number(new URL(req.url, 'http://localhost').searchParams.get('limit')) || 50;
+      return answer(200, (gw.history.get(decodeURIComponent(third)) || []).slice(-limit));
+    }
+    if (action === 'contacts') return gw.contacts.has(decodeURIComponent(third)) ? answer(200, gw.contacts.get(decodeURIComponent(third))) : fail(404, 'Not Found', 'Contact not found');
     if (action === 'messages' && third === 'send-text' && !fourth) {
       const key = req.headers['idempotency-key'];
       gw.sends.push({ sessionId, key, body });
@@ -104,7 +112,8 @@ const gwSessionOf = account => [...gw.sessions.values()].find(s => s.name === 's
 
 // ---- the sub-site with its link ----
 const site = siteApi.create({ dir: path.join(tmp, 'main'), siteId: 's1', now: () => clock });
-const link = openwaLink.create({ dir: path.join(tmp, 'main'), siteId: 's1', site, now: () => clock });
+// The link under test catches up only when a test asks for it or a number comes online, and without pauses.
+const link = openwaLink.create({ dir: path.join(tmp, 'main'), siteId: 's1', site, now: () => clock, sync: { every: 0, pause: 0, delay: 20 } });
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
   return pathname.startsWith('/api/wa/') ? link.handle(req, res, pathname) : site.handle(req, res, pathname);
@@ -377,6 +386,89 @@ test('sending while the number is not connected, and answers that leave the outc
   session.status = 'disconnected';
   assert.deepEqual((await post('/api/wa/send', { ...request, requestId: 'req-00000012' })).json, { error: 'send-refused' });
   session.status = 'ready';
+});
+
+test('when a number comes online, its chats with one person and their latest messages are fetched into the feed', async () => {
+  await post('/api/wa/link', { account: 'a6' });
+  const session = gwSessionOf('a6');
+  Object.assign(session, { status: 'ready', phone: '15550006666' });
+  const t = 1795100000;
+  const message = (chat, n, extra = {}) => ({ id: `${extra.fromMe ? 'true' : 'false'}_${chat}_H${n}`, from: extra.fromMe ? '15550006666@c.us' : chat, to: extra.fromMe ? chat : '15550006666@c.us', chatId: chat, body: 'history ' + n, type: 'text', timestamp: t + n, fromMe: false, isGroup: false, kind: 'individual', ...extra });
+  const ana = '111222333444555@lid', bo = '15550007777@c.us';
+  gw.chats.set(session.id, [
+    { id: ana, name: 'Ana Saved', isGroup: false, kind: 'individual', unreadCount: 2, timestamp: t + 4, lastMessage: 'x', lastMessageType: 'text', archived: false, pinned: false, muted: false },
+    { id: bo, name: 'Bo', isGroup: false, kind: 'individual', unreadCount: 0, timestamp: t + 1, lastMessage: 'x', lastMessageType: 'text' },
+    { id: '1203630299@g.us', name: 'A group', isGroup: true, kind: 'group', unreadCount: 5, timestamp: t + 9 },
+    { id: '0@c.us', name: 'WhatsApp', isGroup: false, kind: 'individual', unreadCount: 0, timestamp: t + 9 },
+    { id: '120363@newsletter', name: 'A channel', isGroup: false, kind: 'channel', unreadCount: 0, timestamp: t + 9 },
+  ]);
+  gw.history.set(ana, [message(ana, 1, { isLidSender: true, contact: { name: 'Ana Saved', pushName: 'Ana' } }), message(ana, 2, { fromMe: true }), message(ana, 3, { type: 'unknown', body: 'x'.repeat(9000) }), message(ana, 4, { type: 'call', body: '', call: { video: false, missed: true } })]);
+  gw.history.set(bo, [message(bo, 1, { body: 'y'.repeat(5000), type: 'image', media: { mimetype: 'image/jpeg', data: 'QUJD', sizeBytes: 3 } })]);
+  gw.history.set('1203630299@g.us', [message('1203630299@g.us', 1, { isGroup: true, kind: 'group' })]);
+  gw.contacts.set(ana, { id: '34600111222@c.us', name: 'Ana Saved', pushName: 'Ana', number: '34600111222', isMyContact: true, isBlocked: false });
+  const start = link.store.lastEvent();
+  gw.calls.length = 0;
+  assert.deepEqual((await deliver(session.id, 'session.authenticated', { sessionId: session.id, phone: '15550006666', pushName: 'Shop Six' })).json, { ok: true, stored: true });
+  for (let i = 0; i < 100 && link.store.lastEvent() < start + 7; i++) await new Promise(resolve => setTimeout(resolve, 20));
+  await post('/api/wa/claim', { client: 'client-sync-01' });
+  const read = (await feed('client-sync-01', start)).json;
+  assert.deepEqual(read.events.map(e => e.kind + ':' + (e.history ? 'history' : e.kind === 'chat' ? e.chat : 'live')), ['state:live', 'chat:' + ana, 'message:history', 'message:history', 'message:history', 'chat:' + bo, 'message:history']);
+  assert.deepEqual(read.events[1], { seq: start + 2, account: 'a6', kind: 'chat', chat: ana, name: 'Ana Saved', phone: '34600111222', unread: 2, at: (t + 4) * 1000 }, 'the phone number behind a privacy id comes from the contact');
+  assert.deepEqual(read.events[5], { seq: start + 6, account: 'a6', kind: 'chat', chat: bo, name: 'Bo', phone: '15550007777', unread: 0, at: (t + 1) * 1000 });
+  assert.deepEqual(read.events.slice(2, 5).map(e => [e.id, e.fromMe, e.type, e.text, e.at, e.name, e.history]), [
+    [`false_${ana}_H1`, false, 'text', 'history 1', (t + 1) * 1000, 'Ana Saved', true],
+    [`true_${ana}_H2`, true, 'text', 'history 2', (t + 2) * 1000, '', true],
+    [`false_${ana}_H4`, false, 'call', '', (t + 4) * 1000, '', true],
+  ], 'oldest first; what WhatsApp shows as a notice of its own is left out');
+  assert.deepEqual([read.events[6].text.length, read.events[6].media], [4096, { mime: 'image/jpeg', name: '', size: 3 }], 'a long text is cut and the bytes of a picture are not kept');
+  assert.deepEqual(gw.calls, [`GET /api/sessions/${session.id}/chats?limit=1000`, `GET /api/sessions/${session.id}/messages/${encodeURIComponent(ana)}/history?limit=50`, `GET /api/sessions/${session.id}/contacts/${encodeURIComponent(ana)}`, `GET /api/sessions/${session.id}/messages/${encodeURIComponent(bo)}/history?limit=50`], 'only chats with one person are read: not the group, the channel or the chat of WhatsApp itself');
+  assert(logged.some(line => line === 'wa sync ok account=a6 chats=2 messages=4'));
+});
+
+test('catching up again fetches only what is new; what the hook delivered is not fetched; a number that is not connected is left alone', async () => {
+  const session = gwSessionOf('a6'), ana = '111222333444555@lid', bo = '15550007777@c.us', cy = '999888777666@lid', t = 1795100000;
+  const historyCalls = () => gw.calls.filter(c => c.includes('/history')).length;
+  const base = { from: 'x', to: 'y', type: 'text', fromMe: false, isGroup: false, kind: 'individual' };
+  gw.calls.length = 0;
+  let last = link.store.lastEvent();
+  await link.sync('a6');
+  assert.deepEqual([historyCalls(), link.store.lastEvent()], [0, last], 'nothing is newer: one look at the list of chats, nothing fetched');
+  // a message the hook never delivered
+  Object.assign(gw.chats.get(session.id)[0], { timestamp: t + 20, unreadCount: 3 });
+  gw.history.get(ana).push({ ...base, id: `false_${ana}_H5`, chatId: ana, body: 'missed by the hook', timestamp: t + 20 });
+  await link.sync('a6');
+  assert.deepEqual([historyCalls(), link.store.lastEvent()], [1, last + 2], 'the chat with something newer is read once');
+  assert.deepEqual(link.store.eventsAfter(last, 5).map(r => r.name), ['sync.chat', 'sync.message'], 'its state, and the one message that was not known');
+  last += 2;
+  // a message the hook delivered: the list of chats shows it too, and it is not fetched
+  assert.equal((await deliver(session.id, 'message.received', { ...base, id: `false_${bo}_L1`, chatId: bo, body: 'live', timestamp: t + 30 })).json.stored, true);
+  gw.chats.get(session.id)[1].timestamp = t + 30;
+  gw.history.get(bo).push({ ...base, id: `false_${bo}_L1`, chatId: bo, body: 'live', timestamp: t + 30 });
+  await link.sync('a6');
+  assert.deepEqual([historyCalls(), link.store.lastEvent()], [1, last + 1], 'only the delivery itself is in the feed');
+  last += 1;
+  // a chat that is new on the number and already got a message through the hook is still read once
+  assert.equal((await deliver(session.id, 'message.received', { ...base, id: `false_${cy}_L1`, chatId: cy, body: 'first contact', timestamp: t + 40 })).json.stored, true);
+  gw.chats.get(session.id).push({ id: cy, name: 'Cy', isGroup: false, kind: 'individual', unreadCount: 1, timestamp: t + 40 });
+  gw.history.set(cy, [{ ...base, id: `false_${cy}_L0`, chatId: cy, body: 'before the link', timestamp: t - 500 }, { ...base, id: `false_${cy}_L1`, chatId: cy, body: 'first contact', timestamp: t + 40 }]);
+  await link.sync('a6');
+  assert.deepEqual([historyCalls(), link.store.eventsAfter(last + 1, 9).map(r => r.name)], [2, ['sync.chat', 'sync.message', 'sync.message']]);
+  await link.sync('a6');
+  assert.equal(historyCalls(), 2, 'and not again');
+  // two runs at once are one run; a number that is not connected is left alone; so is a number nobody knows
+  gw.chats.get(session.id)[0].timestamp = t + 50;
+  await Promise.all([link.sync('a6'), link.sync('a6')]);
+  assert.equal(historyCalls(), 3);
+  session.status = 'disconnected';
+  gw.chats.get(session.id)[0].timestamp = t + 60;
+  gw.calls.length = 0;
+  await link.sync('a6');
+  assert.deepEqual(gw.calls, [`GET /api/sessions/${session.id}/chats?limit=1000`], 'the list is asked for, refused, and nothing else happens');
+  await link.sync('zz');
+  assert.equal(gw.calls.length, 1);
+  session.status = 'ready';
+  assert.equal((await post('/api/wa/unlink', { account: 'a6' })).status, 200);
+  assert.equal(link.store.chat('a6', ana), undefined, 'unlinking forgets what was known about the number\'s chats');
 });
 
 test('unlinking removes the session at OpenWA and the record; later deliveries of it are dropped', async () => {

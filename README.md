@@ -22,7 +22,7 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
 #### 接入 OpenWA（WhatsApp 连接，可选）
-服务带有子站与其专属 OpenWA 之间的连接接口（`/api/wa/*`，需要已设置 `WA_SCRM_DATA_DIR`）：为号码创建并启动会话、返回扫码二维码、接收 OpenWA 的事件通知并在落库后应答、按顺序提供给页面，以及发送文本消息。把 `work/wa-replica/openwa.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_OPENWA_ENV` 指向它启动服务。OpenWA 的密钥只保存在服务器；OpenWA 的通知必须带有效签名才会被接收。页面通过这些接口扫码绑定号码、接收消息并发送文本消息；未设置时，号码管理会提示服务器尚未接入 WhatsApp 连接。
+服务带有子站与其专属 OpenWA 之间的连接接口（`/api/wa/*`，需要已设置 `WA_SCRM_DATA_DIR`）：为号码创建并启动会话、返回扫码二维码、接收 OpenWA 的事件通知并在落库后应答、按顺序提供给页面，以及发送文本消息。把 `work/wa-replica/openwa.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_OPENWA_ENV` 指向它启动服务。OpenWA 的密钥只保存在服务器；OpenWA 的通知必须带有效签名才会被接收。页面通过这些接口扫码绑定号码、接收消息并发送文本消息。号码上线时，服务器会自动取回该号码上已有的一对一会话及每个会话最近的 50 条消息，之后每 15 分钟补取一次通知没有送达的内容（逐个会话读取，中间留有间隔）；未设置时，号码管理会提示服务器尚未接入 WhatsApp 连接。
 
 ### 重新编译与完整性校验
 ```bash

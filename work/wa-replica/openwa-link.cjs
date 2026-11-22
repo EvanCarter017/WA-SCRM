@@ -15,6 +15,8 @@
 //   POST /api/wa/claim   { client }              this page takes the event feed over from any other page
 //   GET  /api/wa/events?after=<seq>&client=<id>&wait=<seconds>
 //   POST /api/wa/hook                            deliveries from OpenWA, stored before they are acknowledged
+// The link also catches up by itself: when a number comes online it fetches the number's chats with one person
+// and the latest messages of each, and every quarter of an hour it looks for what the hook did not deliver.
 // The employee of the sub-site uses all of them; supervisors and administrators read the status. The hook
 // takes no cookie: it accepts only a body signed with the hook secret. A delivery is stored as OpenWA sent it
 // and put into this project's own form when a page reads it, so the page never depends on OpenWA's structures.
@@ -33,6 +35,12 @@ const MAX_WAIT_SECONDS = 25;
 const FEED_PAGE = 200;
 const EVENTS_KEPT = 50000;
 const TIMEOUT_MS = Number(process.env.WA_SCRM_OPENWA_TIMEOUT_MS) || 20000;
+// Catching up: how often, how long to wait between two chats, how many of a chat's latest messages, and which
+// kinds of message are not taken over (what WhatsApp shows as a notice of its own, or has taken back).
+const SYNC_EVERY_MS = Number(process.env.WA_SCRM_OPENWA_SYNC_MS) || 15 * 60 * 1000;
+const SYNC_PAUSE_MS = process.env.WA_SCRM_OPENWA_SYNC_PAUSE_MS === undefined ? 1000 : Number(process.env.WA_SCRM_OPENWA_SYNC_PAUSE_MS);
+const SYNC_MESSAGES = 50;
+const SYNC_SKIP = ['unknown', 'masked', 'revoked'];
 const ACCOUNT = /^[A-Za-z0-9]{1,24}$/;
 const CLIENT = /^[A-Za-z0-9_-]{8,64}$/;
 // A chat with one person: a phone number, or the privacy id WhatsApp shows instead of it.
@@ -133,7 +141,8 @@ async function ask(config, method, pathname, body, headers = {}) {
 function present({ seq, account, name, at, body }) {
   const d = JSON.parse(body);
   const event = { seq, account };
-  if (name === 'message.received' || name === 'message.sent') {
+  if (name === 'sync.chat') return { ...event, kind: 'chat', chat: String(d.chatId || ''), name: String(d.name || ''), phone: digits(d.phone), unread: Number(d.unread) || 0, at: Number(d.timestamp) > 0 ? Number(d.timestamp) * 1000 : Date.parse(at) };
+  if (name === 'message.received' || name === 'message.sent' || name === 'sync.message') {
     // Only chats with one person; groups, channels, status posts and broadcast lists are left out.
     if ((d.kind || 'individual') !== 'individual' || d.isGroup || d.isStatusBroadcast) return null;
     const fromMe = Boolean(d.fromMe);
@@ -145,6 +154,8 @@ function present({ seq, account, name, at, body }) {
       name: fromMe ? '' : String(d.contact?.name || d.contact?.pushName || ''),
       phone: digits(fromMe ? '' : d.senderPhone) || (number ? number[1] : ''),
       media: d.media ? { mime: String(d.media.mimetype || ''), name: String(d.media.filename || ''), size: Number(d.media.sizeBytes) || 0 } : null,
+      // Fetched while catching up, not delivered as it happened: the page takes it over without treating it as news.
+      ...(name === 'sync.message' ? { history: true } : {}),
     };
   }
   if (name === 'message.ack') return RECEIPTS.includes(d.status) ? { ...event, kind: 'receipt', id: String(d.messageId || d.id || ''), status: d.status } : null;
@@ -165,6 +176,7 @@ function openStore(file, now) {
     CREATE TABLE IF NOT EXISTS account (id TEXT PRIMARY KEY, session TEXT NOT NULL UNIQUE, hook TEXT NOT NULL, at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS event (seq INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL UNIQUE, account TEXT NOT NULL, name TEXT NOT NULL, at TEXT NOT NULL, body TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sent (request TEXT PRIMARY KEY, digest TEXT NOT NULL, outcome TEXT, at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS chat (account TEXT NOT NULL, chat TEXT NOT NULL, stamp INTEGER NOT NULL, imported INTEGER NOT NULL, PRIMARY KEY (account, chat));
   `);
   const stamp = () => new Date(now()).toISOString();
   return {
@@ -172,7 +184,13 @@ function openStore(file, now) {
     account: id => db.prepare('SELECT id, session, hook FROM account WHERE id = ?').get(id),
     accountOfSession: session => db.prepare('SELECT id, session, hook FROM account WHERE session = ?').get(session),
     addAccount: (id, session, hook) => db.prepare('INSERT INTO account (id, session, hook, at) VALUES (?, ?, ?, ?)').run(id, session, hook, stamp()),
-    removeAccount: id => db.prepare('DELETE FROM account WHERE id = ?').run(id),
+    removeAccount: id => {
+      db.prepare('DELETE FROM account WHERE id = ?').run(id);
+      db.prepare('DELETE FROM chat WHERE account = ?').run(id);
+    },
+    // What is known of a chat: the time of its newest message here, and whether its messages were fetched once.
+    chat: (account, chat) => db.prepare('SELECT stamp, imported FROM chat WHERE account = ? AND chat = ?').get(account, chat),
+    keepChat: (account, chat, stamp, imported) => db.prepare('INSERT INTO chat (account, chat, stamp, imported) VALUES (?, ?, ?, ?) ON CONFLICT(account, chat) DO UPDATE SET stamp = MAX(stamp, excluded.stamp), imported = MAX(imported, excluded.imported)').run(account, chat, stamp, imported ? 1 : 0),
     // Stores a delivery once; false when its key is already there.
     addEvent({ key, account, name, at, body }) {
       if (db.prepare('SELECT 1 FROM event WHERE key = ?').get(key)) return false;
@@ -190,7 +208,9 @@ function openStore(file, now) {
 }
 
 // site is what site-api.cjs's create() returned; it says who is signed in.
-function create({ dir, siteId, site, now = () => Date.now() }) {
+// sync says how the link catches up: every (milliseconds between two rounds; 0 for none), pause (between two
+// chats), delay (before a run that something triggered).
+function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYNC_EVERY_MS, pause: SYNC_PAUSE_MS, delay: 3000 } }) {
   const store = openStore(path.join(dir, `wa-${siteId}.db`), now);
   const waiting = new Set();
   const wake = () => { for (const release of [...waiting]) release(); };
@@ -400,6 +420,9 @@ function create({ dir, siteId, site, now = () => Date.now() }) {
       if (stored) {
         console.log(`wa hook stored event=${delivery.event} account=${row.id}`);
         wake();
+        // A message that came through the hook needs no fetching later; a number that came online is caught up.
+        if ((delivery.event === 'message.received' || delivery.event === 'message.sent') && CHAT.test(String(data.chatId || '')) && Number(data.timestamp) > 0) store.keepChat(row.id, String(data.chatId), Number(data.timestamp), false);
+        if (delivery.event === 'session.authenticated' || (delivery.event === 'session.status' && data.status === 'ready')) syncSoon(row.id);
       }
       return { ok: true, stored };
     },
@@ -428,7 +451,68 @@ function create({ dir, siteId, site, now = () => Date.now() }) {
     }
   }
 
-  return { handle, store, close: () => { wake(); store.close(); } };
+  // ---- catching up with WhatsApp ----
+  // What is on a number but did not come through the hook is fetched from OpenWA and put into the feed: when
+  // a number comes online, its chats with one person and the latest messages of each; at intervals, only the
+  // chats that hold something newer than what is known here. Chats are read one after the other, with a pause,
+  // so that the number is not kept busy.
+  const syncing = new Set();
+  async function syncAccount(account) {
+    const config = loadConfig();
+    const row = store.account(account);
+    if (!config.configured || !row || syncing.has(account)) return;
+    syncing.add(account);
+    let chats = 0, messages = 0;
+    try {
+      const list = await ask(config, 'GET', `/api/sessions/${row.session}/chats?limit=1000`);
+      if (list.status !== 200 || !Array.isArray(list.body)) return;
+      for (const chat of list.body) {
+        const id = String(chat.id || ''), stamp = Number(chat.timestamp) || 0;
+        if (chat.isGroup || (chat.kind || 'individual') !== 'individual' || !CHAT.test(id)) continue;
+        const known = store.chat(account, id);
+        if (known?.imported && stamp <= known.stamp) continue;
+        const history = await ask(config, 'GET', `/api/sessions/${row.session}/messages/${encodeURIComponent(id)}/history?limit=${SYNC_MESSAGES}`);
+        // A number that is no longer connected ends the run; any other refusal only skips this chat.
+        if (history.status === 409 || history.status === 503) break;
+        if (history.status !== 200 || !Array.isArray(history.body)) continue;
+        // WhatsApp names most chats by a privacy id; the contact tells the phone number where it is known.
+        const contact = id.endsWith('@lid') ? await ask(config, 'GET', `/api/sessions/${row.session}/contacts/${encodeURIComponent(id)}`) : null;
+        const phone = contact ? digits(contact.status === 200 ? contact.body?.number : '') : id.split('@')[0];
+        const at = new Date(now()).toISOString();
+        store.addEvent({ key: `chat_${account}_${id}_${stamp}`, account, name: 'sync.chat', at, body: JSON.stringify({ chatId: id, name: String(chat.name || ''), phone, unread: Number(chat.unreadCount) || 0, timestamp: stamp }) });
+        for (const m of history.body) {
+          if (!m || typeof m.id !== 'string' || !m.id || SYNC_SKIP.includes(m.type)) continue;
+          if (m.media && typeof m.media === 'object') delete m.media.data;
+          if (store.addEvent({ key: `hist_${account}_${m.id}`, account, name: 'sync.message', at, body: JSON.stringify({ ...m, body: String(m.body || '').slice(0, MAX_TEXT) }) })) messages += 1;
+        }
+        store.keepChat(account, id, stamp, true);
+        chats += 1;
+        wake();
+        if (sync.pause) await new Promise(resolve => setTimeout(resolve, sync.pause));
+      }
+    } catch (error) {
+      console.error(`wa sync failed account=${account} error=${error.code || error.name}`);
+    } finally {
+      syncing.delete(account);
+      if (chats) console.log(`wa sync ok account=${account} chats=${chats} messages=${messages}`);
+    }
+  }
+  const syncAll = async () => { for (const row of store.accounts()) await syncAccount(row.id); };
+  const timers = new Set();
+  // Runs soon, not at once: a number that just came online settles first, and several triggers become one run.
+  function syncSoon(account) {
+    const timer = setTimeout(() => { timers.delete(timer); (account ? syncAccount(account) : syncAll()).catch(() => {}); }, sync.delay);
+    timer.unref();
+    timers.add(timer);
+  }
+  if (sync.every > 0) {
+    syncSoon();
+    const every = setInterval(() => { syncAll().catch(() => {}); }, sync.every);
+    every.unref();
+    timers.add(every);
+  }
+
+  return { handle, store, sync: syncAccount, close: () => { for (const timer of timers) clearTimeout(timer); wake(); store.close(); } };
 }
 
 module.exports = { create, loadConfig, present, signed, EVENTS, STATES };
