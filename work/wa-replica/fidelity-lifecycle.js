@@ -625,6 +625,7 @@
             : fidButton('完成并闭环', 'taskDone', 'CheckCircle2', 'slim blue', fidActionID(t.id))}
           ${fidIcon('打开会话', 'openConversation', 'MessageCircle', c.id)}
           ${fidIcon('360° 档案', 'profile', 'ContactRound', c.id)}
+          ${fidIcon('删除待办：' + t.title, 'lcTaskDelete', 'Trash2', t.id)}
         </div></td>
       </tr>`;
     }).join('');
@@ -1072,6 +1073,27 @@
     lcCustomerTier: id => { lcState.customerTier = id; ui.selected.clear(); ui.pages.customers = 0; render(); },
     lcCustomerStatusFilter: id => { lcState.customerStatus = id; ui.selected.clear(); ui.pages.customers = 0; render(); },
     taskDone: id => openTaskCompleteModal(id),
+    // A to-do is removed by hand, after a confirmation. What the customer shows as the next follow-up follows
+    // the to-dos that are left, and the removal is noted in the customer's history.
+    lcTaskDelete: id => {
+      const t = data.tasks.find(x => x.id === id);
+      if (!t || (!manager() && t.owner !== ui.persona)) return;
+      fidConfirm('删除待办', `删除待办「${t.title}」？删除后不能恢复。`, 'lcTaskDeleteDo', id);
+    },
+    lcTaskDeleteDo: id => {
+      const t = data.tasks.find(x => x.id === id);
+      if (!t || (!manager() && t.owner !== ui.persona)) return;
+      const c = customer(t.customer);
+      data.tasks = data.tasks.filter(x => x !== t);
+      if (c) {
+        c.followup = lcNextTask(c.id)?.due || null;
+        lcLog(c.id, 'followup', `删除待办「${t.title}」`);
+      }
+      persist();
+      close();
+      render();
+      toast('待办已删除。');
+    },
     followup: id => openFollowup(id),
     newTask: () => openFollowup(),
     addCustomer: openLifecycleCustomerForm,

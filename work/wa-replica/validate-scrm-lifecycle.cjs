@@ -76,6 +76,11 @@ for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEng
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
 
+// A to-do can be deleted by hand from the queue, after a confirmation.
+for (const required of ["${fidIcon('删除待办：' + t.title, 'lcTaskDelete', 'Trash2', t.id)}", "fidConfirm('删除待办', `删除待办「${t.title}」？删除后不能恢复。`, 'lcTaskDeleteDo', id);", 'data.tasks = data.tasks.filter(x => x !== t);', "c.followup = lcNextTask(c.id)?.due || null;"]) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+}
+
 // 7. Invitation codes were removed from the prototype (2026-11-17): no wording, helper or filter field is left
 const invitationCode = /邀请码|invite/i;
 for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboard.js', 'fidelity-ui.js', 'fidelity-customer-pages.js', 'fidelity-openwa.js', 'fidelity-operations.js', 'fidelity-subsite.js', 'fidelity-index.html', 'fidelity.css', 'fidelity-dashboard.css', 'fidelity-lifecycle.css']) {
