@@ -44,7 +44,6 @@
 
   const lcState = {
     followTab: 'todo',
-    signal: 'all',
     followTags: [],
     followFocus: null,
     customerHealthFilter: 'all',
@@ -84,7 +83,7 @@
   const lcOrigResetExtras = fidResetExtras;
   fidResetExtras = function() {
     lcOrigResetExtras();
-    Object.assign(lcState, { followTab: 'todo', signal: 'all', followTags: [], followFocus: null, customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all', orderOpen: [] });
+    Object.assign(lcState, { followTab: 'todo', followTags: [], followFocus: null, customerHealthFilter: 'all', customerTier: 'all', customerStatus: 'all', orderOpen: [] });
     lcSeed();
   };
 
@@ -115,22 +114,13 @@
     return { primary, nextTask, closed, awaitingReply, recontact, overdue, noPlan };
   }
 
-  // [id, label, icon] of the attention signals; 'all' means "any signal".
-  const lcSignalDefs = [
-    ['all', '全部信号', 'UsersRound'],
-    ['reply', '客户待回复', 'Zap'],
-    ['overdue', '跟进已逾期', 'ClockAlert'],
-    ['noplan', '跟进断档', 'TriangleAlert'],
-    ['recontact', '复联待处理', 'Flame'],
-  ];
-  const lcNeedsAttention = h => h.recontact || h.overdue || h.awaitingReply || h.noPlan;
+  // Does the customer carry this status: 'reply', 'overdue', 'noplan' or 'recontact'. The dashboard counts by it.
   function lcMatchesSignal(c, signal) {
     const h = lcHealth(c);
     if (signal === 'reply') return h.awaitingReply;
     if (signal === 'overdue') return h.overdue;
     if (signal === 'noplan') return h.noPlan;
-    if (signal === 'recontact') return h.recontact;
-    return lcNeedsAttention(h);
+    return signal === 'recontact' && h.recontact;
   }
   const lcHasFollowTags = c => lcState.followTags.every(id => c.tags.includes(id));
 
@@ -234,10 +224,12 @@
   }[id] || 'FileText');
 
   menuHTML = function(mobile = false) {
-    const attention = myCustomers().filter(c => lcNeedsAttention(lcHealth(c))).length;
+    // The follow-up centre holds what people entered by hand; its entry in the menu counts the viewer's to-dos
+    // that are past their day.
+    const late = myTasks().filter(t => !t.done && beforeToday(t.due)).length;
     const renderItem = (id, label) => {
-      const badge = id === 'followups' && attention && !mobile
-        ? `<span class="nav-count" title="待处理信号">${attention}</span>`
+      const badge = id === 'followups' && late && !mobile
+        ? `<span class="nav-count" title="已逾期待办">${late}</span>`
         : '';
       return `<a class="nav-item ${ui.view === id ? 'active' : ''}" href="#${id}" data-nav="${id}" aria-label="${esc(label)}" title="${esc(label)}" ${ui.view === id ? 'aria-current="page"' : ''}>${icon(viewIcon(id))}<span class="nav-label">${esc(label)}</span>${badge}</a>`;
     };
@@ -537,7 +529,9 @@
   }
 
   // ============================================================================
-  // Page: #followups (跟进闭环中心 — 待办队列 + 待处理信号 + 已结束跟进 + 操作日志)
+  // Page: #followups (跟进闭环中心 — 待办队列 + 已结束跟进 + 操作日志). Everything in it was entered by hand; the
+  // system adds the reminders of a to-do's day (due today, overdue). The statuses the system works out for a
+  // customer are shown in the customer list and on the dashboard, not here.
   // ============================================================================
   renderFollowups = function() {
     const inScope = c => Boolean(c) && lcHasFollowTags(c);
@@ -547,11 +541,10 @@
     const today = pending.filter(t => sameDay(t.due));
     const done = allTasks.filter(t => t.done);
     const customers = myCustomers().filter(inScope);
-    const attention = customers.filter(c => lcNeedsAttention(lcHealth(c)));
     const closedList = customers.filter(lcIsClosed);
     const marked = lcState.followTags.map(tag).filter(Boolean);
-    const tab = ['todo', 'signals', 'closed', 'history'].includes(lcState.followTab) ? lcState.followTab : 'todo';
-    // The row opened from the chat strip (lcTrackFollow): a to-do, or a customer when there is no to-do.
+    const tab = ['todo', 'closed', 'history'].includes(lcState.followTab) ? lcState.followTab : 'todo';
+    // The row opened from the chat strip (lcTrackFollow): a to-do, or a customer whose follow-up has ended.
     const focus = lcState.followFocus;
     const focusCustomer = c => focus && !focus.task && focus.customer === c.id ? ' class="lc-row-focus"' : '';
 
@@ -560,7 +553,6 @@
     const headerTabs = `<div class="lc-radar-bar" style="margin-bottom:14px">
       <div class="lc-subtabs" role="tablist" aria-label="跟进闭环视图">
         ${subtab('todo', '跟进待办队列', 'ClipboardList', pending.length)}
-        ${subtab('signals', '待处理信号', 'TriangleAlert', attention.length)}
         ${subtab('closed', '已结束跟进', 'Archive', closedList.length)}
         ${subtab('history', '跟进与操作日志', 'History', fidLogs().length)}
       </div>
@@ -576,32 +568,6 @@
       ${headerTabs}
       ${body}
     </div></section>`;
-
-    if (tab === 'signals') {
-      const counts = Object.fromEntries(lcSignalDefs.map(([id]) => [id, customers.filter(c => lcMatchesSignal(c, id)).length]));
-      const rows = customers.filter(c => lcMatchesSignal(c, lcState.signal)).map(c => {
-        const h = lcHealth(c);
-        return `<tr${focusCustomer(c)}>
-          <td style="text-align:left">${nameCell(c)}</td>
-          <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span></td>
-          <td style="text-align:left">${tagCell(c)}</td>
-          <td>${esc(account(c.account)?.name || '—')}</td>
-          <td style="text-align:left">${esc(c.preview || c.notes || '—')}<span class="fid-cell-detail">最后活跃：${esc(c.last || '—')}</span></td>
-          <td><div class="fid-icon-actions">
-            ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', 'slim blue', fidActionID(c.id))}
-            ${fidButton('去聊天', 'openConversation', 'MessageCircle', 'slim', fidActionID(c.id))}
-            ${h.closed ? '' : fidButton('结束跟进', 'lcCloseOpen', 'Archive', 'slim', fidActionID(c.id))}
-          </div></td>
-        </tr>`;
-      }).join('');
-      const chips = lcSignalDefs.map(([id, label, glyph]) => {
-        const tone = !counts[id] || id === 'all' ? '' : (id === 'overdue' || id === 'recontact') ? 'is-hot' : 'is-alert';
-        return `<button type="button" class="lc-radar-chip ${tone}" data-action="lcSignal" ${fidActionID(id)} aria-pressed="${lcState.signal === id}">${icon(glyph)}${esc(label)}<b>${counts[id]}</b></button>`;
-      }).join('');
-      return page('集中处理客户待回复、跟进已逾期、跟进断档与复联待处理四类信号，确保没有客户悬空。', `${tagBar}
-        <div class="lc-radar-chips" style="margin-bottom:14px" role="group" aria-label="信号筛选">${chips}</div>
-        <div class="fid-table-card">${fidTable('lc-signals-table', ['客户', '信号', '标签', '接待 WhatsApp 号', '最近沟通上下文', '处理'], rows, '当前没有需要处理的信号，跟进闭环完整。', true, 'BadgeCheck')}</div>`);
-    }
 
     if (tab === 'closed') {
       const rows = closedList.map(c => {
@@ -864,7 +830,7 @@
     let html = lcPrevChatHTML(c);
     const h = lcHealth(c);
     const strip = `<div class="lc-chat-strip" aria-label="客户跟进协同栏">
-      <button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon(h.primary.icon)}${esc(h.primary.label)}</button>
+      <button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="${h.closed || h.nextTask ? '在跟进闭环中查看此客户' : '为此客户安排跟进'}">${icon(h.primary.icon)}${esc(h.primary.label)}</button>
       ${h.nextTask ? `<button type="button" class="lc-pill lc-pill-link info" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</button>` : ''}
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
@@ -1080,20 +1046,21 @@
     },
     lcFollowTab: id => { lcState.followTab = id; ui.pages.followups = 0; render(); },
     fidTasks: () => { lcState.followTab = 'todo'; ui.taskFilter = 'pending'; ui.pages.followups = 0; navigate('followups'); },
-    lcSignal: id => { lcState.signal = id; render(); },
-    lcJumpSignal: id => { lcState.followTab = 'signals'; lcState.signal = id; ui.pages.followups = 0; navigate('followups'); },
+    // A status chip of the dashboard → the customer list, filtered by that status.
+    lcJumpSignal: id => { lcState.customerHealthFilter = id; ui.pages.customers = 0; navigate('customers'); },
     // Chat strip → follow-up centre, on this customer's row: the earliest unfinished to-do if the viewer
-    // has one for the customer, otherwise the customer among the signals, or among the ended follow-ups.
-    // The row stays highlighted until the follow-up centre is left (see the render wrapper).
+    // has one for the customer, or the customer among the ended follow-ups. The row stays highlighted until
+    // the follow-up centre is left (see the render wrapper). A customer in follow-up without such a to-do has
+    // no row there: the form that plans a follow-up opens instead.
     lcTrackFollow: id => {
       const c = customer(id);
       if (!c || !myCustomers().includes(c)) return;
       const h = lcHealth(c);
       const task = !h.closed && h.nextTask && myTasks().includes(h.nextTask) ? h.nextTask : null;
+      if (!h.closed && !task) return openFollowup(c.id);
       if (!lcHasFollowTags(c)) lcState.followTags = [];
-      lcState.followTab = h.closed ? 'closed' : task ? 'todo' : 'signals';
+      lcState.followTab = h.closed ? 'closed' : 'todo';
       if (task) ui.taskFilter = 'pending';
-      else if (!h.closed) lcState.signal = 'all';
       lcState.followFocus = { customer: c.id, task: task ? task.id : null, placed: false };
       ui.pages.followups = 0;
       navigate('followups');

@@ -342,7 +342,7 @@ requirement.modules.unshift(
 const follow = requirement.modules.find(module => module.id === 'P-FOLLOW');
 Object.assign(follow, {
   name: '跟进闭环',
-  features: ['待办队列（逾期/今日/全部）', '待处理信号（待回复/逾期/断档/复联）', '完成跟进必须安排下一步或结束跟进', '已结束跟进与重新跟进', '按标签筛选', '操作日志'],
+  features: ['待办队列（逾期/今日/全部）', '完成跟进必须安排下一步或结束跟进', '已结束跟进与重新跟进', '按标签筛选', '操作日志'],
   notes: '每位客户要么有下一步跟进，要么已明确结束跟进。',
 });
 const customersModule = requirement.modules.find(module => module.id === 'P-CUSTOMERS');

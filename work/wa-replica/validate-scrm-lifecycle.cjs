@@ -63,7 +63,15 @@ for (const file of ['fidelity-lifecycle.js', 'fidelity-ai.js', 'fidelity-dashboa
   });
 }
 
-// 6. The engagement loop is wired: two states, four signals, forced choice on completion
+// 6. The engagement loop is wired: two states, forced choice on completion. The follow-up centre lists what
+// people entered by hand: it has no tab of signals the system works out; the dashboard's status chips open the
+// customer list.
+for (const gone of ["subtab('signals'", "tab === 'signals'", 'lcSignalDefs', 'lc-signals-table', 'lcState.signal', 'title="待处理信号"']) {
+  assert(!moduleSource.includes(gone), `fidelity-lifecycle.js still has the tab of pending signals (${gone})`);
+}
+for (const required of ["const tab = ['todo', 'closed', 'history'].includes(lcState.followTab) ? lcState.followTab : 'todo';", "lcJumpSignal: id => { lcState.customerHealthFilter = id; ui.pages.customers = 0; navigate('customers'); },", 'if (!h.closed && !task) return openFollowup(c.id);', 'const late = myTasks().filter(t => !t.done && beforeToday(t.due)).length;']) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+}
 for (const required of ['lcMigrateEngagement', 'lcCloseEngagement', 'lcReopenEngagement', 'lcApplyFormTags', "'lc-close-engagement-form'", "'lc-follow-tag-filter-form'", '请填写下次跟进事项和提醒时间，或选择结束跟进。']) {
   assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
 }
