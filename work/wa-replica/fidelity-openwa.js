@@ -415,20 +415,26 @@
     openwaRefresh();
   }
 
-  // ---- sending a file ----
-  // One file can be attached to a conversation: with the "+" button, by pasting it into the message box, or by
-  // dropping it on the conversation. It goes out with what is in the message box as its caption, and it stays
-  // attached until the server says it was sent — pressing send again repeats the same request, which never
-  // sends twice. The file itself lives in this page only: after a reload nothing is attached.
+  // ---- sending files ----
+  // Files can be attached to a conversation, ten at most: with the "+" button, by pasting them into the message
+  // box, or by dropping them on the conversation. They go out one after the other, each as a message of its own
+  // — the way WhatsApp itself sends several files — and the first one carries what is in the message box as its
+  // caption. A file stays attached until the server says it was sent: pressing send again goes on where the row
+  // stopped and repeats the same request for the file whose outcome was open, which never sends twice. The files
+  // live in this page only: after a reload nothing is attached.
   const OPENWA_FILE_MAX = 16 * 1024 * 1024;
+  const OPENWA_FILES_MAX = 10;
   const OPENWA_CAPTION_MAX = 1024;
   // Pictures the browser can show are shown small beside the name of the file.
   const OPENWA_FILE_SHOWN = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  // For each conversation: the files that wait, in the order they were added, and whether they are on their way.
+  // The baseline's label of an attachment says how many there are; it is what enables the send button.
   const openwaFiles = new Map();
+  const openwaFilesLabel = count => `${count} 个文件`;
   for (const id of Object.keys(ui.attachments)) delete ui.attachments[id];
   const openwaFileSize = bytes => bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + ' KB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
   function openwaAttachButton() {
-    return `<button class="icon-button" type="button" data-action="openwaAttach" aria-label="添加文件" title="添加图片、视频、音频或文件，也可以粘贴或拖到会话里">${icon('Plus')}</button><input type="file" id="openwa-file" hidden>`;
+    return `<button class="icon-button" type="button" data-action="openwaAttach" aria-label="添加文件" title="添加图片、视频、音频或文件，也可以粘贴或拖到会话里；一次最多 ${OPENWA_FILES_MAX} 个">${icon('Plus')}</button><input type="file" id="openwa-file" multiple hidden>`;
   }
   // Draws the line above the message box and the send button again, as the page does while a message is typed.
   // The line takes room from the conversation: one that showed its end goes on showing it.
@@ -440,34 +446,45 @@
     updateSendState(c);
     if (openwaAtEnd) openwaShowEnd();
   }
-  function openwaDetach(id) {
+  // Takes one file off a conversation — or, when none is named, all of them.
+  function openwaDetach(id, item) {
     const held = openwaFiles.get(id);
-    if (held?.url) URL.revokeObjectURL(held.url);
+    if (!held) return;
+    for (const gone of item ? [item] : held.list) if (gone.url) URL.revokeObjectURL(gone.url);
+    held.list = item ? held.list.filter(other => other !== item) : [];
+    if (held.list.length) return void (ui.attachments[id] = openwaFilesLabel(held.list.length));
     openwaFiles.delete(id);
     delete ui.attachments[id];
   }
+  // Adds files to the ones that wait. What cannot be sent — an empty file, one that is too large, more than ten —
+  // is left out, and one sentence says so.
   function openwaAttach(files) {
-    const c = selectedCustomer(), [file, more] = files;
-    if (!c || !file || ui.view !== 'inbox' || !$('#composer-text')) return;
-    if (openwaFiles.get(c.id)?.sending) return toast('上一个文件还在发送，请稍候。');
-    if (!file.size) return toast('这个文件是空的，无法发送。');
-    if (file.size > OPENWA_FILE_MAX) return toast('文件超过 16 MB，无法从这里发送。');
-    openwaDetach(c.id);
-    openwaFiles.set(c.id, { file, url: OPENWA_FILE_SHOWN.includes(file.type) ? URL.createObjectURL(file) : '' });
-    ui.attachments[c.id] = `${file.name || '文件'} · ${openwaFileSize(file.size)}`;
+    const c = selectedCustomer();
+    if (!c || !files.length || ui.view !== 'inbox' || !$('#composer-text')) return;
+    const held = openwaFiles.get(c.id) || { list: [], sending: false };
+    if (held.sending) return toast('文件还在发送，请稍候再添加。');
+    const fit = files.filter(file => file.size && file.size <= OPENWA_FILE_MAX), room = OPENWA_FILES_MAX - held.list.length;
+    for (const file of fit.slice(0, room)) held.list.push({ file, url: OPENWA_FILE_SHOWN.includes(file.type) ? URL.createObjectURL(file) : '' });
+    if (held.list.length) {
+      openwaFiles.set(c.id, held);
+      ui.attachments[c.id] = openwaFilesLabel(held.list.length);
+    }
     openwaShowFile(c);
     $('#composer-text').focus({ preventScroll: true });
-    if (more) toast('一次发送一个文件，已添加第一个。');
+    const empty = files.filter(file => !file.size).length, large = files.filter(file => file.size > OPENWA_FILE_MAX).length, many = Math.max(0, fit.length - room);
+    const left = [empty && `${empty} 个空文件`, large && `${large} 个超过 16 MB 的文件`, many && `${many} 个超出数量的文件（一次最多 ${OPENWA_FILES_MAX} 个）`].filter(Boolean);
+    if (left.length) toast(`没有添加：${left.join('、')}。`);
   }
-  // The line above the message box names the attached file: a picture is shown small, and while the file is on
-  // its way it cannot be removed.
+  // The line above the message box lists the attached files, each with its size and — a picture — shown small.
+  // While they are on their way none can be removed. It takes the place of the baseline's own line, which names
+  // one attachment by its label.
   const openwaBasePreview = previewHTML;
   previewHTML = function(c) {
-    const held = openwaFiles.get(c.id);
-    let html = openwaBasePreview(c);
-    if (held?.url) html = html.replace('<small>附件</small>', `<small>附件</small><img class="openwa-attached" src="${held.url}" alt="">`);
-    if (held?.sending) html = html.replace('<button class="link" data-action="removeAttachment">移除</button>', '<span class="openwa-attached-busy" role="status">发送中…</span>');
-    return html;
+    const held = openwaFiles.get(c.id), html = openwaBasePreview(c);
+    if (!held) return html;
+    const files = held.list.map((item, at) => `<span class="openwa-attached-file">${item.url ? `<img class="openwa-attached" src="${item.url}" alt="">` : ''}<span>${esc(item.file.name || '文件')} · ${openwaFileSize(item.file.size)}</span>${held.sending ? '' : `<button class="link" data-action="removeAttachment" ${fidActionID(at)} aria-label="移除 ${esc(item.file.name || '文件')}">移除</button>`}</span>`).join('');
+    return html.replace(`<small>附件</small>${esc(ui.attachments[c.id])} <button class="link" data-action="removeAttachment">移除</button>`,
+      `<small>附件${held.list.length > 1 ? `（${held.list.length} 个，逐个发出）` : ''}</small><span class="openwa-attached-list">${files}</span>${held.sending ? '<span class="openwa-attached-busy" role="status">发送中…</span>' : ''}`);
   };
   const openwaBaseSendState = updateSendState;
   updateSendState = function(c) {
@@ -507,31 +524,39 @@
     if (event.dataTransfer.items?.[0]?.webkitGetAsEntry?.()?.isDirectory) return toast('不能发送文件夹，请选择文件。');
     openwaAttach([...event.dataTransfer.files]);
   });
-  // The file goes to the server as it is, behind one line with its details: whom it is for, its name, its type
-  // and the caption. text is what was typed; caption is what goes out with the file (the translation when one
-  // was made).
-  async function openwaSendFile(c, held, text, caption) {
+  // The files go out one after the other, in their order; the first carries the caption. text is what was typed;
+  // caption is what goes out with the first file (the translation when one was made). A file that is not sent
+  // stops the row: it and the ones after it stay attached.
+  async function openwaSendFiles(c, held, text, caption) {
     if (held.sending) return;
     const digits = fidPhoneDigits(c.phone);
     if (!c.waChat && digits.length < 7) return toast('这位客户没有可用的 WhatsApp 号码。');
     if (caption.length > OPENWA_CAPTION_MAX) return toast(`带文件发送时，文字最多 ${OPENWA_CAPTION_MAX} 个字符。`);
-    // The same press repeated is the same request; with another caption it is a new one.
-    if (held.caption !== caption) Object.assign(held, { caption, request: nextId('r') });
     held.sending = true;
     openwaShowFile(c);
-    const details = JSON.stringify({ account: c.account, to: c.waChat || digits + '@c.us', requestId: held.request, name: held.file.name, type: held.file.type, caption });
+    let failed = '';
+    for (let first = true; held.list.length && !failed; first = false) failed = await openwaSendFile(c, held.list[0], first ? text : '', first ? caption : '');
+    held.sending = false;
+    if (failed) toast(failed + (held.list.length > 1 ? `其余 ${held.list.length - 1} 个文件也还没有发出。` : ''));
+    openwaShowFile(c);
+  }
+  // One file goes to the server as it is, behind one line with its details: whom it is for, its name, its type
+  // and the caption. Answers with nothing when it was sent, and with what to tell the employee when it was not.
+  async function openwaSendFile(c, item, text, caption) {
+    const digits = fidPhoneDigits(c.phone);
+    // The same press repeated is the same request; with another caption it is a new one.
+    if (item.caption !== caption) Object.assign(item, { caption, request: nextId('r') });
+    const details = JSON.stringify({ account: c.account, to: c.waChat || digits + '@c.us', requestId: item.request, name: item.file.name, type: item.file.type, caption });
     let answer;
     try {
-      const response = await fetch('/api/wa/send-file', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([details, '\n', held.file]) });
+      const response = await fetch('/api/wa/send-file', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([details, '\n', item.file]) });
       answer = { status: response.status, body: await response.json().catch(() => ({})) };
     } catch (e) {
       answer = { status: 0, body: {} };
     }
-    held.sending = false;
     if (answer.status !== 200) {
       const open = answer.status === 0 || answer.status === 502 || answer.body.error === 'outcome-unknown';
-      toast(open ? '发送结果待确认。文件还在消息框上方，再按一次发送即可，不会重复发出。' : answer.body.error === 'not-connected' ? '号码未连接，文件没有发出。' : answer.status === 413 ? '文件超过 16 MB，无法从这里发送。' : '文件没有发出，可再按一次发送。');
-      return openwaShowFile(c);
+      return open ? '发送结果待确认。文件还在消息框上方，再按一次发送即可，不会重复发出。' : answer.body.error === 'not-connected' ? '号码未连接，文件没有发出。' : answer.status === 413 ? '文件超过 16 MB，无法从这里发送。' : '文件没有发出，可再按一次发送。';
     }
     const sent = answer.body, shown = caption || openwaMediaText[sent.type];
     const list = data.messages[c.id] ??= conversationMessages(c);
@@ -547,11 +572,12 @@
     if (list.at(-1) === message) Object.assign(c, { preview: shown, last: message.time, lastAt: message.at });
     c.unread = 0;
     if (draft(c).text.trim() === text) ui.drafts[c.id] = { text: '', translated: '', source: '' };
-    openwaDetach(c.id);
+    openwaDetach(c.id, item);
     persist();
     openwaRefresh();
     // What was just sent is in view, wherever the conversation stood.
     if (ui.view === 'inbox' && selectedCustomer() === c) requestAnimationFrame(openwaShowEnd);
+    return '';
   }
 
   send = function() {
@@ -561,8 +587,8 @@
     const text = el.value.trim(), held = openwaFiles.get(c.id);
     if (!text && !held) return;
     const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
-    // With a file attached, the text is its caption: both go out as one message.
-    if (held) return openwaSendFile(c, held, text, outgoing);
+    // With files attached, the text is the caption of the first: they go out together.
+    if (held) return openwaSendFiles(c, held, text, outgoing);
     // What the employee sends from here is never asked for: it is marked as read in the reading language, and a
     // reply that was put into the customer's language keeps what was typed as its translation.
     const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };
@@ -871,10 +897,10 @@
       openwaDeliver(c, m);
     },
     openwaAttach:()=>$('#openwa-file')?.click(),
-    removeAttachment:()=>{
-      const c = selectedCustomer();
-      if (!c || openwaFiles.get(c.id)?.sending) return;
-      openwaDetach(c.id);
+    removeAttachment:id=>{
+      const c = selectedCustomer(), held = c && openwaFiles.get(c.id);
+      if (!held || held.sending || !held.list[Number(id)]) return;
+      openwaDetach(c.id, held.list[Number(id)]);
       openwaShowFile(c);
     },
   });

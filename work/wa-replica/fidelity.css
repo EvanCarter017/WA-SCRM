@@ -533,8 +533,12 @@
 .message-bubble>.openwa-media:last-child,.message-bubble>.openwa-file:last-child,.message-bubble>.openwa-media-missing:last-child { margin-bottom:0; }
 /* A file attached to the message that is being written (plan 043): a picture small beside its name, the note
    while it is on its way, and the conversation while a file is dragged over it. */
-.openwa-attached { height:40px; max-width:64px; margin-right:8px; border-radius:6px; object-fit:cover; vertical-align:middle; }
+.openwa-attached { flex:none; height:40px; max-width:64px; border-radius:6px; object-fit:cover; }
 .openwa-attached-busy { color:var(--color-text-muted); }
+/* Several files (plan 047) stand side by side and wrap; many of them scroll instead of pushing the conversation away. */
+.openwa-attached-list { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; max-height:120px; overflow:auto; }
+.openwa-attached-file { display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%; }
+.openwa-attached-file>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:220px; }
 .chat-pane.openwa-file-over { outline:2px dashed var(--color-accent); outline-offset:-2px; }
 /* With the button for files the tools beside the message box are one more: where the conversation is too narrow
    for one line they take a second one instead of running into the send button. */
