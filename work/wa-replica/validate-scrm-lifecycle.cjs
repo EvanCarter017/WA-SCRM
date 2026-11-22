@@ -286,6 +286,22 @@ assert(!/language: '其他'/.test(read(path.join(__dirname, 'fidelity-openwa.js'
 assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');"), 'a refresh must not draw the page again under a list box that is being chosen from');
 assert.equal((appJs.match(/\.language (===|!==) '其他'/g) || []).length, 1, 'whether a customer has a language is asked through aiCustomerLanguage, the only place that knows the old value');
 assert(appJs.includes("+aiLanguagePicker(c)+'</div>'") && appJs.includes("esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)"), 'the conversation must offer the choice of the customer\'s language and show it beside the message box');
+// The price list: a file a person uploads is read in the browser by pricefile.js — the built copy of
+// fidelity-pricefile.js, which the page loads before the app. Neither the reader nor the page module calls a
+// server or runs what a file holds, and the button "报价" puts a price into the message box without sending.
+const priceReader = read(path.join(__dirname, 'fidelity-pricefile.js')), pricePage = read(path.join(__dirname, 'fidelity-pricelist.js'));
+assert.equal(read(path.join(out, 'pricefile.js')), priceReader, 'pricefile.js must be the built copy of fidelity-pricefile.js');
+assert(indexHtml.includes('<script src="icons.js"></script><script src="pricefile.js"></script><script src="app.js"></script>'), 'index.html must load pricefile.js before app.js');
+for (const [name, source] of [['fidelity-pricefile.js', priceReader], ['fidelity-pricelist.js', pricePage]]) {
+  assert(!/\b(?:fetch|XMLHttpRequest|WebSocket|eval|importScripts)\s*\(|new Function\b/.test(source), `${name} must not call a server or run text as code`);
+}
+assert(!/\bsend\s*\(/.test(pricePage), 'the price list must not send a message');
+for (const required of ['function priceQuoteButton() {', 'function renderPriceList() {', 'window.WA_PRICE_FILE.read(new Uint8Array(await file.arrayBuffer()))', "fidButton('确认使用', 'priceUse', '', 'blue')", 'priceInsert: id => {', "box.dispatchEvent(new Event('input', { bubbles: true }));"]) {
+  assert(pricePage.includes(required), `fidelity-pricelist.js is missing ${required}`);
+}
+for (const required of ["+priceQuoteButton()+'<span class=\"language-hint\">'", "ai:'AI 能力',prices:'价格表'}", 'ai:renderAiPage,prices:renderPriceList}', "renderItem('prices', views.prices)"]) {
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
 // 22. The page uses the real WhatsApp connection through its own server; nothing simulates it any more.
 // A message shows its picture, voice note, video or file through the server's media route.
 for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {
@@ -340,6 +356,7 @@ const summary = {
   signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
   leftovers: 'removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview',
   whatsappConnection: 'real, through the sub-site\'s own server: QR code, incoming events, sending; no simulation',
+  priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

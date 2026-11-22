@@ -245,7 +245,8 @@
       (operationsMenu.length ? navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) : '') +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
-      renderItem('ai', views.ai)
+      renderItem('ai', views.ai) +
+      renderItem('prices', views.prices)
     );
   };
 

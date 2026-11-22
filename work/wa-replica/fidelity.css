@@ -544,3 +544,34 @@
 .ai-language-pick svg { width:14px; height:14px; flex:none; }
 .ai-language-pick span { flex:none; }
 .ai-language-pick .fid-select { height:28px; min-width:0; flex:0 1 auto; padding:0 8px; font-size:12px; }
+
+/* The price list (plan 037): its page, the button "报价" beside the message box and the dialog it opens. */
+.price-toolbar #price-search { width:240px; }
+.price-note { margin:10px 0; color:var(--fid-quiet); font-size:12px; line-height:1.6; }
+.price-table { min-width:540px; }
+.price-table th,.price-table td { text-align:left; }
+.price-table col:first-child { width:64px; }
+.price-preview p { margin:0 0 10px; font-size:13px; }
+.price-quote-button { display:inline-flex; align-items:center; gap:4px; margin-left:6px; padding:2px 8px; border:1px solid var(--fid-frame); border-radius:999px; background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:12px; line-height:18px; white-space:nowrap; cursor:pointer; }
+.price-quote-button:hover { border-color:var(--color-accent); color:var(--color-accent); }
+.price-quote-button:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }
+.price-quote-button .icon { width:14px; height:14px; }
+.price-quote .fid-input { width:100%; }
+.price-quote-list { list-style:none; max-height:360px; margin:0; padding:0; overflow:auto; border:1px solid var(--fid-frame); border-radius:8px; }
+.price-quote-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--fid-frame); }
+.price-quote-row:last-child { border-bottom:0; }
+.price-quote-product { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; font-size:13px; }
+.price-quote-product small { color:var(--fid-quiet); font-size:12px; }
+.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:6px; margin-left:auto; }
+.price-quote-prices small { margin-right:4px; opacity:.75; }
+.price-quote-empty { display:grid; justify-items:center; gap:10px; padding:20px; color:var(--fid-quiet); font-size:13px; }
+/* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
+@media(max-width:1000px) {
+  .price-quote-button { margin-left:0; padding:2px 4px; }
+  .price-quote-button>span:not(.icon) { display:none; }
+  .composer-tools .language-hint { margin-left:0; }
+}
+@media(max-width:760px) {
+  .price-toolbar #price-search { width:100%; }
+  .price-quote-row { flex-wrap:wrap; }
+}

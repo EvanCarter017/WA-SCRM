@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-22T14:38:14.893Z",
+  "checkedAt": "2026-11-22T15:11:45.636Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -49,5 +49,6 @@
   "signIn": "the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty",
   "leftovers": "removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview",
   "whatsappConnection": "real, through the sub-site's own server: QR code, incoming events, sending; no simulation",
+  "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product's price into the message box and sends nothing",
   "externalNetworkCalls": false
 }

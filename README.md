@@ -39,6 +39,7 @@ node work/wa-replica/validate-scrm-lifecycle.cjs
 node --test work/wa-replica/ai-relay.test.cjs   # AI 中转接口的测试（使用本地替身，不调用真实服务）
 node --test work/wa-replica/site-api.test.cjs   # 账号、会话与数据接口的测试（需要 Node 22.13 或更新版本）
 node --test work/wa-replica/openwa-link.test.cjs   # OpenWA 连接接口的测试（使用本地替身，不连接真实 OpenWA；需要 Node 22.13 或更新版本）
+node --test work/wa-replica/price-file.test.cjs   # 价格表文件读取的测试（需要 Node 22.13 或更新版本）
 ```
 
 ---
@@ -76,6 +77,7 @@ flowchart LR
 | `#chat-records` | **聊天记录（归档）** | 从 WhatsApp 会话移入的快照列表；移入原因、移入人与时间；快照内搜索、译文开关；不设评分或结论分类 |
 | `#tags` / `#tag-stats` | **标签管理与标签统计** | 自建分组维护自定义标签、批量打标与客户穿透查询 |
 | `#ai` | **AI 能力** | AI 功能的统一接入点：能力清单与逐项启停（接收消息翻译、发送前翻译、语音转文字）、译文语言、回复语气、业务说明与发送保护设置、按能力累计的调用次数与字符数、最近调用记录；经本站服务器中转调用模型服务；服务器未配置时显示「未连接」，不提供翻译 |
+| `#prices` | **价格表** | 上传一份 Excel（.xlsx）或 CSV 文件作为价格表：文件在浏览器内读取，先预览识别结果，确认后替换当前价格表；按简称、名称、规格搜索。聊天界面消息框旁的「报价」按钮从价格表查找产品，点击价格即把一行报价（如 `Product Alpha PRDA01 (100*10 Units): $40`）放入消息框，由员工确认后发送；系统不自动报价、不自动发送 |
 
 ---
 
@@ -89,6 +91,7 @@ flowchart LR
 │   ├── wa-replica-prototype/                          # 模块化原型运行目录（由 serve.cjs 托管）
 │   │   ├── index.html / app.js / app.css              # 编译后的前端入口、逻辑与令牌样式
 │   │   ├── boot.js / icons.js                         # 启动、登录与数据同步脚本；内联 Lucide 矢量图标集
+│   │   ├── pricefile.js                               # 价格表文件读取脚本（fidelity-pricefile.js 的构建副本）
 │   │   ├── requirements.json                          # 结构化需求与模块评审配置
 │   │   └── SCRM_Master_OpenWA_Handoff.md              # Master 控制平面 + 独立 OpenWA 子户架构交接文档
 │   ├── scrm-customization-brief.json                  # SCRM 业务功能定制蓝图
@@ -101,6 +104,8 @@ flowchart LR
 │       ├── fidelity-openwa.js                         # 真实 WhatsApp 连接：扫码绑定、事件流（来信、回执、号码状态）、发送与重试、消息中的图片/语音/视频/文件
 │       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
 │       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
+│       ├── fidelity-pricelist.js                      # 「价格表」页（上传、预览、搜索）与聊天界面消息框旁的「报价」
+│       ├── fidelity-pricefile.js / price-file.test.cjs# Excel（.xlsx）/ CSV 价格表文件的读取（在浏览器内运行）及其测试
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务与语音服务）及其测试
 │       ├── ai.env.example                             # AI 设置文件示例（填写后的副本放在仓库之外）
 │       ├── openwa-link.cjs / openwa-link.test.cjs     # 子站与其专属 OpenWA 的连接接口（会话、二维码、事件通知、发送、消息媒体）及其测试

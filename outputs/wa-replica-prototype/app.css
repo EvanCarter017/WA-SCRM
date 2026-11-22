@@ -986,6 +986,37 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .ai-language-pick span { flex:none; }
 .ai-language-pick .fid-select { height:var(--fid-px-28); min-width:0; flex:0 1 auto; padding:0 var(--fid-px-8); font-size:var(--fid-px-12); }
 
+/* The price list (plan 037): its page, the button "报价" beside the message box and the dialog it opens. */
+.price-toolbar #price-search { width:var(--fid-px-240); }
+.price-note { margin:var(--fid-px-10) 0; color:var(--fid-quiet); font-size:var(--fid-px-12); line-height:1.6; }
+.price-table { min-width:var(--fid-px-540); }
+.price-table th,.price-table td { text-align:left; }
+.price-table col:first-child { width:var(--fid-px-64); }
+.price-preview p { margin:0 0 var(--fid-px-10); font-size:var(--fid-px-13); }
+.price-quote-button { display:inline-flex; align-items:center; gap:var(--fid-px-4); margin-left:var(--fid-px-6); padding:var(--fid-px-2) var(--fid-px-8); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-999); background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:var(--fid-px-12); line-height:var(--fid-px-18); white-space:nowrap; cursor:pointer; }
+.price-quote-button:hover { border-color:var(--color-accent); color:var(--color-accent); }
+.price-quote-button:focus-visible { outline:var(--fid-px-2) solid var(--color-accent); outline-offset:var(--fid-px-1); }
+.price-quote-button .icon { width:var(--fid-px-14); height:var(--fid-px-14); }
+.price-quote .fid-input { width:100%; }
+.price-quote-list { list-style:none; max-height:var(--fid-px-360); margin:0; padding:0; overflow:auto; border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-8); }
+.price-quote-row { display:flex; align-items:center; justify-content:space-between; gap:var(--fid-px-10); padding:var(--fid-px-8) var(--fid-px-12); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
+.price-quote-row:last-child { border-bottom:0; }
+.price-quote-product { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--fid-px-4) var(--fid-px-8); min-width:0; font-size:var(--fid-px-13); }
+.price-quote-product small { color:var(--fid-quiet); font-size:var(--fid-px-12); }
+.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:var(--fid-px-6); margin-left:auto; }
+.price-quote-prices small { margin-right:var(--fid-px-4); opacity:.75; }
+.price-quote-empty { display:grid; justify-items:center; gap:var(--fid-px-10); padding:var(--fid-px-20); color:var(--fid-quiet); font-size:var(--fid-px-13); }
+/* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
+@media(max-width:1000px) {
+  .price-quote-button { margin-left:0; padding:var(--fid-px-2) var(--fid-px-4); }
+  .price-quote-button>span:not(.icon) { display:none; }
+  .composer-tools .language-hint { margin-left:0; }
+}
+@media(max-width:760px) {
+  .price-toolbar #price-search { width:100%; }
+  .price-quote-row { flex-wrap:wrap; }
+}
+
 .dash {
   --dash-ink: var(--color-text);
   --dash-muted: var(--color-text-muted);

@@ -118,8 +118,9 @@ const openwaPages = read(__dirname, 'fidelity-openwa.js');
 const dashboardPage = read(__dirname, 'fidelity-dashboard.js');
 const lifecyclePages = read(__dirname, 'fidelity-lifecycle.js');
 const aiPages = read(__dirname, 'fidelity-ai.js');
+const pricePages = read(__dirname, 'fidelity-pricelist.js');
 const subsiteSession = read(__dirname, 'fidelity-subsite.js');
-swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, aiPages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
+swap('  render();\n})();', [read(__dirname, 'fidelity-ui.js'), customerPages, operationsPages, openwaPages, dashboardPage, lifecyclePages, aiPages, pricePages, subsiteSession].join('\n') + '\n  render();\n  window.initWAElementReview(toast);\n})();');
 // Reviewer tools removed (plan 019): the review panel, the requirements page with its export, and the notes
 // tool. The app no longer loads the requirement records; they remain a build-time record in requirements.json.
 const cut = (pattern, what) => { const next = js.replace(pattern, ''); assert(next !== js, 'Missing reviewer-tool code: ' + what); js = next; };
@@ -128,8 +129,8 @@ swap('{version:6,data,requirements:req,', '{version:6,data,');
 swap("$('#pending-count').textContent=req.modules.filter(m=>m.decision==='待定').length;$('.scope-link').classList.toggle('active',ui.view==='scope');", '');
 cut(/^    \$\('#app-shell'\)\.dataset\.reviewPerspective=[^\n]*\n/m, 'review perspective');
 cut(/^    const reviewed=req\.review\.items[^\n]*\n/m, 'review counter');
-swap("ai:'AI 能力',scope:'功能范围'}", "ai:'AI 能力'}");
-swap('ai:renderAiPage,scope:renderScope}', 'ai:renderAiPage}');
+swap("ai:'AI 能力',scope:'功能范围'}", "ai:'AI 能力',prices:'价格表'}");
+swap('ai:renderAiPage,scope:renderScope}', 'ai:renderAiPage,prices:renderPriceList}');
 cut(/^  function scopeCard\(m\) \{\n[\s\S]*?^  function renderScope\(\) \{\n[\s\S]*?^  \}\n/m, 'requirements page');
 cut(/^  function openReview\(\)\{[^\n]*\}\n/m, 'review panel');
 cut(/^  function exportReq\(\)\{[^\n]*\}\n/m, 'requirements export');
@@ -236,6 +237,9 @@ swap("<span>'+esc(c.language)+'</span></div></div><div class=\"chat-heading-acti
 swap("<span class=\"language-hint\">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'", "<span class=\"language-hint\">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'");
 swap("hint.innerHTML=icon('Languages')+esc(c.language)+' · '+aiDraftHint(c);", "hint.innerHTML=icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c);");
 swap("<span>'+esc(c.campaign||'客户来源')+'</span></div>'", "<span>'+esc(c.campaign||'客户来源')+'</span>'+aiLanguagePicker(c)+'</div>'");
+// The price list (plan 037): the message box gets the button "报价" from fidelity-pricelist.js, after the button of
+// the quick replies.
+swap("+icon('MessageSquareText')+'</button><span class=\"language-hint\">'", "+icon('MessageSquareText')+'</button>'+priceQuoteButton()+'<span class=\"language-hint\">'");
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
@@ -409,7 +413,7 @@ const tokenCSS = read(base,'tokens.css')+'\n:root {\n'+Object.entries(palette).m
 const assets = {
   'index.html':index,'app.js':js,'app.css':read(base,'app.css')+'\n'+fidelityCSS,
   'tokens.css':tokenCSS,'components.css':read(base,'components.css'),
-  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),
+  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),'pricefile.js':read(__dirname,'fidelity-pricefile.js'),
   'lucide-license.txt':read(base,'lucide-license.txt'),
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };
