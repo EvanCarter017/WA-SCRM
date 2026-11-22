@@ -169,6 +169,8 @@ swap("esc(m.time.replace('昨天 ',''))+(m.side==='out'?icon(m.local?'Check':'Ch
 swap("emptyHint='写一条演示消息，或选择快捷回复开始。'", "emptyHint='输入消息，或选择快捷回复开始。'");
 swap("'</strong><time>'+esc(c.last)+'</time>", "'</strong><time>'+esc(openwaLastLabel(c))+'</time>");
 swap('.includes(q));return list}', '.includes(q));return openwaOrder(list)}');
+// A customer's profile picture (plan 044) lies over the initials wherever an avatar is drawn.
+swap("+esc(c.initials||c.initial||initial(c.name))+'</span>';", "+esc(c.initials||c.initial||initial(c.name))+openwaAvatar(c)+'</span>';");
 // The button that attaches a file (plan 043) stands where the baseline had its made-up one; the baseline's own
 // line above the message box and its send button already reckon with an attached file.
 swap(`<button class="icon-button" data-action="attachment" aria-label="添加演示附件">'+icon('Paperclip')+'</button>`, `'+openwaAttachButton()+'`);

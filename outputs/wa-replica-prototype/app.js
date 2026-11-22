@@ -45,7 +45,7 @@ window.WA_START = () => {
   const myTags=()=>data.tags.filter(t=>{const g=group(t.group);return g&&(g.scope==='team'||g.owner===ui.persona||manager())});
   const nextId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const initial=s=>String(s||'新').split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase();
-  const avatar=(c,classes='')=>'<span class="avatar '+esc(c.color||'jade')+' '+classes+'">'+esc(c.initials||c.initial||initial(c.name))+'</span>';
+  const avatar=(c,classes='')=>'<span class="avatar '+esc(c.color||'jade')+' '+classes+'">'+esc(c.initials||c.initial||initial(c.name))+openwaAvatar(c)+'</span>';
   const country=c=>c.country==='PR'?'波多黎各':c.country==='US'?'美国':c.country;
   const sameDay=(a,b=new Date())=>new Date(a).toDateString()===b.toDateString();
   const beforeToday=a=>{const d=new Date();d.setHours(0,0,0,0);return new Date(a)<d};
@@ -1448,6 +1448,19 @@ window.WA_START = () => {
     note.className = 'openwa-media-missing';
     note.textContent = (el.tagName === 'IMG' ? '图片' : el.tagName === 'VIDEO' ? '视频' : '语音') + '暂时无法加载';
     holder.replaceWith(note);
+  }, true);
+
+  // ---- the customer's picture ----
+  // A customer of a linked number shows the profile picture WhatsApp gives for the chat, laid over the initials
+  // wherever an avatar is drawn. Where there is none — or the customer hides it from this number — the server
+  // answers without a picture, and the initials stay.
+  function openwaAvatar(c) {
+    const digits = fidPhoneDigits(c.phone || '');
+    if (!c.account || !account(c.account)?.linked || (!c.waChat && digits.length < 7)) return '';
+    return `<img class="openwa-avatar" src="/api/wa/avatar?account=${encodeURIComponent(c.account)}&amp;chat=${encodeURIComponent(c.waChat || digits + '@c.us')}" alt="" loading="lazy">`;
+  }
+  document.addEventListener('error', event => {
+    if (event.target.classList?.contains('openwa-avatar')) event.target.remove();
   }, true);
   // Drawing a conversation again must not stop a voice note or a video that is playing: its element takes the
   // place of its redrawn twin. Every full redraw goes through here; so does the AI module's own redraw.

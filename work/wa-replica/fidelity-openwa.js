@@ -71,6 +71,19 @@
     note.textContent = (el.tagName === 'IMG' ? '图片' : el.tagName === 'VIDEO' ? '视频' : '语音') + '暂时无法加载';
     holder.replaceWith(note);
   }, true);
+
+  // ---- the customer's picture ----
+  // A customer of a linked number shows the profile picture WhatsApp gives for the chat, laid over the initials
+  // wherever an avatar is drawn. Where there is none — or the customer hides it from this number — the server
+  // answers without a picture, and the initials stay.
+  function openwaAvatar(c) {
+    const digits = fidPhoneDigits(c.phone || '');
+    if (!c.account || !account(c.account)?.linked || (!c.waChat && digits.length < 7)) return '';
+    return `<img class="openwa-avatar" src="/api/wa/avatar?account=${encodeURIComponent(c.account)}&amp;chat=${encodeURIComponent(c.waChat || digits + '@c.us')}" alt="" loading="lazy">`;
+  }
+  document.addEventListener('error', event => {
+    if (event.target.classList?.contains('openwa-avatar')) event.target.remove();
+  }, true);
   // Drawing a conversation again must not stop a voice note or a video that is playing: its element takes the
   // place of its redrawn twin. Every full redraw goes through here; so does the AI module's own redraw.
   function openwaKeepPlaying(draw) {

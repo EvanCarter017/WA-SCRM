@@ -340,6 +340,15 @@ assert(!/添加演示附件|data-action="attachment"/.test(appJs), 'the made-up 
 for (const required of ["'POST /api/wa/send-file': async req => {", "if (mediaType(req.headers['content-type']) !== 'application/octet-stream') {", 'const body = await readRaw(req, SEND_DETAILS_MAX + SEND_FILE_MAX), end = body.subarray(0, SEND_DETAILS_MAX).indexOf(10);', 'const SEND_FILE_MAX = 16 * 1024 * 1024;', 'mediaKeep(mediaKey(row.id, to, outcome.messageId), { mime, name, bytes });', "function sendForm(bytes, declared = '') {"]) {
   assert(read(path.join(__dirname, 'openwa-link.cjs')).includes(required), `openwa-link.cjs is missing ${required}`);
 }
+// A customer shows the profile picture WhatsApp gives for the chat, over the initials: every avatar offers it,
+// and the server takes a picture only from WhatsApp's own servers or from the gateway.
+for (const required of ['function openwaAvatar(c) {', "if (!c.account || !account(c.account)?.linked || (!c.waChat && digits.length < 7)) return '';", "if (event.target.classList?.contains('openwa-avatar')) event.target.remove();"]) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
+}
+assert(appJs.includes("+esc(c.initials||c.initial||initial(c.name))+openwaAvatar(c)+'</span>';"), 'every avatar must offer the customer\'s picture');
+for (const required of ["'GET /api/wa/avatar': avatar,", 'const AVATAR_FRESH_MS = 24 * 60 * 60 * 1000;', "if (address.origin !== new URL(config.baseUrl).origin && !(address.protocol === 'https:' && AVATAR_HOSTS.test(address.hostname))) throw problem('gateway-failed');", "response = await fetch(address, { redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS) });"]) {
+  assert(read(path.join(__dirname, 'openwa-link.cjs')).includes(required), `openwa-link.cjs is missing ${required}`);
+}
 // The list of conversations keeps its place when the page is drawn again.
 for (const required of ["const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\\n');", "if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });", 'else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
@@ -395,6 +404,7 @@ const summary = {
   priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing',
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'one file per message from the message box (the + button, paste, drop), sent by the server through OpenWA with the typed words as its caption; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
+  customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

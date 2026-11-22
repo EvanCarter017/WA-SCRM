@@ -57,6 +57,11 @@ const MEDIA_TIMEOUT_MS = Number(process.env.WA_SCRM_OPENWA_MEDIA_TIMEOUT_MS) || 
 const MEDIA_MESSAGES = 50;
 const MEDIA_RETRY_MS = 10 * 60 * 1000;
 const MEDIA_FILE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+// The picture of a customer: the largest one taken, how long one is good for before it is looked up again, and
+// where, besides the gateway itself, a picture may be fetched from: WhatsApp's own servers.
+const AVATAR_MAX = 2 * 1024 * 1024;
+const AVATAR_FRESH_MS = 24 * 60 * 60 * 1000;
+const AVATAR_HOSTS = /(^|\.)whatsapp\.net$/;
 // Sending a file from the page: the largest file taken, the room for its details in front of it, how long OpenWA
 // may take (the proxy in front of this server gives a request a minute), and the longest caption and file name
 // passed on.
@@ -418,6 +423,91 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
     res.end(found.bytes);
     return SENT;
   }
+  // ---- the picture of a customer ----
+  // The profile picture WhatsApp shows for a chat. OpenWA names its address; the picture is fetched from there —
+  // from WhatsApp's own servers or from the gateway itself, nowhere else — and kept beside the media. After a
+  // day it is looked up again; until then, and whenever it cannot be looked up, what was kept is handed out. A
+  // chat without a picture (none set, or hidden from this number) is kept as that. Lookups go one after the
+  // other, and two requests for the same chat share one.
+  const avatarKey = (account, chat) => crypto.createHash('sha256').update(`avatar\n${account}\n${chat}`).digest('hex');
+  function avatarKept(key) {
+    try {
+      const note = JSON.parse(fs.readFileSync(path.join(mediaDir, key + '.json'), 'utf8'));
+      return { ...note, bytes: note.none ? null : fs.readFileSync(path.join(mediaDir, key + '.bin')) };
+    } catch {
+      return null;
+    }
+  }
+  // The note is written last, as for media. A picture that is gone is not kept any longer.
+  function avatarKeep(key, picture) {
+    fs.mkdirSync(mediaDir, { recursive: true, mode: 0o700 });
+    if (picture) fs.writeFileSync(path.join(mediaDir, key + '.bin'), picture.bytes, { mode: 0o600 });
+    else fs.rmSync(path.join(mediaDir, key + '.bin'), { force: true });
+    fs.writeFileSync(path.join(mediaDir, key + '.json'), JSON.stringify(picture ? { mime: picture.mime, at: now() } : { none: true, at: now() }), { mode: 0o600 });
+  }
+  // Looks a picture up: { mime, bytes }, null when the chat has none, or a failure when that cannot be told now.
+  async function avatarLook(config, row, chat) {
+    const answer = await ask(config, 'GET', `/api/sessions/${row.session}/contacts/${encodeURIComponent(chat)}/profile-picture`);
+    if (answer.status !== 200) throw problem(answer.status === 409 ? 'not-connected' : 'gateway-failed');
+    let address = null;
+    try {
+      address = new URL(answer.body?.url);
+    } catch {}
+    if (!address) return null;
+    if (address.origin !== new URL(config.baseUrl).origin && !(address.protocol === 'https:' && AVATAR_HOSTS.test(address.hostname))) throw problem('gateway-failed');
+    let response;
+    try {
+      response = await fetch(address, { redirect: 'error', signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch {
+      throw problem('gateway-unreachable');
+    }
+    if (!response.ok || Number(response.headers.get('content-length')) > AVATAR_MAX) {
+      await response.body?.cancel().catch(() => {});
+      throw problem('gateway-failed');
+    }
+    const bytes = Buffer.from(await response.arrayBuffer()), mime = mediaKind(bytes);
+    if (bytes.length > AVATAR_MAX || !mime?.startsWith('image/')) throw problem('gateway-failed');
+    return { mime, bytes };
+  }
+  const avatarMissing = new Map(), avatarLooking = new Map();
+  let avatarLine = Promise.resolve();
+  // The picture of one chat as it is handed out now: what was kept, looked up first when that is older than a
+  // day. Null when nothing is known of it.
+  async function avatarOf(account, chat) {
+    if (!ACCOUNT.test(account) || !CHAT.test(chat)) throw problem('invalid-request');
+    const key = avatarKey(account, chat), kept = avatarKept(key);
+    if ((kept && now() - kept.at < AVATAR_FRESH_MS) || (avatarMissing.get(key) || 0) > now()) return kept;
+    const row = store.account(account);
+    if (!row) throw problem('unknown-account');
+    if (!avatarLooking.has(key)) {
+      const config = settings(), looked = avatarLine.then(() => avatarLook(config, row, chat));
+      avatarLine = looked.catch(() => {});
+      avatarLooking.set(key, looked.then(picture => {
+        avatarKeep(key, picture);
+        console.log(`wa avatar ok account=${row.id} ${picture ? 'bytes=' + picture.bytes.length : 'none'}`);
+      }, error => {
+        avatarMissing.set(key, now() + MEDIA_RETRY_MS);
+        console.error(`wa avatar failed account=${row.id} error=${error.code || error.name}`);
+      }).finally(() => avatarLooking.delete(key)));
+    }
+    await avatarLooking.get(key);
+    return avatarKept(key);
+  }
+  // Answers with the picture, or with "no content" when the chat has none or nothing can be told now: the page
+  // then leaves the initials. What kind of picture it is, is told by its bytes.
+  async function avatar(req, url, res) {
+    signedIn(req);
+    const found = await avatarOf(url.searchParams.get('account') || '', url.searchParams.get('chat') || '');
+    const kind = found?.bytes ? mediaKind(found.bytes) : null, shown = Boolean(kind?.startsWith('image/'));
+    res.writeHead(shown ? 200 : 204, {
+      ...(shown ? { 'Content-Type': kind, 'Content-Length': found.bytes.length } : {}),
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "sandbox; default-src 'none'",
+      'Cache-Control': `private, max-age=${found ? 3600 : 600}`,
+    });
+    res.end(shown ? found.bytes : undefined);
+    return SENT;
+  }
   // The words of a voice note or sound file. The speech service is asked once for each: the text is kept beside
   // the file, and two requests for the same voice note at the same time share one call.
   const transcribing = new Map();
@@ -654,6 +744,7 @@ function create({ dir, siteId, site, now = () => Date.now(), sync = { every: SYN
       return found || { events: [], last: after };
     },
     'GET /api/wa/media': media,
+    'GET /api/wa/avatar': avatar,
     'POST /api/wa/transcribe': transcribe,
 
     'POST /api/wa/hook': async req => {

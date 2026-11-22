@@ -980,6 +980,9 @@ dialog>#toast,dialog>#toast.show{transform:none}
 /* With the button for files the tools beside the message box are one more: where the conversation is too narrow
    for one line they take a second one instead of running into the send button. */
 .composer-tools { flex-wrap:wrap; row-gap:var(--fid-px-4); }
+/* The customer's profile picture (plan 044) lies over the initials and takes the round shape of the avatar. */
+.avatar { position:relative; }
+.openwa-avatar { position:absolute; inset:0; width:100%; height:100%; border-radius:50%; object-fit:cover; }
 
 /* The words of a voice note (plan 034): the button that asks for them, and the text under the player. */
 .ai-transcribe { display:inline-flex; align-items:center; gap:var(--fid-px-4); margin:0 0 var(--fid-px-6); font-size:var(--fid-px-12); }

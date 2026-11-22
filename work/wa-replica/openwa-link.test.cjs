@@ -27,7 +27,7 @@ for (const level of ['log', 'error']) {
 }
 
 // ---- the stand-in for OpenWA ----
-const gw = { sessions: new Map(), hooks: new Map(), sends: [], files: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map(), media: new Map() };
+const gw = { sessions: new Map(), hooks: new Map(), sends: [], files: [], calls: [], sendMode: 'ok', replies: new Map(), chats: new Map(), history: new Map(), contacts: new Map(), media: new Map(), pictures: new Map() };
 const uuid = () => crypto.randomUUID();
 const gwSession = name => ({ id: uuid(), name, status: 'created', phone: null, pushName: null, connectedAt: null, lastActive: null, createdAt: new Date(clock).toISOString(), updatedAt: new Date(clock).toISOString(), lastError: null, restriction: null, engineLoaded: false });
 const publicHook = ({ secret, ...hook }) => hook;
@@ -39,6 +39,13 @@ const gateway = http.createServer((req, res) => {
     const answer = (status, json) => { res.writeHead(status, json === undefined ? {} : { 'Content-Type': 'application/json' }); res.end(json === undefined ? '' : JSON.stringify(json)); };
     const fail = (status, error, message) => answer(status, { message, error, statusCode: status });
     gw.calls.push(`${req.method} ${req.url}`);
+    // A profile picture is fetched from the address OpenWA names, without a key: here, the stand-in's own.
+    if (req.url.startsWith('/pictures/')) {
+      const picture = gw.pictures.get(decodeURIComponent(req.url.slice(10)));
+      if (!Buffer.isBuffer(picture)) return fail(404, 'Not Found', 'no picture');
+      res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': picture.length });
+      return res.end(picture);
+    }
     if (req.headers['x-api-key'] !== KEY) return fail(401, 'Unauthorized', 'API key is required');
     const [, , , sessionId, action, third, fourth, fifth] = req.url.split('?')[0].split('/');
     if (!sessionId) {
@@ -99,6 +106,13 @@ const gateway = http.createServer((req, res) => {
       if (action === 'chats') return answer(200, gw.chats.get(sessionId) || []);
       const limit = Number(new URL(req.url, 'http://localhost').searchParams.get('limit')) || 50;
       return answer(200, (gw.history.get(decodeURIComponent(third)) || []).slice(-limit));
+    }
+    // The picture of a chat: its address, null when there is none, a failure for a number WhatsApp does not know.
+    if (action === 'contacts' && fourth === 'profile-picture') {
+      if (session.status !== 'ready') return fail(409, 'Conflict', 'Session is not connected. The WhatsApp client is not ready.');
+      const picture = gw.pictures.get(decodeURIComponent(third));
+      if (picture === 'unknown') return fail(503, 'Service Unavailable', 'The engine could not answer');
+      return answer(200, { url: Buffer.isBuffer(picture) ? `http://127.0.0.1:${gwPort}/pictures/${third}` : picture || null });
     }
     if (action === 'contacts') return gw.contacts.has(decodeURIComponent(third)) ? answer(200, gw.contacts.get(decodeURIComponent(third))) : fail(404, 'Not Found', 'Contact not found');
     if (action === 'messages' && /^send-(text|image|video|audio|document)$/.test(third) && !fourth) {
@@ -758,6 +772,82 @@ test('sending a file: its details come first in the request, then the file; it g
   assert.deepEqual(gw.files.slice(-3).map(f => f.key), Array(3).fill('s1-file-0000051'), 'OpenWA gets the same key every time');
 });
 
+test('the picture of a customer: looked up through OpenWA, fetched once and kept for a day; no picture is kept as that; what cannot be told now is asked again later; only a picture from WhatsApp or the gateway is taken', async () => {
+  gwSessionOf('a1').status = 'ready';
+  const chat = '15550002222@c.us', lid = '333444555666777@lid', other = '15550003333@c.us';
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(500, 9)]), png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.alloc(300, 4)]);
+  const avatar = (query, cookie = lin) => fetch(`http://127.0.0.1:${port}/api/wa/avatar?${query}`, { headers: cookie ? { Cookie: cookie } : {} })
+    .then(async r => ({ status: r.status, type: r.headers.get('content-type'), cache: r.headers.get('cache-control'), nosniff: r.headers.get('x-content-type-options'), csp: r.headers.get('content-security-policy'), bytes: Buffer.from(await r.arrayBuffer()) }));
+  const q = (c, account = 'a1') => `account=${account}&chat=${encodeURIComponent(c)}`;
+  const lookups = () => gw.calls.filter(c => c.endsWith('/profile-picture')).length, fetches = () => gw.calls.filter(c => c.startsWith('GET /pictures/')).length;
+  const file = (c, ending) => path.join(tmp, 'main', 'wa-media-s1', crypto.createHash('sha256').update(`avatar\na1\n${c}`).digest('hex') + ending);
+  gw.calls.length = 0;
+  gw.pictures.set(chat, jpeg);
+  // looked up, fetched from the address OpenWA names, handed out
+  const first = await avatar(q(chat));
+  assert.deepEqual([first.status, first.type, first.cache, first.nosniff, first.csp, first.bytes.equals(jpeg)], [200, 'image/jpeg', 'private, max-age=3600', 'nosniff', "sandbox; default-src 'none'", true]);
+  assert.deepEqual([lookups(), fetches()], [1, 1]);
+  // kept: not asked again within a day, also when the picture has changed meanwhile
+  gw.pictures.set(chat, png);
+  clock += 23 * 60 * 60 * 1000;
+  assert((await avatar(q(chat))).bytes.equals(jpeg));
+  assert.deepEqual([lookups(), fetches()], [1, 1]);
+  // after a day it is looked up again; several requests at the same time share one lookup
+  clock += 2 * 60 * 60 * 1000;
+  const next = await Promise.all([avatar(q(chat)), avatar(q(chat)), avatar(q(chat))]);
+  assert.deepEqual([next.map(n => n.status), next.map(n => n.type), next.every(n => n.bytes.equals(png)), lookups(), fetches()], [[200, 200, 200], ['image/png', 'image/png', 'image/png'], true, 2, 2]);
+  // no picture: "no content", and that is kept for a day too
+  const none = await avatar(q(lid));
+  assert.deepEqual([none.status, none.type, none.cache, none.bytes.length, lookups()], [204, null, 'private, max-age=3600', 0, 3]);
+  assert.deepEqual([(await avatar(q(lid))).status, lookups(), fs.existsSync(file(lid, '.json')), fs.existsSync(file(lid, '.bin'))], [204, 3, true, false]);
+  // a picture that is gone is not kept any longer
+  gw.pictures.delete(chat);
+  clock += 25 * 60 * 60 * 1000;
+  assert.deepEqual([(await avatar(q(chat))).status, fs.existsSync(file(chat, '.bin')), lookups()], [204, false, 4]);
+  // what cannot be told now is not kept: asked again after ten minutes, and what was kept before is still handed out
+  gw.pictures.set(other, jpeg);
+  assert.equal((await avatar(q(other))).status, 200);
+  clock += 25 * 60 * 60 * 1000;
+  gw.pictures.set(other, 'unknown');
+  const before = lookups();
+  const stale = await avatar(q(other));
+  assert.deepEqual([stale.status, stale.bytes.equals(jpeg), lookups()], [200, true, before + 1], 'the picture from before, while OpenWA cannot answer');
+  assert.deepEqual([(await avatar(q(other))).status, lookups()], [200, before + 1], 'not asked again at once');
+  gw.pictures.set('15550004444@c.us', 'unknown');
+  const unknown = await avatar(q('15550004444@c.us'));
+  assert.deepEqual([unknown.status, unknown.cache, fs.existsSync(file('15550004444@c.us', '.json'))], [204, 'private, max-age=600', false], 'nothing known and nothing kept');
+  clock += 11 * 60 * 1000;
+  gw.pictures.set(other, png);
+  assert.deepEqual([(await avatar(q(other))).bytes.equals(png), lookups()], [true, before + 3], 'asked again later');
+  // the number is not connected: what was kept is handed out, nothing else is asked for
+  gwSessionOf('a1').status = 'qr_ready';
+  clock += 25 * 60 * 60 * 1000;
+  assert.deepEqual([(await avatar(q(other))).status, (await avatar(q('15550005555@c.us'))).status], [200, 204]);
+  gwSessionOf('a1').status = 'ready';
+  // only a picture from WhatsApp's own servers or from the gateway is fetched, and only a picture is taken
+  const taken = fetches();
+  gw.pictures.set('15550006666@c.us', `http://127.0.0.1:${port}/api/site/status`);
+  gw.pictures.set('15550007777@c.us', 'http://pps.whatsapp.net/v/t61/picture.jpg');
+  gw.pictures.set('15550008888@c.us', 'https://whatsapp.net.example.org/picture.jpg');
+  gw.pictures.set('15550009990@c.us', Buffer.from('<!doctype html><script>alert(1)</script>' + ' '.repeat(40)));
+  gw.pictures.set('15550009991@c.us', Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(2 * 1024 * 1024, 1)]));
+  for (const c of ['15550006666@c.us', '15550007777@c.us', '15550008888@c.us', '15550009990@c.us', '15550009991@c.us']) {
+    const answer = await avatar(q(c));
+    assert.deepEqual([answer.status, answer.bytes.length, fs.existsSync(file(c, '.bin'))], [204, 0, false], c);
+  }
+  assert.equal(fetches(), taken + 2, 'only the two addresses at the gateway were fetched');
+  // who may ask, and for what
+  const nina = await member('nina', 'supervisor', null), omar = await member('omar', 'agent', 'elsewhere');
+  assert.deepEqual([(await avatar(q(other), '')).status, (await avatar(q(other), omar)).status, (await avatar(q(other), nina)).status], [401, 403, 200]);
+  for (const bad of ['account=a1&chat=120363000000000000%40g.us', 'account=a%2F1&chat=' + encodeURIComponent(chat), 'account=a1', 'account=a1&chat=..%2F..%2Fetc%2Fpasswd']) {
+    assert.deepEqual((await call('/api/wa/avatar?' + bad, { cookie: lin })).json, { error: 'invalid-request' }, bad);
+  }
+  assert.deepEqual((await call('/api/wa/avatar?' + q(chat, 'zz'), { cookie: lin })).json, { error: 'unknown-account' });
+  // what is kept is private
+  assert.equal(fs.statSync(file(other, '.bin')).mode & 0o077, 0);
+  assert.equal(fs.statSync(file(other, '.json')).mode & 0o077, 0);
+});
+
 test('unlinking removes the session at OpenWA and the record; later deliveries of it are dropped', async () => {
   await post('/api/wa/link', { account: 'a4' });
   const id = gwSessionOf('a4').id;
@@ -773,10 +863,10 @@ test('unlinking removes the session at OpenWA and the record; later deliveries o
 
 test('the log names actions and numbers, never a key, a secret, a phone number or message text', () => {
   const lines = logged.filter(line => line.startsWith('wa '));
-  for (const expected of ['wa link ok account=a1 state=scan', 'wa hook stored event=message.received account=a1', 'wa send ok account=a1 chars=5', 'wa send failed account=a1 error=not-connected upstream=409', 'wa send ok account=a1 file=image bytes=304', 'wa send failed account=a1 file=document error=not-connected upstream=409', 'wa unlink ok account=a4', 'error=gateway-unreachable', 'error=gateway-refused']) {
+  for (const expected of ['wa link ok account=a1 state=scan', 'wa hook stored event=message.received account=a1', 'wa send ok account=a1 chars=5', 'wa send failed account=a1 error=not-connected upstream=409', 'wa send ok account=a1 file=image bytes=304', 'wa send failed account=a1 file=document error=not-connected upstream=409', 'wa avatar ok account=a1 bytes=504', 'wa avatar ok account=a1 none', 'wa avatar failed account=a1 error=gateway-failed', 'wa avatar failed account=a1 error=not-connected', 'wa unlink ok account=a4', 'error=gateway-unreachable', 'error=gateway-refused']) {
     assert(lines.some(line => line.includes(expected)), expected);
   }
-  for (const secret of [KEY, SECRET, '15550001111', '15550009999', 'hello', 'Hola', 'On my way', 'Here it is', 'photo.jpg', QR]) assert(!lines.some(line => line.includes(secret)), secret);
+  for (const secret of [KEY, SECRET, '15550001111', '15550009999', '15550002222', '333444555666777', 'hello', 'Hola', 'On my way', 'Here it is', 'photo.jpg', QR]) assert(!lines.some(line => line.includes(secret)), secret);
   const stored = ['wa-s1.db', 'wa-s1.db-wal'].map(name => path.join(tmp, 'main', name)).filter(file => fs.existsSync(file)).map(file => fs.readFileSync(file).toString('latin1')).join('');
   assert(!stored.includes(KEY) && !stored.includes(SECRET), 'the link\'s records hold neither the key nor the secret');
   assert.equal(fs.statSync(path.join(tmp, 'main', 'wa-s1.db')).mode & 0o077, 0, 'the records are private');
