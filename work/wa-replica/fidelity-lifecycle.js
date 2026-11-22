@@ -249,7 +249,7 @@
       renderItem('accounts', views.accounts) +
       '<div class="nav-caption">客户与跟进</div>' +
       navGroup('客户与跟进闭环', 'ContactRound', 'fidNavCustomers', ui.customerNavOpen, lcCustomerMenu) +
-      navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) +
+      (operationsMenu.length ? navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) : '') +
       (manager() ? '<div class="nav-caption">账户与组织</div>' + navGroup('组织管理', 'Network', 'fidNavOrg', fid.orgOpen, ['team', 'members']) : '') +
       '<div class="nav-caption">工作台设置</div>' +
       renderItem('ai', views.ai)
@@ -446,7 +446,7 @@
           <div class="lc-block-head"><h3>${icon('StickyNote')}客户沟通备忘与交接摘要</h3></div>
           <textarea class="profile-note" style="width:100%;min-height:140px" data-note-customer="${esc(c.id)}" id="customer-note-${esc(c.id)}-drawer" aria-label="客户备注" placeholder="记录客户性格偏好、关键决策人、特殊包装或历史约定…">${esc(dirtyNote ? ui.noteDrafts[c.id] : c.notes)}</textarea>
           <div class="note-save" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
-            <span role="status" style="font-size:12px;color:var(--color-text-muted)">${dirtyNote ? '有未保存的修改' : '已实时同步至本地档案'}</span>
+            <span role="status" style="font-size:12px;color:var(--color-text-muted)">${dirtyNote ? '有未保存的修改' : '已保存到客户档案'}</span>
             <button type="button" class="fid-btn blue slim" data-action="saveNote" ${fidActionID(c.id)}>保存备注</button>
           </div>
         </div>`;
@@ -790,10 +790,10 @@
     const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'whatsapp-演示客户列表.csv';
+    a.download = 'whatsapp-客户列表.csv';
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    toast('已导出当前筛选的演示客户列表。');
+    toast('已导出当前筛选的客户列表。');
   };
 
   // ============================================================================

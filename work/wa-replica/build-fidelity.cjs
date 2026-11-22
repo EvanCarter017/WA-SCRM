@@ -184,6 +184,49 @@ swap("error('演示数据中已有该号码。重复客户归属/合并规则待
 cut(/^      case 'attachment':\{[^\n]*\n/m, 'demo attachment dialog');
 cut(/^    if\(formId==='attachment-form'\)[^\n]*\n/m, 'demo attachment form');
 assert(!/<span>本地演示<\/span>|演示消息|添加演示附件|模拟扫码|模拟掉线|模拟重连|lcSimLeadOpen|lcSimReply|openwaDemoQr/.test(js), 'the app must not simulate the WhatsApp connection');
+// Wording of a release (plan 032): the baseline's texts no longer speak of a demonstration, a prototype, a review
+// or of saving on this machine. Every pair must be found. The texts of the modules were changed in their files.
+for (const [from, to] of [
+  ['当前为团队评审视角', '当前为团队视角'],
+  ['也可以新增一位演示客户，体验资料、标签和跟进。', '也可以新建一位客户。'],
+  ['本地演示附件', '附件'],
+  ['来源信息<span class="sample-label">演示</span>', '来源信息'],
+  ['已保存到本机', '已保存'],
+  ['账号资料与连接状态均为本机演示', '账号资料与连接状态'],
+  ['清除筛选，或添加一个演示账号。', '清除筛选，或添加一个账号。'],
+  ['人数与账号数可继续扩展。真实 WhatsApp 接入路线在功能评审后确定。', '人数与账号数可继续扩展。'],
+  ['调整筛选条件，或创建一位演示客户。', '调整筛选条件，或新建一位客户。'],
+  ["+' 权限方案待评审。</span>", "+'</span>"],
+  [' 位演示成员 ', ' 位成员 '],
+  ['<li>此页是权限方案评审，不代表已实现真实鉴权</li>', '<li>此页的角色说明尚未与登录权限关联</li>'],
+  ['接收译文展示和快捷话术填入；本轮是示例交互。', '接收译文展示和快捷话术填入。'],
+  ['；现有来源只是示例，真实广告关联和回传待确认。', '；真实广告关联和回传待确认。'],
+  ['仅保存演示数据', '保存后同步到服务器'],
+  ['先体验账号信息与负责人配置。在「号码管理」可体验 OpenWA 扫码绑定。', '填写账号信息与负责人。扫码绑定在「号码管理」中进行。'],
+  ['加入演示账号列表', '添加账号'],
+  ['用于评审成员组织与分配。这里只创建演示成员，不会发送邀请或开通真实账号。', '这里只登记成员资料，不会发送邀请，也不会开通登录账号。'],
+  ['创建演示成员', '创建成员'],
+  ['这个演示只改变客户与未完成跟进的负责人，不移动账号。', '只改变客户与未完成跟进的负责人，不移动账号。'],
+  ['确认演示转交', '确认转交'],
+  ['原型只做提示，没有自动合并、抢单或改归属。', '这里只做提示，不会自动合并、抢单或改归属。'],
+  ['要统一客户还是各聊手独立维护、重复进线由谁跟进，等你评审后确定。', '同一位客户由谁跟进，请在团队内约定。'],
+  ['可修改后再发送。此处使用演示话术。', '可修改后再发送。'],
+  ['内部演示数据 · 仅用于界面评审', '内部使用'],
+  ['刷新演示视图', '刷新视图'],
+  ['已刷新当前演示视图。', '已刷新当前视图。'],
+  ['已展开示例中文译文。', '已展开中文译文。'],
+  ['演示成员已创建，可继续分配账号。', '成员已创建，可继续分配账号。'],
+  ['演示账号分配已更新，客户归属未改变。', '账号分配已更新，客户归属未改变。'],
+  ['客户与未完成待办已演示转交。账号归属未改变。', '客户与未完成待办已转交。账号归属未改变。'],
+]) {
+  assert(js.includes(from), 'Missing baseline wording: ' + from);
+  js = js.replaceAll(from, to);
+}
+// The materials screen is hidden until files are real (plan 032): it kept the names of files only. Its code stays in
+// fidelity-operations.js; the screen has no title, no route and no menu entry, so old links open the home page.
+swap("materials:'素材管理',", '');
+swap('materials:renderMaterials,', '');
+assert(!/演示|原型|评审|本机|示例|体验/.test(js), 'the app must not speak of a demonstration, a prototype or a review');
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
@@ -269,7 +312,7 @@ requirement.modules.splice(autoIndex+1,0,{
 });
 requirement.modules.splice(autoIndex,0,{
   id:'P-MATERIALS', name:'素材管理', decision:'保留', basis:'用户评审备注确认保留',
-  originalIds:['ops-material'], screens:['materials'], features:['素材分组','素材维护','预览','导入导出'], notes:'运营管理保留素材管理。',
+  originalIds:['ops-material'], screens:['materials'], features:['素材分组','素材维护','预览','导入导出'], notes:'素材管理暂不开放：此前只保存文件名，待真实文件收发接入后恢复。',
 }, {
   id:'P-REPLY-MANAGEMENT', name:'快捷回复管理', decision:'本轮不展示', basis:deferredByReview,
   originalIds:['ops-reply'], screens:[], features:['公共快捷回复模板维护'], notes:'运营管理的快捷回复页面暂缓。',

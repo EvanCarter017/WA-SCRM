@@ -103,7 +103,7 @@
     const body=type==='text'||type==='rich'?opsField('素材内容',opsArea('body',item?.body)):'';
     const contact=type==='contact'?opsField('昵称',opsInput('nickname',item?.nickname,'选填','maxlength="30"'))+
       opsField('联系方式',opsInput('contact',item?.contact,'含国家区号的 WhatsApp 号码','type="tel" maxlength="24" required')):'';
-    const media=type==='text'||type==='contact'?'':opsField('本地文件',`<input type="file" name="file" accept="${type==='rich'?'image':type}/*"><small class="fid-ops-hint">${item?.file?esc(item.file)+' · ':''}演示保留文件名。</small>`);
+    const media=type==='text'||type==='contact'?'':opsField('本地文件',`<input type="file" name="file" accept="${type==='rich'?'image':type}/*"><small class="fid-ops-hint">${item?.file?esc(item.file)+' · ':''}仅保留文件名。</small>`);
     fidForm(item?'编辑素材':'新增'+assetTypes[type],'fid-ops-asset',opsHidden('id',id)+
       opsField('分组',opsSelect('groupId',groups.map(group=>[group.id,group.name]),currentGroup))+
       opsField('素材名称',opsInput('title',item?.title,'请输入素材名称','maxlength="50" required'))+body+contact+media);
@@ -232,7 +232,7 @@
     opsAssetAdd:()=>openAsset(),opsAssetEdit:openAsset,opsAssetPreview:previewAsset,
     opsAssetMove:moveAssets,
     opsAssetDelete:()=>{
-      if(manager()&&operationsView.assetSelection.size)fidConfirm('批量删除素材','确定删除所选的演示素材？','opsAssetDeleteConfirmed');
+      if(manager()&&operationsView.assetSelection.size)fidConfirm('批量删除素材','确定删除所选的素材？','opsAssetDeleteConfirmed');
     },
     opsAssetDeleteConfirmed:()=>{
       if(!manager())return;

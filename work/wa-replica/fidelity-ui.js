@@ -7,7 +7,8 @@
     logFilter:{start:'',end:'',app:'all',field:'customer',query:''} };
   const oldFollowupView = renderFollowups;
   const customerMenu = ['customers','chat-records','tags','tag-stats','followups'];
-  const operationsMenu = ['materials'];
+  // Empty while the materials screen is hidden (plan 032): it comes back with real files.
+  const operationsMenu = [];
   const fidDate = v => !v ? '—' : Number.isNaN(new Date(v).getTime()) ? String(v) : new Date(v).toLocaleString('sv-SE').slice(0,16);
   const fidDay = (offset=0) => new Date(Date.now()+offset*86400000).toISOString();
   const fidStages = ['新客户','跟进中','已报价','已成交','培育中'];
@@ -164,7 +165,7 @@
     if (removed.has(ui.customerTag)) ui.customerTag='all';
     fid.tagChecked.clear();
     persist();close();render();
-    toast('已删除 '+selected.length+' 个演示标签。',()=>{
+    toast('已删除 '+selected.length+' 个标签。',()=>{
       data.tags=originalTags;
       for (const [id,tags] of assignments) {
         const c=customer(id);
@@ -264,7 +265,7 @@
       <div class="fid-actions fid-filter-submit"><button class="fid-btn gradient" type="submit">${icon('Search')}搜索</button>${fidButton('重置','fidCustomerReset','RotateCw')}</div>
       <div class="fid-actions fid-tag-filter"><span>标签查询</span><span class="fid-small-note" aria-live="polite">${marked.length?marked.map(t=>esc(t.name)).join('、'):'未选'}</span>${fidButton('选择标签','fidCustomerChooseTags','Tag')}${fidButton('重置标签','fidCustomerClearFilter','X')}</div>
     </form>`;
-    const toolbar=`<div class="fid-actions fid-list-toolbar">${fidButton('批量打标签','batchTags','Tag','gradient',selected?'':'disabled')}${fidButton('清空标签','fidClearCustomerTags','Eraser','',selected?'':'disabled')}${fidButton('跟进记录','','ClipboardList','green','data-nav="followups"')}${fidButton('导出列表','fidExportCustomers','FileDown')}${fidButton('新增客户','addCustomer','Plus','slim')}${manager()&&selected?fidButton('转交客户','batchTransfer','ArrowRightLeft','slim'):''}<span class="fid-small-note">演示号码</span></div>`;
+    const toolbar=`<div class="fid-actions fid-list-toolbar">${fidButton('批量打标签','batchTags','Tag','gradient',selected?'':'disabled')}${fidButton('清空标签','fidClearCustomerTags','Eraser','',selected?'':'disabled')}${fidButton('跟进记录','','ClipboardList','green','data-nav="followups"')}${fidButton('导出列表','fidExportCustomers','FileDown')}${fidButton('新增客户','addCustomer','Plus','slim')}${manager()&&selected?fidButton('转交客户','batchTransfer','ArrowRightLeft','slim'):''}</div>`;
     const header=['<input type="checkbox" id="select-all-customers" aria-label="选择当前结果全部客户">','序号','主账号信息','备注','联系人信息','标签','手机号','客户类型','国家','添加时间','更新时间','操作 '+icon('Settings2')];
     const table=fidTable('fid-customer-table',header,customerRows(),'暂无数据',true).replace('<tbody>','<tbody id="customer-rows">');
     return `<section class="fid-page"><h1 class="sr-only">客户列表</h1>${filters}${toolbar}<div class="fid-batchbar" id="batchbar" hidden><span id="selected-count">${selected}</span></div><div class="fid-table-card">${table}${fidPager(list.length,'customers',[10,20,50])}</div></section>`;
@@ -311,7 +312,7 @@
       <td>${esc(a.number)}</td><td>${stateText(a)}</td>
       <td>${esc(a.annotation||'—')}</td><td>${esc(a.note||'—')}</td>
       <td>${esc(fidDate(a.createdAt||fidDay(-8)))} / ${esc(a.lastSync||'—')}</td>
-      <td>${esc(country(a))}</td><td>演示</td><td>—</td><td>—</td>
+      <td>${esc(country(a))}</td><td>—</td><td>—</td><td>—</td>
       <td><div class="fid-icon-actions">${fidIcon('编辑'+a.name,'editAccount','SquarePen',a.id)}${a.state!=='online'?fidIcon('重连'+a.name,'connect','RefreshCw',a.id):fidIcon('打开'+a.name+'会话','accountInbox','MessageCircle',a.id)}</div></td>
     </tr>`).join('');
     const columns=['<input type="checkbox" id="fid-account-all" aria-label="全选账号">','序号','主账号详情','用户名/ID','手机号','在线状态','注释','备注','首登时间/最近活跃','地区','版本号','主页地址','二维码','操作'];
@@ -327,12 +328,12 @@
   renderFollowups = function() {
     if(fid.followMode==='todo')return oldFollowupView().replace('<section class="section-page">','<section class="section-page"><div class="fid-actions fid-return-tasks">'+fidButton('返回跟进记录','fidLogHistory','ArrowLeft')+'</div>').replace('跟进管理</h1>','跟进待办</h1>');
     const f=fid.logFilter,rows=fidLogs(),body=paged(rows,'followups').map(({c,entry,at,kind})=>`<tr><td>${esc(entry.by)}</td><td>${esc(kind)}</td><td>${esc(account(c.account)?.name||'—')}</td><td><button class="fid-link" data-action="profile" ${fidActionID(c.id)}>${esc(c.name)}</button></td><td>${esc(c.phone)}</td><td>${esc(fidDate(at))}</td><td>${esc(entry.text)}</td></tr>`).join('');
-    return `<section class="fid-page"><div class="fid-panel fid-log">${fidHead('跟进记录','客户资料、标签与跟进操作会记录在这里。')}<form class="fid-filter-row fid-log-filter" id="fid-log-search-form"><div class="fid-range">${icon('Clock3')}<input id="fid-log-start" aria-label="开始时间" placeholder="开始时间" value="${esc(f.start)}" data-fid-date><span>~</span><input id="fid-log-end" aria-label="截止时间" placeholder="截止时间" value="${esc(f.end)}" data-fid-date></div><select class="fid-select" id="fid-log-app" aria-label="选择APP">${fidOption([['all','请选择APP'],['wa','WhatsApp']],f.app)}</select><div class="fid-joined"><select class="fid-select" id="fid-log-field" aria-label="跟进查询字段">${fidOption([['customer','线索账号'],['text','内容'],['actor','操作人']],f.field)}</select><input class="fid-input" id="fid-log-query" aria-label="搜索跟进记录" placeholder="请输入线索账号或内容" value="${esc(f.query)}"></div><button class="fid-btn blue" type="submit">${icon('Search')}搜索</button>${fidButton('重选','fidLogReset','RotateCw')}</form><div class="fid-log-line"><span class="fid-small-note">演示号码</span><button class="fid-link" data-action="fidTasks">跟进待办 (${pendingTasks().length})</button></div>${fidTable('fid-log-table',['操作人','操作类型','主账号','线索账号信息','线索账号','创建日期','内容'],body)}${fidPager(rows.length,'followups')}</div></section>`;
+    return `<section class="fid-page"><div class="fid-panel fid-log">${fidHead('跟进记录','客户资料、标签与跟进操作会记录在这里。')}<form class="fid-filter-row fid-log-filter" id="fid-log-search-form"><div class="fid-range">${icon('Clock3')}<input id="fid-log-start" aria-label="开始时间" placeholder="开始时间" value="${esc(f.start)}" data-fid-date><span>~</span><input id="fid-log-end" aria-label="截止时间" placeholder="截止时间" value="${esc(f.end)}" data-fid-date></div><select class="fid-select" id="fid-log-app" aria-label="选择APP">${fidOption([['all','请选择APP'],['wa','WhatsApp']],f.app)}</select><div class="fid-joined"><select class="fid-select" id="fid-log-field" aria-label="跟进查询字段">${fidOption([['customer','线索账号'],['text','内容'],['actor','操作人']],f.field)}</select><input class="fid-input" id="fid-log-query" aria-label="搜索跟进记录" placeholder="请输入线索账号或内容" value="${esc(f.query)}"></div><button class="fid-btn blue" type="submit">${icon('Search')}搜索</button>${fidButton('重选','fidLogReset','RotateCw')}</form><div class="fid-log-line"><button class="fid-link" data-action="fidTasks">跟进待办 (${pendingTasks().length})</button></div>${fidTable('fid-log-table',['操作人','操作类型','主账号','线索账号信息','线索账号','创建日期','内容'],body)}${fidPager(rows.length,'followups')}</div></section>`;
   };
 
   toolsRailHTML = function(c) {
     const t=(label,action,glyph,needs=false)=>`<button class="icon-button" data-action="${action}" ${fidActionID(c?.id||'')} aria-label="${label}" ${needs&&!c?'disabled':''}>${icon(glyph)}</button>`;
-    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新演示视图','refreshUI','RefreshCw')}${t('权限说明','fidChatPermissions','ShieldCheck')}</aside>`;
+    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新视图','refreshUI','RefreshCw')}${t('权限说明','fidChatPermissions','ShieldCheck')}</aside>`;
   };
   const fidOldFillQuick=fillQuick;
   fillQuick = function(id) {
@@ -352,18 +353,18 @@
     if(!manager())return '';
     fidSeed();const f=fid.memberFilter, list=data.members.filter(m=>fidMatch(m.login||m.id,f.id)&&fidMatch([m.name,m.team,m.note].join(' '),f.name)&&(f.role==='all'||fidMemberRole(m)===f.role)&&(f.status==='all'||(m.enabled!==false)===(f.status==='enabled')));
     const rows=paged(list,'members').map((m,i)=>`<tr><td>${rowNumber('members',i)}</td><td>${esc(m.login||m.id)}</td><td>${esc(m.name)}</td><td>${esc(fidRole(fidMemberRole(m))?.name||'—')}</td><td>${esc(m.note||m.team)}</td><td><span class="tag ${m.enabled!==false?'jade':'slate'}">${m.enabled!==false?'正常':'禁用'}</span></td><td>—</td><td>${esc(fidDate(m.created||fidDay(-7)))}</td><td><div class="fid-icon-actions">${fidIcon('编辑子账号'+m.name,'fidMemberEdit','SquarePen',m.id)}${fidIcon('分配账号给'+m.name,'memberAccounts','UsersRound',m.id)}</div></td></tr>`).join('');
-    return `<section class="fid-page">${fidOrgHead('账号管理','为员工建立子账号，并用权限组管理可查看和可操作的页面。','fidMemberAdd','新增子账号','UsersRound')}<p class="fid-org-help">子账号的权限和备注都可以在这里评审。当前为本地演示。</p><form class="fid-filter-row fid-org-filter" id="fid-member-search-form"><input id="fid-member-id" class="fid-input" placeholder="账号" aria-label="筛选账号" value="${esc(f.id)}"><input id="fid-member-name" class="fid-input" placeholder="昵称 / 备注" aria-label="筛选昵称或备注" value="${esc(f.name)}"><select class="fid-select" id="fid-member-role" aria-label="筛选权限组">${fidOption([['all','全部权限组'],...data.roleGroups.map(g=>[g.id,g.name])],f.role)}</select><select class="fid-select" id="fid-member-status" aria-label="筛选子账号状态">${fidOption([['all','全部状态'],['enabled','正常'],['disabled','禁用']],f.status)}</select><button type="submit" class="fid-btn gradient">${icon('Search')}搜索</button>${fidButton('重置','fidMemberReset')}</form><div class="fid-table-card">${fidTable('fid-org-table fid-member-table',['序号','账号','昵称','权限组','备注','状态','最近登录','创建时间','操作'],rows,'暂无子账号',true,'UsersRound')}${fidPager(list.length,'members',[10,20,50])}</div></section>`;
+    return `<section class="fid-page">${fidOrgHead('账号管理','为员工建立子账号，并用权限组管理可查看和可操作的页面。','fidMemberAdd','新增子账号','UsersRound')}<p class="fid-org-help">子账号的资料、权限组和备注在这里维护。</p><form class="fid-filter-row fid-org-filter" id="fid-member-search-form"><input id="fid-member-id" class="fid-input" placeholder="账号" aria-label="筛选账号" value="${esc(f.id)}"><input id="fid-member-name" class="fid-input" placeholder="昵称 / 备注" aria-label="筛选昵称或备注" value="${esc(f.name)}"><select class="fid-select" id="fid-member-role" aria-label="筛选权限组">${fidOption([['all','全部权限组'],...data.roleGroups.map(g=>[g.id,g.name])],f.role)}</select><select class="fid-select" id="fid-member-status" aria-label="筛选子账号状态">${fidOption([['all','全部状态'],['enabled','正常'],['disabled','禁用']],f.status)}</select><button type="submit" class="fid-btn gradient">${icon('Search')}搜索</button>${fidButton('重置','fidMemberReset')}</form><div class="fid-table-card">${fidTable('fid-org-table fid-member-table',['序号','账号','昵称','权限组','备注','状态','最近登录','创建时间','操作'],rows,'暂无子账号',true,'UsersRound')}${fidPager(list.length,'members',[10,20,50])}</div></section>`;
   }
   function fidPermissionTree(g,readOnly=false) {
     return `<div class="fid-permission-box">${fidPerms.map((page,i)=>`<div class="fid-permission-row"><label><input type="checkbox" name="view" value="${esc(page)}" data-fid-perm="${i}" ${g?.view.includes(page)?'checked':''} ${readOnly?'disabled':''}>${esc(page)}</label><label><input type="checkbox" name="write" value="${esc(page)}" data-fid-perm="${i}" ${g?.write.includes(page)?'checked':''} ${readOnly?'disabled':''}>操作</label></div>`).join('')}</div>`;
   }
   function fidRoleEdit(id='') {
     if(!manager())return;const g=fidRole(id);
-    fidForm(g?'编辑权限组':'新增权限组','fid-role',`<input type="hidden" name="id" value="${esc(id)}">${fidFormRow('权限组名称',fidCountField('fid-role-name','name',g?.name||'',30,'请输入权限组名称',true),'fid-role-name',true)}${fidFormRow('状态',`<select name="enabled" id="fid-role-enabled" class="fid-select" ${g?.builtIn?'disabled':''}>${fidOption([['1','正常'],['0','禁用']],g?.enabled===false?'0':'1')}</select>`,'fid-role-enabled')}${fidFormRow('页面权限',fidPermissionTree(g)+'<small class="fid-field-help">勾选操作会同时勾选查看。此处用于评审权限方案。</small>')}`,'保存',{wide:true,saveLast:true});
+    fidForm(g?'编辑权限组':'新增权限组','fid-role',`<input type="hidden" name="id" value="${esc(id)}">${fidFormRow('权限组名称',fidCountField('fid-role-name','name',g?.name||'',30,'请输入权限组名称',true),'fid-role-name',true)}${fidFormRow('状态',`<select name="enabled" id="fid-role-enabled" class="fid-select" ${g?.builtIn?'disabled':''}>${fidOption([['1','正常'],['0','禁用']],g?.enabled===false?'0':'1')}</select>`,'fid-role-enabled')}${fidFormRow('页面权限',fidPermissionTree(g)+'<small class="fid-field-help">勾选操作会同时勾选查看。</small>')}`,'保存',{wide:true,saveLast:true});
   }
   function fidMemberEdit(id='') {
     if(!manager())return;const m=member(id),roles=data.roleGroups.filter(g=>g.enabled||g.id===fidMemberRole(m));
-    fidForm(m?'编辑子账号':'新增子账号','fid-member',`<input type="hidden" name="id" value="${esc(id)}">${fidFormRow('账号',fidCountField('fid-member-login','login',m?.login||m?.id||'',30,'输入演示账号',true),'fid-member-login',true)}${fidFormRow('昵称',fidCountField('fid-member-nick','name',m?.name||'',30,'输入成员昵称',true),'fid-member-nick',true)}${fidFormRow('权限组',`<select class="fid-select" id="fid-member-group" name="roleGroup">${roles.map(g=>option(g.id,g.name,fidMemberRole(m))).join('')}</select>`,'fid-member-group',true)}${fidFormRow('所属团队',fidCountField('fid-member-team','team',m?.team||'北美一组',30,'输入团队名称',true),'fid-member-team',true)}${fidFormRow('备注',fidCountField('fid-member-note','note',m?.note||'',80,'选填'),'fid-member-note')}${fidFormRow('状态',`<select class="fid-select" id="fid-member-enabled" name="enabled" ${m?.id===ui.persona?'disabled':''}>${fidOption([['1','正常'],['0','禁用']],m?.enabled===false?'0':'1')}</select>`,'fid-member-enabled')}`,'保存',{wide:true,saveLast:true});
+    fidForm(m?'编辑子账号':'新增子账号','fid-member',`<input type="hidden" name="id" value="${esc(id)}">${fidFormRow('账号',fidCountField('fid-member-login','login',m?.login||m?.id||'',30,'输入账号',true),'fid-member-login',true)}${fidFormRow('昵称',fidCountField('fid-member-nick','name',m?.name||'',30,'输入成员昵称',true),'fid-member-nick',true)}${fidFormRow('权限组',`<select class="fid-select" id="fid-member-group" name="roleGroup">${roles.map(g=>option(g.id,g.name,fidMemberRole(m))).join('')}</select>`,'fid-member-group',true)}${fidFormRow('所属团队',fidCountField('fid-member-team','team',m?.team||'北美一组',30,'输入团队名称',true),'fid-member-team',true)}${fidFormRow('备注',fidCountField('fid-member-note','note',m?.note||'',80,'选填'),'fid-member-note')}${fidFormRow('状态',`<select class="fid-select" id="fid-member-enabled" name="enabled" ${m?.id===ui.persona?'disabled':''}>${fidOption([['1','正常'],['0','禁用']],m?.enabled===false?'0':'1')}</select>`,'fid-member-enabled')}`,'保存',{wide:true,saveLast:true});
   }
 
   function fidResetExtras() {
@@ -380,7 +381,7 @@
   function fidExportCustomers() {
     const safe=v=>'"'+( /^[=+\-@\t\r]/.test(String(v??'')) ? "'" : '' )+String(v??'').replaceAll('"','""')+'"';
     const rows=[['主账号','联系人','手机号','客户类型','国家','标签'],...filteredCustomers().map(c=>[account(c.account)?.name,c.name,c.phone,c.clientType,country(c),c.tags.map(tag).filter(t=>t&&myTags().includes(t)).map(t=>t.name).join('、')])];
-    const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='whatsapp-演示客户列表.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('已导出当前筛选的演示客户列表。');
+    const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(safe).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='whatsapp-客户列表.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('已导出当前筛选的客户列表。');
   }
   const fidConversationFilters = {all:'全部',unread:'未读',reply:'待回复',star:'星标'};
   function fidResetCustomerFilters() {
@@ -402,7 +403,7 @@
     fidTagBatchDelete:()=>fidConfirm('批量删除','删除选中的标签并从客户资料中移除？','fidDoTagBatchDelete'),
     fidDoTagBatchDelete:()=>fidRemoveTags([...fid.tagChecked]),
     fidGroupAdd:()=>fidGroupEdit(),fidGroupEdit,
-    fidGroupDelete:id=>{if(!group(id)||!canEditGroup(group(id)))return;if(data.tags.some(t=>t.group===id))return toast('请先清空此分组的标签。');fidConfirm('删除分组','删除此空的演示分组？','fidDoGroupDelete',id);},
+    fidGroupDelete:id=>{if(!group(id)||!canEditGroup(group(id)))return;if(data.tags.some(t=>t.group===id))return toast('请先清空此分组的标签。');fidConfirm('删除分组','删除此空分组？','fidDoGroupDelete',id);},
     fidDoGroupDelete:id=>{const g=group(id);if(!g||!canEditGroup(g)||data.tags.some(t=>t.group===id))return;data.tagGroups=data.tagGroups.filter(x=>x!==g);ui.tagGroup='all';persist();close();render();toast('分组已删除。');},
     fidTagCustomers:id=>{if(!myTags().some(t=>t.id===id))return;fid.customerTags=[id];ui.customerTag='all';ui.customerQuery='';ui.pages.customers=0;navigate('customers');},
     fidViewCustomerTags,
@@ -410,16 +411,16 @@
     fidCustomerClearFilter:()=>{fid.customerTags=[];ui.customerTag='all';ui.selected.clear();ui.pages.customers=0;render();},
     fidCustomerPlatform:()=>{fid.customerPlatform=!fid.customerPlatform;ui.selected.clear();ui.pages.customers=0;render();},
     fidCustomerReset:()=>{fidResetCustomerFilters();render();},
-    fidClearCustomerTags:()=>{if(ui.selected.size)fidConfirm('清空标签','清空所选客户的可见演示标签？','fidDoClearCustomerTags');},
+    fidClearCustomerTags:()=>{if(ui.selected.size)fidConfirm('清空标签','清空所选客户的可见标签？','fidDoClearCustomerTags');},
     fidDoClearCustomerTags:()=>{const scope=new Set(myTags().map(t=>t.id)),before=[];for(const c of myCustomers()){if(!ui.selected.has(c.id))continue;before.push([c,c.tags]);c.tags=c.tags.filter(id=>!scope.has(id));addActivity(c.id,'清空可见标签');}persist();close();render();toast('已清空所选客户的可见标签。',()=>{for(const [c,t] of before)c.tags=t;persist();render()});},
     fidExportCustomers,
     fidAccountPlatform:()=>{fid.accountPlatform=!fid.accountPlatform;fid.accountChecked.clear();ui.pages.accounts=0;render();},
     fidAccountReset:()=>{fid.accountChecked.clear();Object.assign(fid,{accountField:'name',accountPlatform:true,accountChannel:'all'});ui.accountQuery='';ui.accountStatus='all';ui.pages.accounts=0;render();},
     fidAccountNote:()=>fidForm('批量注释','fid-account-note',fidFormRow('注释',fidCountField('fid-annotation','note','',80,'输入选中账号的注释',true),'fid-annotation',true)),
-    fidAccountDelete:()=>{const selected=fidSelectedAccounts();if(!selected.length)return;if(selected.some(a=>data.customers.some(c=>c.account===a.id)))return toast('选中的账号仍有关联客户，演示中不能移除。');fidConfirm('移除账号','移除选中的无客户演示账号？','fidDoAccountDelete');},
-    fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!data.customers.some(c=>c.account===a.id));data.accounts=data.accounts.filter(a=>!selected.includes(a));fid.accountChecked.clear();persist();close();render();toast('已移除选中的演示账号。');},
-    fidAccountZero:()=>fidConfirm('统计清零','将已选账号的演示未读统计清零？','fidDoAccountZero'),
-    fidDoAccountZero:()=>{const selected=new Set(fidSelectedAccounts().map(a=>a.id));myCustomers().filter(c=>selected.has(c.account)).forEach(c=>c.unread=0);persist();close();render();toast('演示未读统计已清零。');},
+    fidAccountDelete:()=>{const selected=fidSelectedAccounts();if(!selected.length)return;if(selected.some(a=>data.customers.some(c=>c.account===a.id)))return toast('选中的账号仍有关联客户，不能移除。');fidConfirm('移除账号','移除选中的无客户账号？','fidDoAccountDelete');},
+    fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!data.customers.some(c=>c.account===a.id));data.accounts=data.accounts.filter(a=>!selected.includes(a));fid.accountChecked.clear();persist();close();render();toast('已移除选中的账号。');},
+    fidAccountZero:()=>fidConfirm('统计清零','将已选账号的未读统计清零？','fidDoAccountZero'),
+    fidDoAccountZero:()=>{const selected=new Set(fidSelectedAccounts().map(a=>a.id));myCustomers().filter(c=>selected.has(c.account)).forEach(c=>c.unread=0);persist();close();render();toast('未读统计已清零。');},
     fidLogReset:()=>{fid.logFilter={start:'',end:'',app:'all',field:'customer',query:''};ui.pages.followups=0;render();},
     fidTasks:()=>{fid.followMode='todo';ui.pages.followups=0;navigate('followups');},
     fidLogHistory:()=>{fid.followMode='history';ui.pages.followups=0;render();},
@@ -427,10 +428,10 @@
     fidChatFilters:()=>fidDialog('会话筛选','<div class="modal-body fid-conversation-filters">'+Object.entries(fidConversationFilters).map(([id,label])=>fidButton(label,'fidChatFilter','',ui.conversationFilter===id?'blue':'',`${fidActionID(id)} aria-pressed="${ui.conversationFilter===id}"`)).join('')+'</div>'),
     fidChatFilter:id=>{ui.conversationFilter=id;close();render();},
     fidClearChatFilter:()=>{ui.conversationFilter='all';render();$('#conversation-search')?.focus({preventScroll:true});},
-    fidChatPermissions:()=>fidDialog('会话权限','<div class="modal-body">'+(manager()?'主管可评审团队演示账号及其会话。':'聊手只查看分配给自己的演示账号及客户。')+'</div>',fidButton('关闭','close')),
+    fidChatPermissions:()=>fidDialog('会话权限','<div class="modal-body">'+(manager()?'主管可查看团队账号及其会话。':'聊手只查看分配给自己的账号及客户。')+'</div>',fidButton('关闭','close')),
     fidRoleAdd:()=>fidRoleEdit(),fidRoleEdit,
     fidRoleDetails:id=>{if(!manager())return;const g=fidRole(id);if(g)fidDialog('权限详情 · '+g.name,'<div class="modal-body">'+fidPermissionTree(g,true)+'</div>',fidButton('关闭','close'));},
-    fidRoleDelete:id=>{if(!manager())return;const g=fidRole(id);if(!g||g.builtIn)return;if(data.members.some(m=>fidMemberRole(m)===id))return toast('请先迁移此权限组下的演示子账号。');fidConfirm('删除权限组','删除此演示权限组？','fidDoRoleDelete',id);},
+    fidRoleDelete:id=>{if(!manager())return;const g=fidRole(id);if(!g||g.builtIn)return;if(data.members.some(m=>fidMemberRole(m)===id))return toast('请先迁移此权限组下的子账号。');fidConfirm('删除权限组','删除此权限组？','fidDoRoleDelete',id);},
     fidDoRoleDelete:id=>{const g=fidRole(id);if(!manager()||!g||g.builtIn||data.members.some(m=>fidMemberRole(m)===id))return;data.roleGroups=data.roleGroups.filter(r=>r!==g);persist();close();render();toast('权限组已删除。');},
     fidMemberAdd:()=>fidMemberEdit(),fidMemberEdit,
     fidMemberReset:()=>{fid.memberFilter={id:'',name:'',role:'all',status:'all'};ui.pages.members=0;render();},
@@ -509,20 +510,20 @@
     },
     'fid-customer-search-form':fidApplyCustomerSearch,
     'fid-account-search-form':()=>{Object.assign(fid,{accountField:$('#fid-account-field').value,accountChannel:$('#fid-account-channel').value});ui.accountQuery=$('#account-query').value;ui.accountStatus=$('#account-state').value;fid.accountChecked.clear();ui.pages.accounts=0;render();},
-    'fid-account-note-form':(f,v)=>{if(!v('note'))return error('请输入注释。');fidSelectedAccounts().forEach(a=>a.annotation=v('note'));persist();close();render();toast('所选演示账号已更新注释。');},
+    'fid-account-note-form':(f,v)=>{if(!v('note'))return error('请输入注释。');fidSelectedAccounts().forEach(a=>a.annotation=v('note'));persist();close();render();toast('所选账号已更新注释。');},
     'fid-log-search-form':()=>{fid.logFilter={start:$('#fid-log-start').value,end:$('#fid-log-end').value,app:$('#fid-log-app').value,field:$('#fid-log-field').value,query:$('#fid-log-query').value};ui.pages.followups=0;render();},
     'fid-role-form':(f,v)=>{
       if(!manager())return;if(!v('name'))return error('请输入权限组名称。');const g=fidRole(v('id')),view=f.getAll('view').filter(x=>fidPerms.includes(x)),write=f.getAll('write').filter(x=>view.includes(x));
       if(data.roleGroups.some(r=>r!==g&&r.name===v('name')))return error('已存在同名权限组。');
-      const values={name:v('name'),enabled:g?.builtIn?g.enabled:v('enabled')==='1',view,write};if(g)Object.assign(g,values);else data.roleGroups.push({id:nextId('role'),...values,created:fidDay()});persist();close();render();toast('演示权限组已保存。');
+      const values={name:v('name'),enabled:g?.builtIn?g.enabled:v('enabled')==='1',view,write};if(g)Object.assign(g,values);else data.roleGroups.push({id:nextId('role'),...values,created:fidDay()});persist();close();render();toast('权限组已保存。');
     },
     'fid-member-form':(f,v)=>{
       if(!manager())return;const m=member(v('id')),g=fidRole(v('roleGroup'));
       if(!v('login')||!v('name')||!v('team')||!g)return error('请填写账号、昵称、权限组和团队。');
-      if(data.members.some(x=>x!==m&&(x.login||x.id).toLowerCase()===v('login').toLowerCase()))return error('演示账号已存在。');
+      if(data.members.some(x=>x!==m&&(x.login||x.id).toLowerCase()===v('login').toLowerCase()))return error('账号已存在。');
       if(m?.id===ui.persona&&g.id!=='lead')return error('请保留当前主管的主管权限。');
       const values={login:v('login'),name:v('name'),team:v('team'),note:v('note'),roleGroup:g.id,role:g.id==='lead'?'manager':'agent',enabled:m?.id===ui.persona?true:v('enabled')==='1'};
-      if(m)Object.assign(m,values);else data.members.push({id:nextId('u'),...values,initial:initial(values.name),color:'blue',created:fidDay()});persist();close();render();toast('演示子账号已保存。');
+      if(m)Object.assign(m,values);else data.members.push({id:nextId('u'),...values,initial:initial(values.name),color:'blue',created:fidDay()});persist();close();render();toast('子账号已保存。');
     },
     'fid-member-search-form':()=>{fid.memberFilter={id:$('#fid-member-id').value,name:$('#fid-member-name').value,role:$('#fid-member-role').value,status:$('#fid-member-status').value};ui.pages.members=0;render();},
   };

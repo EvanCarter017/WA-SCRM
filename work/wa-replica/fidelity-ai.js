@@ -292,10 +292,10 @@
       <div class="fid-ai-provider"><strong>发送保护</strong><label class="fid-ai-switch"><input type="checkbox" role="switch" data-ai-setting="sendGuard" ${settings.sendGuard ? 'checked' : ''} aria-label="发送保护">${settings.sendGuard ? '已开启' : '已关闭'}</label><span>开启后，不是客户语言的回复不会直接发出：第一次按 Enter 先翻译，确认译文后再按一次发送。也可在输入框旁切换。</span></div>
       <h2>能力清单</h2>
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
-      <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。正式版由主管在主站管理；原型开放操作以便评审。</p>
+      <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。</p>
       <h2>最近调用</h2>
       ${fidTable('fid-ai-usage', ['时间', '能力', '客户', '操作人', '输入字符', '输出字符', '结果'], usageRows, '暂无调用记录。收到客户消息或翻译回复后，这里会出现记录。')}
-      <p class="fid-field-help">显示最近 ${AI_USAGE_SHOWN} 次调用，本机最多保留 ${AI_USAGE_KEPT} 条；累计数见上表。</p>
+      <p class="fid-field-help">显示最近 ${AI_USAGE_SHOWN} 次调用，最多保留 ${AI_USAGE_KEPT} 条；累计数见上表。</p>
     </div></section>`;
   }
 
