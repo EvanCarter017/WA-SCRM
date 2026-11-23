@@ -46,6 +46,11 @@ const PURGEABLE = ['priceList'];
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const FIELD = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
 const NAME_MAX = 60;
+// How much of a deleted sub-site's data is looked at for the translations the relay keeps of it: the languages
+// (the page offers 12), the longest text the relay translates (ai-relay.cjs MAX_TEXT), and fingerprints in all.
+const TRANSLATION_LANGUAGES = 12;
+const TRANSLATED_MAX = 4000;
+const TRANSLATIONS_AT_MOST = 2000000;
 // An employee's sign-in name where it is the name of a sub-site as well: what does as the name of a host.
 const EMPLOYEE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 const STATUS = {
@@ -153,6 +158,7 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
   async function newWorkspace(actor, body, given) {
     const id = body.username.trim().toLowerCase();
     if (!EMPLOYEE.test(id) || RESERVED.includes(id)) throw problem('invalid-username');
+    if (id === siteId) throw problem('invalid-username');
     if (!body.name.trim()) throw problem('invalid-name');
     if (given && !validPassword(body.password)) throw problem('invalid-password');
     if (auth.listUsers().some(user => user.username === id)) throw problem('username-taken');
@@ -174,6 +180,8 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
   // employee of the same sub-site can still sign in. The account is off whatever comes of this.
   async function workspaceOff(actor, target) {
     if (!workspaces || target.role !== 'agent' || auth.listUsers().some(user => user.site === target.site && !user.disabled)) return {};
+    // A name no sub-site can have, or the first server's own, has no sub-site to stop.
+    if (!SITE_ID.test(target.site) || RESERVED.includes(target.site) || target.site === siteId) return {};
     try {
       await asked('stop', actor, target.site, () => workspaces.stop(target.site));
       return { workspace: 'stopped' };
@@ -196,61 +204,85 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
     }
     return { workspace: 'starting' };
   }
-  // The fingerprints under which the relay keeps the translations of a sub-site's messages for everyone
-  // (ai-relay.cjs: the language and the text), read from the sub-site's data before it is deleted: every text of
-  // its messages, for every language they were translated into and the one its employee reads in.
-  function translationsOf(id) {
-    const file = path.join(dir, `site-${id}.db`);
-    if (!fs.existsSync(file)) return [];
-    const doc = openData(file);
-    let data;
+  // The translations the relay keeps for everyone of a sub-site's messages (ai-relay.cjs: a fingerprint of the
+  // language and the text), taken out of its store before the sub-site's data goes: of every text and voice
+  // transcript of its messages, for every language they were translated into and the one its employee reads in.
+  // The data is read part by part, and only what a translation can have come from is looked at — at most
+  // TRANSLATION_LANGUAGES languages, texts the relay translates, TRANSLATIONS_AT_MOST fingerprints in all —; the
+  // work is done in batches, and the server answers other requests between them.
+  async function forgetTranslations(id) {
+    const file = path.join(dir, `site-${id}.db`), storeFile = path.join(dir, 'ai-translations.db');
+    if (!fs.existsSync(file) || !fs.existsSync(storeFile)) return;
+    const source = new DatabaseSync(file), db = new DatabaseSync(storeFile);
     try {
-      data = doc.read(['messages', 'ai']).data;
-    } finally {
-      doc.close();
-    }
-    const languages = new Set(), texts = new Set();
-    if (typeof data.ai?.readLanguage === 'string') languages.add(data.ai.readLanguage.trim());
-    for (const list of Object.values(data.messages && typeof data.messages === 'object' ? data.messages : {})) {
-      for (const message of Array.isArray(list) ? list : []) {
-        if (typeof message?.text === 'string' && message.text.trim()) texts.add(message.text.trim());
-        if (typeof message?.translatedTo === 'string') languages.add(message.translatedTo.trim());
-      }
-    }
-    languages.delete('');
-    return [...languages].flatMap(language => [...texts].map(text => crypto.createHash('sha256').update(language + '\n' + text).digest('hex')));
-  }
-  // Those translations taken out of the relay's store; nothing else of it is touched.
-  function forgetTranslations(id, keys) {
-    const file = path.join(dir, 'ai-translations.db');
-    if (!keys.length || !fs.existsSync(file)) return;
-    const db = new DatabaseSync(file);
-    try {
+      source.exec('PRAGMA busy_timeout = 5000');
       db.exec('PRAGMA busy_timeout = 5000');
+      // The messages one by one: a part is one customer's messages; the field stored whole is a map of them.
+      const messages = function* () {
+        for (const { json } of source.prepare("SELECT json FROM doc WHERE key = 'messages' OR key LIKE 'messages/%' ORDER BY key").iterate()) {
+          let value = null;
+          try {
+            value = JSON.parse(json);
+          } catch {}
+          for (const list of Array.isArray(value) ? [value] : Object.values(value && typeof value === 'object' ? value : {})) {
+            for (const message of Array.isArray(list) ? list : []) if (message && typeof message === 'object') yield message;
+          }
+        }
+      };
+      const languages = new Set();
+      const language = value => { if (typeof value === 'string' && value.trim() && languages.size < TRANSLATION_LANGUAGES) languages.add(value.trim()); };
+      try {
+        language(JSON.parse(source.prepare("SELECT json FROM doc WHERE key = 'ai'").get()?.json ?? 'null')?.readLanguage);
+      } catch {}
+      for (const message of messages()) language(message.translatedTo);
+      const fingerprint = (language, text) => crypto.createHash('sha256').update(language + '\n' + text).digest('hex');
       const drop = db.prepare('DELETE FROM translations WHERE key = ?');
-      let rows = 0;
+      let rows = 0, done = 0;
+      const forget = async () => {
+        for (const message of messages()) {
+          for (const raw of [message.text, message.transcript]) {
+            const text = typeof raw === 'string' ? raw.trim() : '';
+            if (!text || text.length > TRANSLATED_MAX) continue;
+            for (const to of languages) {
+              rows += Number(drop.run(fingerprint(to, text)).changes);
+              if (++done >= TRANSLATIONS_AT_MOST) return;
+              if (done % 500 === 0) {
+                db.exec('COMMIT');
+                await new Promise(resolve => setImmediate(resolve));
+                db.exec('BEGIN');
+              }
+            }
+          }
+        }
+      };
       db.exec('BEGIN');
-      for (const key of keys) rows += Number(drop.run(key).changes);
-      db.exec('COMMIT');
+      try {
+        await forget();
+      } finally {
+        db.exec('COMMIT');
+      }
       console.log(`site workspace translations removed site=${id} rows=${rows}`);
     } finally {
+      source.close();
       db.close();
     }
   }
   // An employee's sub-site goes with the last account of it — the account is deleted only once it is gone — and
-  // the translations of its messages with it. A sub-site the platform does not know, or whose name no sub-site
-  // can have, is nothing to delete. Where the platform does not make sub-sites an employee's account is not
-  // deleted here: its data would stay behind.
+  // the translations of its messages with it (taken first: they are what the relay keeps, and the sub-site's
+  // data is what they are found by). A sub-site the platform does not know, a name no sub-site can have, or the
+  // first server's own is nothing to delete. Where the platform does not make sub-sites an employee's account is
+  // not deleted here: its data would stay behind. A sub-site another account still has is said so (shared).
   async function workspaceRemove(actor, target) {
-    if (target.role !== 'agent' || auth.listUsers().some(user => user.site === target.site && user.username !== target.username)) return {};
+    if (target.role !== 'agent') return {};
+    if (auth.listUsers().some(user => user.site === target.site && user.username !== target.username)) return { shared: true };
     if (!workspaces) throw problem('workspace-unavailable');
-    if (!SITE_ID.test(target.site) || RESERVED.includes(target.site)) return {};
-    let keys = [], removed = null;
+    if (!SITE_ID.test(target.site) || RESERVED.includes(target.site) || target.site === siteId) return {};
     try {
-      keys = translationsOf(target.site);
+      await forgetTranslations(target.site);
     } catch (error) {
-      console.error(`site workspace translations unread site=${target.site} error=${error.code || error.name}`);
+      console.error(`site workspace translations failed site=${target.site} error=${error.code || error.name}`);
     }
+    let removed = null;
     await asked('remove', actor, target.site, async () => {
       try {
         removed = await workspaces.remove(target.site);
@@ -259,11 +291,6 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
       }
     });
     if (!removed) return {};
-    try {
-      forgetTranslations(target.site, keys);
-    } catch (error) {
-      console.error(`site workspace translations failed site=${target.site} error=${error.code || error.name}`);
-    }
     return { workspace: 'removed', ...(removed.signedOut === false ? { phone: 'not-signed-out' } : {}) };
   }
 
@@ -355,10 +382,11 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
     // An account deleted for good, with its sessions — and an employee's sub-site with it (workspaceRemove).
     'POST /api/auth/users/remove': async req => {
       const actor = manager(req), target = managed(actor, (await readJson(req)).username);
-      const workspace = await workspaceRemove(actor, target);
+      const { shared, ...workspace } = await workspaceRemove(actor, target);
       auth.deleteUser(target.username);
       console.log(`site account removed by=${actor.username} user=${target.username} role=${target.role}`);
-      return { body: { ok: true, ...workspace } };
+      // A sub-site another account still has stays — and stops when none of them can sign in any more.
+      return { body: { ok: true, ...workspace, ...(shared ? await workspaceOff(actor, target) : {}) } };
     },
     'GET /api/data': req => {
       const user = signedIn(req);

@@ -351,7 +351,22 @@ for (const required of ['function deleteUser(username) {', "db.prepare('DELETE F
 for (const required of ["'POST /api/auth/users/remove': async req => {", "if (!workspaces) throw problem('workspace-unavailable');", "crypto.createHash('sha256').update(language + '\\n' + text).digest('hex')", "const drop = db.prepare('DELETE FROM translations WHERE key = ?');"]) {
   assert(apiSource.includes(required), `site-api.cjs is missing ${required}`);
 }
-assert(apiSource.indexOf('const actor = manager(req), target = managed(actor, (await readJson(req)).username);\n      const workspace = await workspaceRemove(actor, target);\n      auth.deleteUser(target.username);') > 0, 'an account must be deleted only after the sub-site that goes with it');
+assert(apiSource.indexOf('const actor = manager(req), target = managed(actor, (await readJson(req)).username);\n      const { shared, ...workspace } = await workspaceRemove(actor, target);\n      auth.deleteUser(target.username);') > 0, 'an account must be deleted only after the sub-site that goes with it');
+// What the review of plan 057 found, held: the translations of a deleted sub-site are looked for part by part and
+// within bounds, in batches between which the server answers others; the first server's own name is no
+// employee's sub-site; a sub-site another account has stops when none can sign in; signing numbers out is bounded
+// in time, sessions and answers, and a settings file is read only when it is a plain file; the gateway's
+// configuration is tried before an upgrade changes anything; the note about the phone is not lost.
+for (const required of ['const TRANSLATION_LANGUAGES = 12;', 'const TRANSLATED_MAX = 4000;', 'if (++done >= TRANSLATIONS_AT_MOST) return;', 'await new Promise(resolve => setImmediate(resolve));', 'for (const raw of [message.text, message.transcript]) {', "if (id === siteId) throw problem('invalid-username');", "if (!SITE_ID.test(target.site) || RESERVED.includes(target.site) || target.site === siteId) return {};", '...(shared ? await workspaceOff(actor, target) : {})']) {
+  assert(apiSource.includes(required), `site-api.cjs is missing ${required}`);
+}
+assert(read(path.join(__dirname, 'ai-relay.cjs')).includes('const MAX_TEXT = 4000;'), 'the longest text looked at for a translation must be the longest the relay translates');
+assert(apiSource.indexOf('await forgetTranslations(target.site);') < apiSource.indexOf('removed = await workspaces.remove(target.site);'), 'the translations must be looked for while the sub-site\'s data is still there');
+for (const required of ['const SIGN_OUT_BUDGET_MS = 60000;', 'const SESSIONS_AT_MOST = 20;', 'const ANSWER_MAX = 1024 * 1024;', 'stat?.isFile() && stat.size <= 4096', 'if (size > ANSWER_MAX) return { status: 0, body: null };', 'signal: AbortSignal.timeout(Math.min(20000, left()))', 'for (const session of listed.body.slice(0, SESSIONS_AT_MOST)) {']) {
+  assert(provisionerSource.includes(required), `site-provisioner.cjs is missing ${required}`);
+}
+assert(deploy('upgrade.sh').indexOf('-t -q || { echo "deploy/gateway.conf has an error: nothing was changed" >&2; exit 1; }') > 0 && deploy('upgrade.sh').indexOf('-t -q ||') < deploy('upgrade.sh').indexOf('"${COMPOSE[@]}" up -d\n'), 'the upgrade script must try the gateway\'s configuration before it changes anything');
+assert(masterSource.includes("if (phone && (asking.isConnected || !$('#dialog').open)) showDialog('账号已删除', `<p>账号已删除。${NOT_SIGNED_OUT}</p>`, DONE);"), 'the note about the phone must not be lost when the dialog was closed meanwhile');
 assert(read(path.join(__dirname, 'ai-relay.cjs')).includes("const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\\n' + text).digest('hex');"), 'the fingerprint of a translation must be the relay\'s own');
 for (const required of ["'POST /sites/remove': async (body, id) => {", "work.set(id, 'removing');", "const files = [n.settings, ...['site', 'wa'].flatMap(kind => ['', '-wal', '-shm'].map(end => `${kind}-${id}.db${end}`)), `wa-media-${id}`].map(name => path.join(config.dataDir, name));", "const signedOut = await signOut(id, parts, volume);", "/^\\/sites\\/([^/]+)\\/(start|stop|remove)$/"]) {
   assert(provisionerSource.includes(required), `site-provisioner.cjs is missing ${required}`);

@@ -612,13 +612,15 @@ test('deleting an account: for supervisors and administrators, never one\'s own,
   const rosaData = openData(path.join(dir, 'site-rosa.db'));
   rosaData.write({ baseVersion: 0, by: 'test', set: {
     'messages/c1': [{ id: 'm1', text: ' Hola, ¿tienen cajas? ', translated: '你好，有箱子吗？', translatedTo: '简体中文' }, { id: 'm2', text: 'Gracias', translatedTo: 'English' }],
-    'messages/c2': [{ id: 'm3', text: '[图片]' }],
+    'messages/c2': [{ id: 'm3', text: '[图片]' }, { id: 'm4', text: '[语音]', transcript: 'Necesito diez cajas', translatedTo: '简体中文' }, { id: 'm5', text: 'x'.repeat(4001), translatedTo: '简体中文' }],
+    // a language for each of these — more than a page ever offered: only so many are looked at
+    'messages/c3': Array.from({ length: 13 }, (_, i) => ({ id: 'l' + i, text: 'Hola', translatedTo: 'Lang' + String(i + 1).padStart(2, '0') })),
     ai: { readLanguage: '简体中文' },
   } });
   rosaData.close();
   const store = new DatabaseSync(path.join(dir, 'ai-translations.db'));
   store.exec('CREATE TABLE IF NOT EXISTS translations (key TEXT PRIMARY KEY, text TEXT NOT NULL, at TEXT NOT NULL)');
-  for (const [to, text] of [['简体中文', 'Hola, ¿tienen cajas?'], ['English', 'Gracias'], ['简体中文', 'Gracias'], ['简体中文', 'Bonjour à tous']]) store.prepare('INSERT OR REPLACE INTO translations (key, text, at) VALUES (?, ?, ?)').run(fingerprint(to, text), 'translated', 'now');
+  for (const [to, text] of [['简体中文', 'Hola, ¿tienen cajas?'], ['English', 'Gracias'], ['简体中文', 'Gracias'], ['简体中文', 'Bonjour à tous'], ['简体中文', 'Necesito diez cajas'], ['Lang10', 'Gracias'], ['Lang11', 'Gracias'], ['简体中文', 'x'.repeat(4001)]]) store.prepare('INSERT OR REPLACE INTO translations (key, text, at) VALUES (?, ?, ?)').run(fingerprint(to, text), 'translated', 'now');
   const kept = () => store.prepare('SELECT key FROM translations').all().map(row => row.key);
   try {
     const rosa = await member('rosa', 'agent', 'rosa');
@@ -639,8 +641,10 @@ test('deleting an account: for supervisors and administrators, never one\'s own,
     // a supervisor's account: deleted with its sessions; the provisioner is not asked
     assert.deepEqual((await send(joy, 'zara')).json, { ok: true });
     assert.deepEqual([exists('zara'), (await call('/api/auth/me', { cookie: zara, base })).status, (await call('/api/auth/login', { method: 'POST', base, body: { username: 'zara', password: PASSWORD } })).status, asked], [false, 401, 401, []]);
-    // an employee whose sub-site another account still has — also one that is switched off: the account only
-    assert.deepEqual([(await send(ivo, 'tim')).json, exists('tim'), asked, states.has('pair')], [{ ok: true }, false, [], true]);
+    // an employee whose sub-site another account still has — also one that is switched off: the account only;
+    // and as nobody can sign in to the sub-site any more, it stops
+    assert.deepEqual([(await send(ivo, 'tim')).json, exists('tim'), asked, states.has('pair')], [{ ok: true, workspace: 'stopped' }, false, ['stop pair'], true]);
+    asked.length = 0;
     // the last account of it: the sub-site goes too — and while the provisioner refuses, the account stays
     for (const [reason, status] of [['workspace-busy', 409], ['workspace-unavailable', 503]]) {
       refuse = reason;
@@ -650,14 +654,19 @@ test('deleting an account: for supervisors and administrators, never one\'s own,
     refuse = null;
     asked.length = 0;
     assert.deepEqual([(await send(ivo, 'tom')).json, exists('tom'), asked, states.has('pair')], [{ ok: true, workspace: 'removed' }, false, ['remove pair'], false]);
-    // rosa's: her sub-site, and the translations of its messages — those of another stay; her session ends
+    // rosa's: her sub-site, and the translations of its messages and voice notes — those of another stay, and
+    // what no translation can have come from is not looked at; her session ends
     asked.length = 0;
     assert.deepEqual((await send(ivo, 'rosa')).json, { ok: true, workspace: 'removed' });
-    assert.deepEqual([exists('rosa'), asked, kept(), (await call('/api/auth/me', { cookie: rosa, base })).status], [false, ['remove rosa'], [fingerprint('简体中文', 'Bonjour à tous')], 401]);
+    assert.deepEqual([exists('rosa'), asked, kept().sort(), (await call('/api/auth/me', { cookie: rosa, base })).status], [false, ['remove rosa'], [fingerprint('简体中文', 'Bonjour à tous'), fingerprint('Lang11', 'Gracias'), fingerprint('简体中文', 'x'.repeat(4001))].sort(), 401]);
     // a number that could not be signed out at WhatsApp is said so
     signedOut = false;
     assert.deepEqual((await send(joy, 'vera')).json, { ok: true, workspace: 'removed', phone: 'not-signed-out' });
     signedOut = true;
+    // the first server's own name is no employee's sub-site: neither made nor deleted
+    await site.auth.createUser({ username: 'hqa', role: 'agent', name: 'Hqa', site: 'hq3' });
+    asked.length = 0;
+    assert.deepEqual([(await call('/api/auth/users', { method: 'POST', cookie: ivo, base, body: { username: 'hq3', name: 'Own', role: 'agent' } })).json, (await send(ivo, 'hqa')).json, exists('hqa'), asked], [{ error: 'invalid-username' }, { ok: true }, false, []]);
     // a sub-site the provisioner does not know, and a name no sub-site can have: the account only
     asked.length = 0;
     assert.deepEqual([(await send(ivo, 'drift')).json, (await send(ivo, 'odd')).json, exists('drift'), exists('odd'), asked], [{ ok: true }, { ok: true }, false, false, ['remove nobody-knows']]);
@@ -667,7 +676,7 @@ test('deleting an account: for supervisors and administrators, never one\'s own,
     assert.deepEqual([(await call('/api/auth/users/remove', { method: 'POST', cookie: ivo, body: { username: 'ulla' } })).json, exists('ulla'), (await call('/api/auth/users/remove', { method: 'POST', cookie: ivo, body: { username: 'quint' } })).json, exists('quint')], [{ error: 'workspace-unavailable' }, true, { ok: true }, false]);
     // every step in the log, with who did it; no password
     const lines = logged.filter(line => /^site (account removed|workspace (remove|translations))/.test(line));
-    for (const line of ['site account removed by=joy user=zara role=supervisor', 'site account removed by=ivo user=tim role=agent', 'site workspace remove failed by=ivo site=pair error=workspace-busy', 'site workspace remove ok by=ivo site=pair', 'site workspace remove ok by=ivo site=rosa', 'site workspace translations removed site=rosa rows=3', 'site account removed by=ivo user=rosa role=agent', 'site account removed by=ivo user=quint role=supervisor']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+    for (const line of ['site account removed by=joy user=zara role=supervisor', 'site account removed by=ivo user=tim role=agent', 'site workspace remove failed by=ivo site=pair error=workspace-busy', 'site workspace remove ok by=ivo site=pair', 'site workspace remove ok by=ivo site=rosa', 'site workspace translations removed site=rosa rows=5', 'site account removed by=ivo user=rosa role=agent', 'site account removed by=ivo user=quint role=supervisor']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
     assert(!logged.join('\n').includes(PASSWORD), 'a password in the log');
   } finally {
     store.close();

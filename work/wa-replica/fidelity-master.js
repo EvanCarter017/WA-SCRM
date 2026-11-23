@@ -266,6 +266,7 @@
     $('#master-remove [name="confirm"]').focus();
   }
   const REMOVE_PROBLEM = { 'workspace-busy': '这个工作区正在准备或停止中，请稍后再试。', 'workspace-unavailable': '暂时无法删除工作区，请稍后再试。' };
+  const NOT_SIGNED_OUT = 'WhatsApp 号码没能在手机上自动退出：如果这位员工绑定过号码，请在手机 WhatsApp 的「设置 → 已关联的设备」中把它移除。';
   async function removeAccount(form) {
     const username = form.dataset.id;
     if (form.elements.confirm.value.trim().toLowerCase() !== username) return removeForm(username, '输入的登录名不一致。');
@@ -275,9 +276,12 @@
     for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
     $('#dialog [type="submit"]').textContent = '正在删除…';
     const answer = await post('/api/auth/users/remove', { username });
-    if (!asking.isConnected) say(answer.status === 200 ? '账号已删除' : problemText(answer));
+    const phone = answer.status === 200 && answer.body.phone === 'not-signed-out';
+    // What is left to do on the phone is said in a dialog — also when the one that asked was closed meanwhile,
+    // unless another one is open by now: then the note says it.
+    if (phone && (asking.isConnected || !$('#dialog').open)) showDialog('账号已删除', `<p>账号已删除。${NOT_SIGNED_OUT}</p>`, DONE);
+    else if (!asking.isConnected) say(phone ? '账号已删除。' + NOT_SIGNED_OUT : answer.status === 200 ? '账号已删除' : problemText(answer));
     else if (answer.status !== 200) removeForm(username, REMOVE_PROBLEM[answer.body.error] || problemText(answer));
-    else if (answer.body.phone === 'not-signed-out') showDialog('账号已删除', '<p>账号已删除。WhatsApp 号码没能在手机上自动退出：如果这位员工绑定过号码，请在手机 WhatsApp 的「设置 → 已关联的设备」中把它移除。</p>', DONE);
     else {
       closeDialog();
       say('账号已删除');

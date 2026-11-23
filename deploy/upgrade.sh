@@ -11,6 +11,9 @@ cd "$(dirname "$0")/.."
 COMPOSE=(docker compose -f deploy/compose.yml --env-file "$SETTINGS")
 IMAGE=$(sed -n 's/^WA_SCRM_SERVER_IMAGE=//p' "$SETTINGS")
 IMAGE=${IMAGE:-wa-scrm-server:current}
+# The gateway's configuration is tried before anything is changed: one with an error stops the upgrade here.
+GATEWAY_IMAGE=$(sed -n 's/^    image: \(nginx:[^ ]*\)$/\1/p' deploy/compose.yml)
+docker run --rm --entrypoint nginx -v "$PWD/deploy/gateway.conf:/etc/nginx/nginx.conf:ro" "$GATEWAY_IMAGE" -t -q || { echo "deploy/gateway.conf has an error: nothing was changed" >&2; exit 1; }
 echo "building $IMAGE"
 docker build -q -f deploy/Dockerfile -t "$IMAGE" . > /dev/null
 "${COMPOSE[@]}" up -d
@@ -20,7 +23,7 @@ if ! docker exec wa-scrm-gateway cat /etc/nginx/nginx.conf | cmp -s - deploy/gat
   echo "the gateway gets its new configuration"
   "${COMPOSE[@]}" up -d --force-recreate gateway
 else
-  docker exec wa-scrm-gateway nginx -s reload 2> /dev/null || true
+  docker exec wa-scrm-gateway nginx -s reload || echo "the gateway could NOT read its configuration again" >&2
 fi
 healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' wa-scrm-provisioner 2> /dev/null)" = healthy ]; }
 for i in $(seq 1 60); do

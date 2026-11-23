@@ -7,6 +7,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { create, engine, configFromEnv, client, clientFromEnv, openwaAddress, RESERVED } = require('./site-provisioner.cjs');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-prov-'));
@@ -68,22 +69,24 @@ const fake = http.createServer((req, res) => {
 });
 // ---- the stand-in OpenWA: gives a restricted key to whoever shows the key its container was started with ----
 const keys = [];
-// The sessions of the sub-sites' numbers, by sub-site: { id, status, phone, polls }. A sub-site is known by the
-// restricted key its settings file holds. sessionCalls: what was asked of them, in order.
-const sessions = new Map(), sessionCalls = [];
+// The sessions of the sub-sites' numbers, by sub-site: { id, status, phone, polls, stuck }. A sub-site is known by
+// the restricted key its settings file holds. sessionCalls: what was asked of them, in order. hugeSites: the
+// sub-sites whose list of sessions is answered with far too much.
+const sessions = new Map(), sessionCalls = [], hugeSites = new Set();
 let logoutDelay = 0;
 const siteOfKey = key => keys.find(k => k.apiKey === key)?.name.replace(/^wa-scrm-(.+)-[0-9a-z]+$/, '$1');
 function sessionAnswer(site, req, res) {
   const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
   const [, id, action] = req.url.slice('/api/sessions'.length).split('/'), list = sessions.get(site) || [];
   sessionCalls.push(`${req.method} ${site}${id ? ' ' + id : ''}${action ? ' ' + action : ''}`);
-  if (!id) return send(200, list.map(({ polls, ...session }) => session));
+  if (!id && hugeSites.has(site)) return send(200, 'x'.repeat(2 * 1024 * 1024));
+  if (!id) return send(200, list.map(({ polls, stuck, ...session }) => session));
   const session = list.find(s => s.id === id);
   if (!session) return send(404, { message: 'no such session' });
   if (req.method === 'GET') {
     // a linked number whose connection is down is up again after it was asked about twice
-    if (session.status === 'disconnected' && session.phone && ++session.polls >= 2) session.status = 'ready';
-    const { polls, ...shown } = session;
+    if (session.status === 'disconnected' && session.phone && !session.stuck && ++session.polls >= 2) session.status = 'ready';
+    const { polls, stuck, ...shown } = session;
     return send(200, shown);
   }
   if (action === 'logout') return void setTimeout(() => (session.status === 'ready' ? (session.status = 'logged-out', send(200, { ok: true })) : send(400, { message: 'not running' })), logoutDelay);
@@ -106,7 +109,7 @@ const openwa = http.createServer((req, res) => {
 });
 
 let base, openwaBase;
-const provisioner = () => create({ config, docker: engine(socket), freeMb: () => free, openwaUrl: () => openwaBase, wait: () => new Promise(resolve => setImmediate(resolve)), healthWaitMs: 150, signOutWaitMs: 150 });
+const provisioner = () => create({ config, docker: engine(socket), freeMb: () => free, openwaUrl: () => openwaBase, wait: () => new Promise(resolve => setImmediate(resolve)), healthWaitMs: 150, signOutWaitMs: 150, signOutBudgetMs: 2000 });
 let front;
 const call = (pathname, { method = 'GET', body, secret = SECRET } = {}) =>
   fetch(base + pathname, { method, headers: { ...(secret ? { Authorization: 'Bearer ' + secret } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
@@ -417,6 +420,41 @@ test('deleting a sub-site: its numbers signed out at WhatsApp — an OpenWA that
   // the lines say what went, and whether its numbers were signed out
   const lines = logged.filter(line => line.startsWith('provisioner remove'));
   for (const line of ['provisioner remove ok site=x1 signed-out=yes', 'provisioner remove ok site=x2 signed-out=yes', 'provisioner remove ok site=x3 signed-out=no', 'provisioner remove ok site=x4 signed-out=none']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+});
+
+test('signing out the numbers of a deleted sub-site is bounded — in time, in sessions, in what is read of an answer; a settings file that is no plain file holds no key — and the sub-site is deleted all the same', async () => {
+  const make = async id => { assert.equal((await call('/sites', { method: 'POST', body: { id } })).status, 202, id); assert.equal((await settled(id)).state, 'ready', id); };
+  // a stopped sub-site whose number never comes back, deleted by a provisioner with little time to spare
+  await make('y1');
+  sessions.set('y1', [{ id: 'ffff-1', status: 'ready', phone: '15550011', polls: 0 }]);
+  assert.equal((await call('/sites/y1/stop', { method: 'POST' })).status, 200);
+  Object.assign(sessions.get('y1')[0], { status: 'disconnected', stuck: true });
+  const hasty = create({ config, docker: engine(socket), freeMb: () => free, openwaUrl: () => openwaBase, wait: () => new Promise(resolve => setTimeout(resolve, 20)), healthWaitMs: 150, signOutWaitMs: 5000, signOutBudgetMs: 300 });
+  const server = http.createServer(hasty.handle);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const started = Date.now();
+    const answer = await (await fetch(`http://127.0.0.1:${server.address().port}/sites/y1/remove`, { method: 'POST', headers: { Authorization: 'Bearer ' + SECRET } })).json();
+    assert.deepEqual([answer, Date.now() - started < 2000, containers.has('wa-scrm-openwa-y1')], [{ id: 'y1', state: 'removed', signedOut: false }, true, false]);
+  } finally {
+    server.closeAllConnections(); server.close();
+  }
+  // twenty-five sessions: twenty are looked at, and it cannot be said that every number is signed out
+  await make('y2');
+  sessions.set('y2', Array.from({ length: 25 }, (_, i) => ({ id: 'gggg-' + i, status: 'qr_ready', phone: null, polls: 0 })));
+  sessionCalls.length = 0;
+  assert.deepEqual([(await call('/sites/y2/remove', { method: 'POST' })).json, sessionCalls.filter(line => line.startsWith('DELETE')).length], [{ id: 'y2', state: 'removed', signedOut: false }, 20]);
+  // an answer far too large is no answer
+  await make('y3');
+  hugeSites.add('y3');
+  assert.deepEqual((await call('/sites/y3/remove', { method: 'POST' })).json, { id: 'y3', state: 'removed', signedOut: false });
+  hugeSites.delete('y3');
+  // a pipe in place of the settings file: nothing waits for it, and it goes with the rest
+  await make('y4');
+  const settingsFile = path.join(dataDir, 'openwa-y4.env');
+  fs.rmSync(settingsFile);
+  assert.equal(spawnSync('mkfifo', [settingsFile]).status, 0);
+  assert.deepEqual([(await call('/sites/y4/remove', { method: 'POST' })).json, fs.existsSync(settingsFile)], [{ id: 'y4', state: 'removed', signedOut: false }, false]);
 });
 
 test('an answer of the engine about a volume that is neither "there" nor "not there" makes nothing and takes nothing away', async () => {

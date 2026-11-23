@@ -33,6 +33,11 @@ const MAX_BODY = 4096;
 const HEALTH_WAIT_MS = 180000;
 // How long a sub-site that is deleted is waited for: its OpenWA to come up, and a number's connection to be up.
 const SIGN_OUT_WAIT_MS = 30000;
+// How long the signing out of a deleted sub-site's numbers may take in all — the first server waits for less
+// than two minutes —, how many of its sessions are looked at, and how much of an answer of its OpenWA is read.
+const SIGN_OUT_BUDGET_MS = 60000;
+const SESSIONS_AT_MOST = 20;
+const ANSWER_MAX = 1024 * 1024;
 const ENGINE_TIMEOUT_MS = 120000;
 const STATUS = { 'invalid-request': 400, 'not-allowed': 401, 'unknown-site': 404, 'not-found': 404, 'method-not-allowed': 405, exists: 409, full: 409, 'low-memory': 409, busy: 409 };
 const problem = code => Object.assign(new Error(code), { code });
@@ -64,9 +69,9 @@ const openwaAddress = id => `http://wa-scrm-openwa-${id}:2785`;
 
 // config: see the settings above. docker: (method, path, body) → { status, body }. freeMb: () → the host's free
 // memory. openwaUrl: id → the address of a sub-site's OpenWA; wait, healthWaitMs and signOutWaitMs: how the
-// provisioner waits for an OpenWA to come up, and for a number's connection when it is deleted (all replaceable
-// for tests).
-function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = sleep, healthWaitMs = HEALTH_WAIT_MS, signOutWaitMs = SIGN_OUT_WAIT_MS }) {
+// provisioner waits for an OpenWA to come up, and for a number's connection when it is deleted; signOutBudgetMs:
+// how long the signing out may take in all (all replaceable for tests).
+function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = sleep, healthWaitMs = HEALTH_WAIT_MS, signOutWaitMs = SIGN_OUT_WAIT_MS, signOutBudgetMs = SIGN_OUT_BUDGET_MS }) {
   const names = id => ({ server: `wa-scrm-site-${id}`, openwa: `wa-scrm-openwa-${id}`, volume: `wa-scrm-openwa-${id}`, settings: `openwa-${id}.env` });
   const labels = (id, part) => ({ 'wa-scrm.site': id, 'wa-scrm.part': part });
   // What is being made or started right now ('working'), what is being stopped ('stopping') or deleted
@@ -228,23 +233,39 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
   // started for this when the host has the memory to spare. Resolves to true (every number that was linked is
   // signed out), false (one could not be, or OpenWA could not be asked) or null (no number was linked).
   async function signOut(id, parts, volume) {
-    const n = names(id), file = path.join(config.dataDir, n.settings);
+    const n = names(id), file = path.join(config.dataDir, n.settings), until = Date.now() + signOutBudgetMs, left = () => until - Date.now();
     if (!parts.openwa) return volume ? false : null;
-    const key = fs.existsSync(file) ? ((fs.readFileSync(file, 'utf8').match(/^OPENWA_API_KEY=(.+)$/m) || [])[1] || '').trim() : '';
+    // The settings file is read when it is a plain file of a settings file's size: anything else in its place —
+    // a pipe would never end — holds no key.
+    const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+    const key = stat?.isFile() && stat.size <= 4096 ? ((fs.readFileSync(file, 'utf8').match(/^OPENWA_API_KEY=(.+)$/m) || [])[1] || '').trim() : '';
     if (!key) return false;
     if (!up(parts.openwa)) {
       if (freeMb() < config.minFreeMb) return false;
       ok(await docker('POST', `/containers/${n.openwa}/start`), 204, 304);
       try {
-        await healthy(id, signOutWaitMs);
+        await healthy(id, Math.min(signOutWaitMs, left()));
       } catch {
         return false;
       }
     }
+    // Each call has the time that is left — twenty seconds at most —, and an answer is read up to ANSWER_MAX.
     const openwaAsk = async (method, pathname) => {
+      if (left() <= 0) return { status: 0, body: null };
       try {
-        const answer = await fetch(openwaUrl(id) + pathname, { method, headers: { 'X-API-Key': key }, signal: AbortSignal.timeout(20000) });
-        return { status: answer.status, body: await answer.json().catch(() => null) };
+        const answer = await fetch(openwaUrl(id) + pathname, { method, headers: { 'X-API-Key': key }, signal: AbortSignal.timeout(Math.min(20000, left())) });
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of answer.body || []) {
+          size += chunk.length;
+          if (size > ANSWER_MAX) return { status: 0, body: null };
+          chunks.push(chunk);
+        }
+        let body = null;
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        } catch {}
+        return { status: answer.status, body };
       } catch {
         return { status: 0, body: null };
       }
@@ -252,12 +273,12 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     const listed = await openwaAsk('GET', '/api/sessions');
     if (listed.status !== 200 || !Array.isArray(listed.body)) return false;
     let linked = 0, out = 0;
-    for (const session of listed.body) {
+    for (const session of listed.body.slice(0, SESSIONS_AT_MOST)) {
       if (typeof session?.id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(session.id)) continue;
       if (session.phone) {
         linked += 1;
-        // A linked number is signed out once its connection is up again.
-        for (const end = Date.now() + signOutWaitMs; session.status !== 'ready' && Date.now() < end;) {
+        // A linked number is signed out once its connection is up again — while there is time left.
+        for (const end = Date.now() + Math.min(signOutWaitMs, left()); session.status !== 'ready' && Date.now() < end;) {
           await wait(2000);
           session.status = (await openwaAsk('GET', `/api/sessions/${session.id}`)).body?.status;
         }
@@ -266,6 +287,8 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
       }
       await openwaAsk('DELETE', `/api/sessions/${session.id}`);
     }
+    // Sessions beyond those looked at may hold a number as well: then it cannot be said that every one is out.
+    if (listed.body.length > SESSIONS_AT_MOST) return false;
     return linked ? out === linked : null;
   }
   // The sub-site deleted for good: its numbers signed out, its two containers, the data of its OpenWA, its
