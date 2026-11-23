@@ -386,6 +386,8 @@ requirement.modelOutline.entities.push('Order');
 requirement.modelOutline.relationships.push('客户档案的订单追踪：订单（Order）归属一位客户，记录订单号、下单时间、当前物流状态与物流记录，由聊手手动登记，每次变更写入互动轨迹；未对接店铺、支付或物流系统。登记订单是独立的一步，新订单的物流状态为待发货；此后推进按钮只能沿「待发货 → 已发货 → 已签收」逐步前进，或在签收前转为「异常」，已签收与异常之后不再有推进。订单每到达一个物流状态就在物流记录中追加一条（状态与时间），第一条为待发货并取下单时间；界面按订单号分区展示这些记录，订单号旁显示下单时间。「撤销上一步」随时移除最新一条物流记录并回到上一个状态，已签收与异常同样可撤回；第一条记录不可撤回，删除订单才会移除。客户首次联系时间取客户建档时间。登记订单不改变客户状态、等级、标签或跟进状态。');
 
 const index = read(__dirname, 'fidelity-index.html');
+// The supervisor page is shipped as it is written (master.js); its icons come from the same pool as the app's.
+const master = read(__dirname, 'fidelity-master.js');
 let lucideIcons = null;
 const localLucide = path.join(process.env.USERPROFILE || process.env.HOME || '', '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/lucide/dist/cjs/lucide.js');
 for (const candidate of ['lucide', localLucide]) {
@@ -400,7 +402,7 @@ if (!lucideIcons && fs.existsSync(path.join(output, 'icons.js'))) {
   lucideIcons = vm.runInNewContext(read(output, 'icons.js') + ';window.WA_ICONS', { window: {} });
 }
 assert(lucideIcons, 'Unable to load icon definitions');
-const names = [...new Set([...(index+js).matchAll(/["']([A-Z][A-Za-z0-9]*)["']/g)].map(m=>m[1]))].filter(n=>Array.isArray(lucideIcons[n]));
+const names = [...new Set([...(index+js+master).matchAll(/["']([A-Z][A-Za-z0-9]*)["']/g)].map(m=>m[1]))].filter(n=>Array.isArray(lucideIcons[n]));
 const iconJS = 'window.WA_ICONS='+JSON.stringify(Object.fromEntries(names.map(n=>[n,lucideIcons[n]])))+';\n';
 
 // Record new dimensions and colors centrally; component rules use the token references.
@@ -418,7 +420,7 @@ const tokenCSS = read(base,'tokens.css')+'\n:root {\n'+Object.entries(palette).m
 const assets = {
   'index.html':index,'app.js':js,'app.css':read(base,'app.css')+'\n'+fidelityCSS,
   'tokens.css':tokenCSS,'components.css':read(base,'components.css'),
-  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),'pricefile.js':read(__dirname,'fidelity-pricefile.js'),
+  'icons.js':iconJS,'boot.js':read(__dirname,'fidelity-boot.js'),'master.js':master,'pricefile.js':read(__dirname,'fidelity-pricefile.js'),
   'lucide-license.txt':read(base,'lucide-license.txt'),
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };

@@ -70,7 +70,13 @@
 
   async function enter(user, site) {
     if (user.mustChangePassword) return show('请先修改临时密码', `${user.name}，你正在使用管理员发放的临时密码。设置自己的密码后才能进入工作台。`, 'password', { leave: true });
-    if (user.role !== 'agent') return show('主管与管理员入口尚未开放', '查看各员工子站的入口将随主站一起提供。请使用员工账号登录。', null, { leave: true });
+    // A supervisor or an administrator gets the supervisor page (master.js) instead of the app: the employees
+    // and, read-only, their customers and conversations.
+    if (user.role !== 'agent') {
+      $('#subsite-login').hidden = true;
+      $('.skip-link').hidden = true;
+      return window.WA_MASTER(user);
+    }
     let loaded;
     try {
       loaded = await request('/api/data');

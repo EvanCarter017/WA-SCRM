@@ -315,6 +315,38 @@ test('several sub-sites on one set of accounts: signing in names the employee\'s
   }
 });
 
+test('the supervisor page\'s questions: the sub-sites and their employees; only some fields of a sub-site\'s data; each read by someone else than the employee leaves a line', async () => {
+  const [gus, ivo, joy] = await Promise.all(['gus', 'ivo', 'joy'].map(async username => cookieOf(await call('/api/auth/login', { method: 'POST', body: { username, password: PASSWORD } }))));
+  // the list: every sub-site that has an employee, with the employees' names; not for an employee, not without sign-in
+  const list = await call('/api/auth/sites', { cookie: ivo });
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.json.sites.map(entry => entry.site), [...list.json.sites.map(entry => entry.site)].sort(), 'in the order of the names');
+  assert.deepEqual(list.json.sites.find(entry => entry.site === 's2').employees, [{ username: 'hana', name: 'hana name', disabled: false }, { username: 'max', name: 'max name', disabled: false }, { username: 'nora', name: 'Nora', disabled: false }]);
+  assert(list.json.sites.find(entry => entry.site === 's1').employees.some(employee => employee.username === 'dana' && employee.name === 'dana name'));
+  assert(!JSON.stringify(list.json).includes('ivo') && !JSON.stringify(list.json).includes('joy') && !list.raw.includes('scrypt'), 'supervisors and administrators are no employees; no password hash');
+  assert.deepEqual((await call('/api/auth/sites', { cookie: joy })).json, list.json, 'an administrator gets the same');
+  site.auth.setDisabled('max', true);
+  assert.equal((await call('/api/auth/sites', { cookie: ivo })).json.sites.find(entry => entry.site === 's2').employees.find(employee => employee.username === 'max').disabled, true);
+  site.auth.setDisabled('max', false);
+  assert.deepEqual([(await call('/api/auth/sites', { cookie: gus })).json, (await call('/api/auth/sites')).status, (await call('/api/auth/sites', { method: 'POST', cookie: ivo, body: {} })).status], [{ error: 'forbidden' }, 401, 405]);
+  // only some fields: the others are left out, a split field comes back whole, a field that is not there is simply missing
+  const version = (await call('/api/data', { cookie: gus })).json.version;
+  assert.equal((await call('/api/data', { method: 'PUT', cookie: gus, body: { baseVersion: version, set: { customers: [{ id: 'c1' }], tasks: [], 'messages/c1': [{ id: 'm1' }], 'messages/c2': [] } } })).status, 200);
+  const some = await call('/api/data?fields=customers,tasks,nothing', { cookie: ivo });
+  assert.deepEqual([some.status, some.json], [200, { version: version + 1, data: { customers: [{ id: 'c1' }], tasks: [] } }]);
+  assert.deepEqual((await call('/api/data?fields=messages', { cookie: gus })).json.data, { messages: { c1: [{ id: 'm1' }], c2: [] } });
+  const whole = (await call('/api/data', { cookie: ivo })).json.data;
+  assert(['customers', 'messages', 'note', 'tasks'].every(field => field in whole) && Object.keys(whole).length > 4, 'without the question everything comes, as before');
+  for (const fields of ['', 'customers,', 'messages/c1', 'a b', '1st', 'x'.repeat(41), Array.from({ length: 21 }, (_, i) => 'f' + i).join(',')]) {
+    assert.deepEqual((await call('/api/data?fields=' + encodeURIComponent(fields), { cookie: ivo })).json, { error: 'invalid-request' }, JSON.stringify(fields));
+  }
+  assert.deepEqual((await call('/api/data?fields=customers', { cookie: await member('olga', 'agent', 's2') })).json, { error: 'forbidden' }, 'not for an employee of another sub-site');
+  // the lines: one for each read of a supervisor or an administrator, none for the employee's own
+  const reads = logged.filter(line => line.startsWith('site data read '));
+  assert(reads.includes('site data read user=ivo role=supervisor site=s1 fields=customers,tasks,nothing') && reads.includes('site data read user=ivo role=supervisor site=s1 fields=all') && reads.includes('site data read user=joy role=admin site=s1 fields=all'), reads.join('\n'));
+  assert(!reads.some(line => line.includes('user=gus')), 'the employee\'s own reads leave no line');
+});
+
 test('the log names users and outcomes, never a password, a token or data', () => {
   const lines = logged.filter(line => line.startsWith('site '));
   assert(lines.some(line => line === 'site login ok user=ana') && lines.some(line => line === 'site login failed error=invalid-credentials') && lines.some(line => line === 'site password changed user=ben'), lines.slice(0, 8).join('\n'));
@@ -396,6 +428,11 @@ test('the preview server: without a data folder the routes are off; with one, th
     assert.equal((await call('/api/auth/password', { base: on.base, method: 'POST', cookie: cookieOf(first), body: { current: password, next: PASSWORD } })).status, 200);
     assert.deepEqual((await call('/api/ai/status', { base: on.base, cookie: cookieOf(first) })).json, { configured: false, reason: 'no-settings-file', voice: { configured: false, reason: 'no-settings-file' } });
     assert.deepEqual((await call('/api/data', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
+    // the server also answers under the name of its sub-site, and under no other
+    assert.deepEqual((await call('/site/default/api/data?fields=customers', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
+    assert.deepEqual([(await call('/site/default/api/site/status', { base: on.base })).json, (await call('/site/default/api/data', { base: on.base })).status, (await call('/site/default/api/wa/status', { base: on.base })).status], [{ enabled: true, site: 'default' }, 401, 401]);
+    assert.deepEqual((await call('/site/default/api/ai/status', { base: on.base })).json, { error: 'not-signed-in' });
+    assert.deepEqual([(await fetch(on.base + '/site/other/api/data', { headers: { Cookie: cookieOf(first) } })).status, (await fetch(on.base + '/site/default/index.html')).status, (await fetch(on.base + '/site/default')).status], [404, 404, 404]);
     for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
     assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
   } finally {

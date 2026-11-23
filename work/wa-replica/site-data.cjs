@@ -21,11 +21,12 @@ function openData(file, { now = () => Date.now() } = {}) {
   `);
   const version = () => db.prepare('SELECT COALESCE(MAX(version), 0) AS v FROM saves').get().v;
 
-  // The whole document with its version. Split fields are put together again.
-  function read() {
+  // The whole document with its version, or only the named top-level fields of it. Split fields are put together again.
+  function read(fields) {
     const data = {};
     for (const { key, json } of db.prepare('SELECT key, json FROM doc ORDER BY key').all()) {
       const [field, id] = key.split('/');
+      if (fields && !fields.includes(field)) continue;
       if (id === undefined) data[field] = JSON.parse(json);
       else (data[field] ??= {})[id] = JSON.parse(json);
     }

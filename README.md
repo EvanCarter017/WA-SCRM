@@ -16,12 +16,16 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/serve.cjs
 ```bash
 WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
 ```
-工具只显示一次临时密码，持有人首次登录后必须修改；自己设置的密码至少 8 位。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
+工具只显示一次临时密码，持有人首次登录后必须修改；自己设置的密码至少 8 位。员工登录后进入自己的子站，新子站从空白开始。主管与管理员登录后进入「主管视图」：员工总览列出每位员工的 WhatsApp 号码及连接状态、客户数、未读会话数、待跟进数和最近消息时间；点击「查看」可以只读方式查看该员工的客户与会话（含图片、语音、文件和已有译文）。主管视图不能发送消息，也不能修改任何数据；主管或管理员每读取一次子站数据，该子站的服务器都会记录一行日志（谁、哪个子站、读取了哪些内容）。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
 
-多个子站可以共用同一个访问地址：每个子站各运行一个服务进程（`WA_SCRM_SITE_ID` 和端口各不相同，`WA_SCRM_DATA_DIR` 相同，账号只有一套），并通过各自的 `WA_SCRM_OPENWA_ENV` 连接自己的 OpenWA。登录时服务器除登录凭证外还会写入名为 `scrm_site` 的 Cookie，记录该员工所属的子站；前面的网关（nginx 或 OpenResty）按这个 Cookie 把 `/api/data` 和 `/api/wa/*` 转发到对应子站的进程，其余请求（页面文件、`/api/auth/*`、`/api/site/status`、`/api/ai/*`）固定交给其中一个进程。这个 Cookie 只决定请求的去向，不代表权限：每个子站都会自行核对登录状态和账号所属的子站。每个子站的 OpenWA 事件通知要送到该子站自己的进程，可在网关上为它单独设置一条转发路径。nginx 的写法如下（两个子站 `default` 与 `site-b`）：
+多个子站可以共用同一个访问地址：每个子站各运行一个服务进程（`WA_SCRM_SITE_ID` 和端口各不相同，`WA_SCRM_DATA_DIR` 相同，账号只有一套），并通过各自的 `WA_SCRM_OPENWA_ENV` 连接自己的 OpenWA。登录时服务器除登录凭证外还会写入名为 `scrm_site` 的 Cookie，记录该员工所属的子站；前面的网关（nginx 或 OpenResty）按这个 Cookie 把 `/api/data` 和 `/api/wa/*` 转发到对应子站的进程，其余请求（页面文件、`/api/auth/*`、`/api/site/status`、`/api/ai/*`）固定交给其中一个进程。这个 Cookie 只决定请求的去向，不代表权限：每个子站都会自行核对登录状态和账号所属的子站。每个子站的进程也用子站自己的名字应答：`/site/<子站编号>/api/…` 等同于该子站的 `/api/…`。主管视图用这种地址同时读取多个子站，各子站的 OpenWA 事件通知也送到 `/site/<子站编号>/api/wa/hook`；网关按路径里的子站编号转发即可。nginx 的写法如下（两个子站 `default` 与 `site-b`）：
 
 ```nginx
 map $cookie_scrm_site $scrm_node {
+    default  127.0.0.1:56141;
+    site-b   127.0.0.1:56142;
+}
+map $scrm_named $scrm_named_node {
     default  127.0.0.1:56141;
     site-b   127.0.0.1:56142;
 }
@@ -31,7 +35,7 @@ server {
     location / { proxy_pass http://127.0.0.1:56141; }
     location = /api/data { proxy_pass http://$scrm_node; }
     location /api/wa/ { proxy_pass http://$scrm_node; }
-    location = /site/site-b/api/wa/hook { proxy_pass http://127.0.0.1:56142/api/wa/hook; }
+    location ~ ^/site/(?<scrm_named>[a-z0-9-]+)/api/ { proxy_pass http://$scrm_named_node; }
 }
 ```
 
@@ -115,6 +119,7 @@ flowchart LR
 │   │   ├── index.html / app.js / app.css              # 编译后的前端入口、逻辑与令牌样式
 │   │   ├── boot.js / icons.js                         # 启动、登录与数据同步脚本；内联 Lucide 矢量图标集
 │   │   ├── pricefile.js                               # 价格表文件读取脚本（fidelity-pricefile.js 的构建副本）
+│   │   ├── master.js                                  # 主管视图脚本（fidelity-master.js 的构建副本）
 │   │   ├── requirements.json                          # 结构化需求与模块评审配置
 │   │   └── SCRM_Master_OpenWA_Handoff.md              # Master 控制平面 + 独立 OpenWA 子户架构交接文档
 │   ├── scrm-customization-brief.json                  # SCRM 业务功能定制蓝图
@@ -127,6 +132,7 @@ flowchart LR
 │       ├── fidelity-openwa.js                         # 真实 WhatsApp 连接：扫码绑定、事件流（来信、回执、号码状态）、发送与重试、消息中的图片/语音/视频/文件
 │       ├── fidelity-ai.js                             # AI 能力接入点：能力清单、服务器中转、回复翻译与发送保护、用量记录与「AI 能力」页
 │       ├── fidelity-boot.js                           # 页面启动：登录界面、读取子站数据、把修改保存到服务器
+│       ├── fidelity-master.js                         # 主管视图：员工总览，以及只读的客户与会话查看
 │       ├── fidelity-pricelist.js                      # 「价格表」页（上传、预览、搜索）与聊天界面消息框旁的「报价」
 │       ├── fidelity-pricefile.js / price-file.test.cjs# Excel（.xlsx）/ CSV 价格表文件的读取（在浏览器内运行）及其测试
 │       ├── ai-relay.cjs / ai-relay.test.cjs           # 预览服务的 AI 中转接口（读取服务器上的密钥并调用模型服务与语音服务）及其测试

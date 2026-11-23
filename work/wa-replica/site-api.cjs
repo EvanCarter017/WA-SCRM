@@ -5,10 +5,12 @@
 //   GET  /api/auth/me        the signed-in user (401 when nobody is signed in)
 //   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
 //   POST /api/auth/password  { current, next }
-//   GET  /api/data           the sub-site's data document
+//   GET  /api/auth/sites     the sub-sites and their employees, for supervisors and administrators
+//   GET  /api/data           the sub-site's data document; ?fields=a,b gives only these top-level fields
 //   PUT  /api/data           { baseVersion, set, remove }
 //   DELETE /api/data         { baseVersion, field }: takes a field out for good, with every trace of it
-// The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it.
+// The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it, and
+// each of their reads leaves a log line that says who read which sub-site and which fields.
 // A log line carries the action, the user name and the outcome; never a password, a token or data.
 //
 // Several sub-sites can share one address. Each runs this server with its own WA_SCRM_SITE_ID on the same data
@@ -27,6 +29,7 @@ const MAX_BODY = 8 * 1024 * 1024;
 // The fields that can be taken out for good, leaving no trace (see purge in site-data.cjs).
 const PURGEABLE = ['priceList'];
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const FIELD = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
 const STATUS = {
   'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
   'password-change-required': 403, 'forbidden': 403, 'read-only': 403, 'version-conflict': 409, 'too-long': 413, 'too-many-attempts': 429,
@@ -129,10 +132,26 @@ function create({ dir, siteId = 'default', now }) {
       console.log(`site password changed user=${user.username}`);
       return { body: { user: changed } };
     },
+    // The sub-sites and the employees of each, from the accounts: what the supervisor page lists.
+    'GET /api/auth/sites': req => {
+      if (signedIn(req).role === 'agent') throw problem('forbidden');
+      const sites = new Map();
+      for (const account of auth.listUsers()) {
+        if (account.role !== 'agent') continue;
+        if (!sites.has(account.site)) sites.set(account.site, []);
+        sites.get(account.site).push({ username: account.username, name: account.name, disabled: account.disabled });
+      }
+      return { body: { sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([site, employees]) => ({ site, employees })) } };
+    },
     'GET /api/data': req => {
       const user = signedIn(req);
       if (!mayRead(user)) throw problem('forbidden');
-      return { body: data.read() };
+      const asked = new URL(req.url, 'http://localhost').searchParams.get('fields');
+      const fields = asked === null ? null : asked.split(',');
+      if (fields && (fields.length > 20 || !fields.every(field => FIELD.test(field)))) throw problem('invalid-request');
+      // Who is not the sub-site's own employee leaves a line for every read: who, which sub-site, which fields.
+      if (user.role !== 'agent') console.log(`site data read user=${user.username} role=${user.role} site=${siteId} fields=${fields ? fields.join(',') : 'all'}`);
+      return { body: data.read(fields) };
     },
     'PUT /api/data': async req => {
       const user = signedIn(req);

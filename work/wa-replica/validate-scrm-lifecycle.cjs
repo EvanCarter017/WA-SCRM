@@ -279,6 +279,23 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// The supervisor page: master.js is the built copy of fidelity-master.js and is loaded before boot.js, which hands
+// a supervisor or an administrator over to it. The page only reads: the addresses it asks are these, each of a
+// sub-site under the sub-site's name, and its one request that is not a GET signs out.
+const masterSource = read(path.join(__dirname, 'fidelity-master.js'));
+assert.equal(read(path.join(out, 'master.js')), masterSource, 'master.js must be the built copy of fidelity-master.js');
+assert(indexHtml.includes('<main id="master" class="fid-master" aria-label="主管视图" hidden></main>') && indexHtml.includes('<script src="app.js"></script><script src="master.js"></script><script src="boot.js"></script>'), 'index.html must hold the supervisor page and load master.js before boot.js');
+assert(bootSource.includes("if (user.role !== 'agent') {") && bootSource.includes('return window.WA_MASTER(user);') && !bootSource.includes('主管与管理员入口尚未开放'), 'fidelity-boot.js must hand a supervisor over to the supervisor page');
+assert.deepEqual([...new Set(masterSource.match(/'\/api\/[^']*'/g))].sort(), ["'/api/auth/logout'", "'/api/auth/sites'", "'/api/data'", "'/api/data?fields=accounts,customers,tasks'", "'/api/wa/media?account='", "'/api/wa/status'"], 'the supervisor page asks an unexpected address');
+assert.deepEqual(masterSource.match(/method: '[A-Z]+'/g), ["method: 'POST'"], 'the supervisor page must send nothing but its sign-out');
+assert(masterSource.includes("await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});") && masterSource.includes("const at = (site, path) => '/site/' + encodeURIComponent(site) + path;"), 'the supervisor page must ask each sub-site under its own name');
+assert(!/演示|原型|评审|本机|示例|体验/.test(masterSource) && !/WA_SITE|localStorage|sessionStorage/.test(masterSource), 'the supervisor page must not speak of a demonstration, nor touch the app or the browser\'s storage');
+for (const required of ["const named = site ? '/site/' + site.siteId : null;", "if (named && pathname.startsWith(named + '/api/')) pathname = pathname.slice(named.length);"]) {
+  assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
+}
+for (const required of ["'GET /api/auth/sites': req => {", "if (signedIn(req).role === 'agent') throw problem('forbidden');", "if (user.role !== 'agent') console.log(`site data read user=${user.username} role=${user.role} site=${siteId} fields=${fields ? fields.join(',') : 'all'}`);", 'return { body: data.read(fields) };']) {
+  assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
+}
 assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');
 // Several sub-sites behind one address: signing in names the employee's sub-site in a second cookie, signing out
 // takes it away, asking who is signed in gives it again; the accounts wait for another server's write.
