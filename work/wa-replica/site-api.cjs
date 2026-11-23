@@ -1,6 +1,6 @@
 // Sign-in and data routes of one sub-site, used by the preview server when WA_SCRM_DATA_DIR is set:
 //   GET  /api/site/status    is the sub-site's server side switched on?
-//   POST /api/auth/login     { username, password } → session cookie
+//   POST /api/auth/login     { username, password } → session cookie, and the cookie that names the sub-site
 //   POST /api/auth/logout
 //   GET  /api/auth/me        the signed-in user (401 when nobody is signed in)
 //   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
@@ -10,12 +10,19 @@
 //   DELETE /api/data         { baseVersion, field }: takes a field out for good, with every trace of it
 // The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it.
 // A log line carries the action, the user name and the outcome; never a password, a token or data.
+//
+// Several sub-sites can share one address. Each runs this server with its own WA_SCRM_SITE_ID on the same data
+// folder — there is one set of accounts — and a gateway in front of them passes the requests for a sub-site's
+// data (/api/data) and WhatsApp link (/api/wa/*) to the sub-site that the cookie scrm_site names; everything
+// else can be answered by any of them. That cookie only says where a request goes: it grants nothing, every
+// sub-site checks the session and the account's sub-site itself.
 const path = require('node:path');
 const fs = require('node:fs');
 const { openAuth } = require('./site-auth.cjs');
 const { openData } = require('./site-data.cjs');
 
 const COOKIE = 'scrm_sid';
+const SITE_COOKIE = 'scrm_site';
 const MAX_BODY = 8 * 1024 * 1024;
 // The fields that can be taken out for good, leaving no trace (see purge in site-data.cjs).
 const PURGEABLE = ['priceList'];
@@ -51,19 +58,22 @@ async function readJson(req) {
   return body;
 }
 
-function cookieToken(req) {
+function cookieValue(req, name) {
   for (const part of String(req.headers.cookie || '').split(';')) {
     const at = part.indexOf('=');
-    if (at > 0 && part.slice(0, at).trim() === COOKIE) return part.slice(at + 1).trim();
+    if (at > 0 && part.slice(0, at).trim() === name) return part.slice(at + 1).trim();
   }
   return '';
 }
+const cookieToken = req => cookieValue(req, COOKIE);
 
-// The cookie is marked Secure when the request came in over HTTPS, or when WA_SCRM_COOKIE_SECURE=1.
-function cookieHeader(req, token, maxAgeSeconds) {
+// A cookie is marked Secure when the request came in over HTTPS, or when WA_SCRM_COOKIE_SECURE=1.
+function cookieHeader(req, token, maxAgeSeconds, name = COOKIE) {
   const secure = process.env.WA_SCRM_COOKIE_SECURE === '1' || req.headers['x-forwarded-proto'] === 'https';
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
+  return `${name}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure ? '; Secure' : ''}`;
 }
+// The cookie that names an employee's sub-site, for as long as a session lasts at most; anyone else's is taken away.
+const siteCookie = (req, user) => (user?.role === 'agent' ? cookieHeader(req, user.site, 30 * 24 * 60 * 60, SITE_COOKIE) : cookieHeader(req, '', 0, SITE_COOKIE));
 
 function create({ dir, siteId = 'default', now }) {
   if (!SITE_ID.test(siteId)) throw new Error('WA_SCRM_SITE_ID must be lower-case letters, digits and hyphens');
@@ -94,7 +104,7 @@ function create({ dir, siteId = 'default', now }) {
       try {
         const { token, user } = await auth.signIn(body.username, body.password);
         console.log(`site login ok user=${user.username}`);
-        return { body: { user }, headers: { 'Set-Cookie': cookieHeader(req, token, 30 * 24 * 60 * 60) } };
+        return { body: { user }, headers: { 'Set-Cookie': [cookieHeader(req, token, 30 * 24 * 60 * 60), siteCookie(req, user)] } };
       } catch (error) {
         if (error.code) console.error(`site login failed error=${error.code}`);
         throw error;
@@ -102,10 +112,16 @@ function create({ dir, siteId = 'default', now }) {
     },
     'POST /api/auth/logout': req => {
       auth.signOut(cookieToken(req));
-      return { body: { ok: true }, headers: { 'Set-Cookie': cookieHeader(req, '', 0) } };
+      return { body: { ok: true }, headers: { 'Set-Cookie': [cookieHeader(req, '', 0), siteCookie(req, null)] } };
     },
     'GET /api/auth/me': req => ({ body: { user: signedIn(req, { allowPendingPassword: true }), site: siteId } }),
-    'GET /api/auth/session': req => ({ body: { user: authenticate(req), site: siteId } }),
+    'GET /api/auth/session': req => {
+      const user = authenticate(req);
+      // An employee whose request does not name their sub-site — the cookie is gone, or is another account's —
+      // gets it again: the page asks this first, so what it asks next goes to the right sub-site.
+      const named = user?.role !== 'agent' || cookieValue(req, SITE_COOKIE) === user.site;
+      return { body: { user, site: siteId }, headers: named ? {} : { 'Set-Cookie': siteCookie(req, user) } };
+    },
     'POST /api/auth/password': async req => {
       const user = signedIn(req, { allowPendingPassword: true });
       const body = await readJson(req);
@@ -164,4 +180,4 @@ function create({ dir, siteId = 'default', now }) {
   return { handle, authenticate, allows, auth, data, siteId, close: () => { auth.close(); data.close(); } };
 }
 
-module.exports = { create, COOKIE };
+module.exports = { create, COOKIE, SITE_COOKIE };

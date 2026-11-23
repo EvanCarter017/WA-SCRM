@@ -18,6 +18,23 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 ```
 工具只显示一次临时密码，持有人首次登录后必须修改；自己设置的密码至少 8 位。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
 
+多个子站可以共用同一个访问地址：每个子站各运行一个服务进程（`WA_SCRM_SITE_ID` 和端口各不相同，`WA_SCRM_DATA_DIR` 相同，账号只有一套），并通过各自的 `WA_SCRM_OPENWA_ENV` 连接自己的 OpenWA。登录时服务器除登录凭证外还会写入名为 `scrm_site` 的 Cookie，记录该员工所属的子站；前面的网关（nginx 或 OpenResty）按这个 Cookie 把 `/api/data` 和 `/api/wa/*` 转发到对应子站的进程，其余请求（页面文件、`/api/auth/*`、`/api/site/status`、`/api/ai/*`）固定交给其中一个进程。这个 Cookie 只决定请求的去向，不代表权限：每个子站都会自行核对登录状态和账号所属的子站。每个子站的 OpenWA 事件通知要送到该子站自己的进程，可在网关上为它单独设置一条转发路径。nginx 的写法如下（两个子站 `default` 与 `site-b`）：
+
+```nginx
+map $cookie_scrm_site $scrm_node {
+    default  127.0.0.1:56141;
+    site-b   127.0.0.1:56142;
+}
+server {
+    listen 8141;
+    client_max_body_size 20m;
+    location / { proxy_pass http://127.0.0.1:56141; }
+    location = /api/data { proxy_pass http://$scrm_node; }
+    location /api/wa/ { proxy_pass http://$scrm_node; }
+    location = /site/site-b/api/wa/hook { proxy_pass http://127.0.0.1:56142/api/wa/hook; }
+}
+```
+
 如果在服务前面放置反向代理（nginx、OpenResty 等），代理允许的请求体大小必须不低于 8 MB（例如 nginx 的 `client_max_body_size 10m;`）：页面把较大的修改拆成多次请求保存，但单个数据项最大 2 MB，服务本身一次请求最多接收 8 MB。上限过低时页面会提示「修改未能保存：内容超过服务器允许的大小」。
 
 #### 接入 AI 翻译（可选）

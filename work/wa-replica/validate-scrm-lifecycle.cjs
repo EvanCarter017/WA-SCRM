@@ -280,6 +280,12 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
 assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');
+// Several sub-sites behind one address: signing in names the employee's sub-site in a second cookie, signing out
+// takes it away, asking who is signed in gives it again; the accounts wait for another server's write.
+for (const required of ["const SITE_COOKIE = 'scrm_site';", "return { body: { user }, headers: { 'Set-Cookie': [cookieHeader(req, token, 30 * 24 * 60 * 60), siteCookie(req, user)] } };", "return { body: { ok: true }, headers: { 'Set-Cookie': [cookieHeader(req, '', 0), siteCookie(req, null)] } };", "const named = user?.role !== 'agent' || cookieValue(req, SITE_COOKIE) === user.site;"]) {
+  assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
+}
+assert(siteSources['site-auth.cjs'].includes('PRAGMA busy_timeout = 5000;'), 'the accounts must wait for another server that is writing');
 
 // 21. Leftovers of the prototype are gone: sample-content code, single-file bundles, the Windows launcher
 for (const [name, gone] of [['fidelity-lifecycle.js', 'lcSeededV06'], ['fidelity-lifecycle.js', 'lcSeededOrders'], ['fidelity-ui.js', 'fidRemovePresetTags'], ['fidelity-ui.js', 'WA_DEMO'], ['fidelity-customer-pages.js', 'seedChatArchives'], ['fidelity-operations.js', 'ops-material-1'], ['fidelity-boot.js', 'lcSeededV06']]) {

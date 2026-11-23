@@ -24,7 +24,7 @@ for (const level of ['log', 'error']) {
 
 const call = (pathname, { method = 'GET', body, cookie, headers = {}, base = `http://127.0.0.1:${port}` } = {}) =>
   fetch(base + pathname, { method, headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
-    .then(async response => ({ status: response.status, setCookie: response.headers.get('set-cookie') || '', retryAfter: response.headers.get('retry-after'), raw: await response.text() }))
+    .then(async response => ({ status: response.status, setCookie: response.headers.get('set-cookie') || '', cookies: response.headers.getSetCookie(), retryAfter: response.headers.get('retry-after'), raw: await response.text() }))
     .then(result => ({ ...result, json: JSON.parse(result.raw) }));
 const cookieOf = response => response.setCookie.split(';')[0];
 // Creates an account whose password is already its owner's, and signs it in.
@@ -82,9 +82,11 @@ test('sign-in: a wrong password and an unknown account get the same answer; the 
   const ok = await call('/api/auth/login', { method: 'POST', body: { username: ' ANA ', password } });
   assert.equal(ok.status, 200);
   assert.deepEqual(ok.json.user, { id: ok.json.user.id, username: 'ana', name: 'Ana', role: 'agent', site: 's1', mustChangePassword: true, disabled: false });
-  assert.match(ok.setCookie, /^scrm_sid=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
+  assert.equal(ok.cookies.length, 2);
+  assert.match(ok.cookies[0], /^scrm_sid=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
+  assert.equal(ok.cookies[1], 'scrm_site=s1; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000', 'the second cookie names the employee\'s sub-site');
   const https = await call('/api/auth/login', { method: 'POST', body: { username: 'ana', password }, headers: { 'X-Forwarded-Proto': 'https' } });
-  assert(https.setCookie.endsWith('; Secure'), 'Secure when the request came over HTTPS');
+  assert(https.cookies.length === 2 && https.cookies.every(cookie => cookie.endsWith('; Secure')), 'Secure when the request came over HTTPS');
   assert(!ok.raw.includes(password) && !ok.raw.includes('scrypt'));
   const me = await call('/api/auth/me', { cookie: cookieOf(ok) });
   assert.deepEqual([me.status, me.json.user.username, me.json.site], [200, 'ana', 's1']);
@@ -138,7 +140,7 @@ test('sessions end: after seven idle days, after thirty days, on sign-out, when 
   assert.equal((await call('/api/auth/me', { cookie: long })).status, 401, 'thirty days at most');
   const out = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
   const signedOut = await call('/api/auth/logout', { method: 'POST', cookie: out, body: {} });
-  assert.match(signedOut.setCookie, /^scrm_sid=; Path=\/; HttpOnly; SameSite=Lax; Max-Age=0$/);
+  assert.deepEqual(signedOut.cookies, ['scrm_sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0', 'scrm_site=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0']);
   assert.equal((await call('/api/auth/me', { cookie: out })).status, 401);
   const disabled = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'dana', password: PASSWORD } }));
   site.auth.setDisabled('dana', true);
@@ -261,6 +263,56 @@ test('access: only the sub-site\'s own employee writes; supervisors and administ
   assert.deepEqual([crossSite.status, crossSite.json], [403, { error: 'forbidden' }]);
   assert.equal((await call('/api/data', { method: 'PATCH', cookie: owner })).status, 405);
   assert.equal((await call('/api/auth/unknown')).status, 404);
+});
+
+test('several sub-sites on one set of accounts: signing in names the employee\'s sub-site; each sub-site checks the session itself; a write to the accounts waits for another server', async () => {
+  // a second sub-site: its own server on the same data folder
+  const second = siteApi.create({ dir: path.join(tmp, 'main'), siteId: 's2', now: () => clock });
+  const secondServer = http.createServer((req, res) => second.handle(req, res, new URL(req.url, 'http://localhost').pathname));
+  await new Promise(resolve => secondServer.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${secondServer.address().port}`;
+  const names = site => `scrm_site=${site}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`;
+  try {
+    // an employee of the second sub-site signs in at the first: the second cookie names their own
+    const { password } = await site.auth.createUser({ username: 'nora', role: 'agent', name: 'Nora', site: 's2' });
+    const first = await call('/api/auth/login', { method: 'POST', body: { username: 'nora', password } });
+    assert.equal(first.cookies[1], names('s2'));
+    const nora = cookieOf(first);
+    assert.equal((await call('/api/auth/password', { method: 'POST', cookie: nora, body: { current: password, next: PASSWORD } })).status, 200);
+    // the session holds at both; the data of a sub-site is for its own employee
+    assert.deepEqual([(await call('/api/auth/session', { cookie: nora })).json.site, (await call('/api/auth/session', { cookie: nora, base })).json.site], ['s1', 's2']);
+    assert.deepEqual([(await call('/api/data', { cookie: nora })).json, (await call('/api/data', { cookie: nora, base })).json], [{ error: 'forbidden' }, { version: 0, data: {} }]);
+    assert.deepEqual((await call('/api/data', { method: 'PUT', cookie: nora, base, body: { baseVersion: 0, set: { note: 'of s2' } } })).json, { version: 1 });
+    const gus = cookieOf(await call('/api/auth/login', { method: 'POST', body: { username: 'gus', password: PASSWORD } }));
+    assert.deepEqual([(await call('/api/data', { cookie: gus, base })).json, (await call('/api/data', { cookie: gus })).json.data.note], [{ error: 'forbidden' }, 'mine']);
+    // a supervisor reads both and writes neither; signing in as one takes the cookie away
+    const boss = await call('/api/auth/login', { method: 'POST', body: { username: 'ivo', password: PASSWORD } });
+    assert.equal(boss.cookies[1], 'scrm_site=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+    assert.deepEqual([(await call('/api/data', { cookie: cookieOf(boss) })).json.data.note, (await call('/api/data', { cookie: cookieOf(boss), base })).json.data.note], ['mine', 'of s2']);
+    assert.deepEqual((await call('/api/data', { method: 'PUT', cookie: cookieOf(boss), base, body: { baseVersion: 1, set: { note: 'x' } } })).json, { error: 'read-only' });
+    // asking who is signed in gives an employee the cookie again when it is gone or names another sub-site — only then
+    const asked = cookie => call('/api/auth/session', { cookie }).then(answer => answer.cookies);
+    assert.deepEqual(await asked(nora), [names('s2')]);
+    assert.deepEqual(await asked(nora + '; scrm_site=s1'), [names('s2')]);
+    assert.deepEqual(await asked(nora + '; scrm_site=s2'), []);
+    assert.deepEqual(await asked(cookieOf(boss) + '; scrm_site=s2'), [], 'a supervisor\'s is left as it is');
+    assert.deepEqual(await asked('scrm_site=s2'), [], 'nobody is signed in');
+    assert.deepEqual((await call('/api/auth/session', { cookie: nora, headers: { 'X-Forwarded-Proto': 'https' } })).cookies, [names('s2') + '; Secure']);
+    // signing out at one sub-site ends the session at the other
+    assert.equal((await call('/api/auth/logout', { method: 'POST', cookie: nora, base, body: {} })).status, 200);
+    assert.equal((await call('/api/auth/me', { cookie: nora })).status, 401);
+    // another server (or the administration tool) is in the middle of a write to the accounts: a write here waits for it
+    const accounts = path.join(tmp, 'main', 'auth.db');
+    const holder = spawn(process.execPath, ['-e', "const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.argv[1]); db.exec('BEGIN IMMEDIATE'); console.log('held'); setTimeout(() => { db.exec('COMMIT'); db.close(); }, 1500);", accounts], { stdio: ['ignore', 'pipe', 'ignore'] });
+    await new Promise(resolve => holder.stdout.once('data', resolve));
+    const probe = new (require('node:sqlite').DatabaseSync)(accounts);
+    assert.throws(() => probe.exec('BEGIN IMMEDIATE'), /locked/, 'the other writer holds the file at this moment');
+    probe.close();
+    assert.equal((await site.auth.createUser({ username: 'waits', role: 'agent', name: 'Waits', site: 's1' })).user.username, 'waits');
+    await new Promise(resolve => holder.once('exit', resolve));
+  } finally {
+    secondServer.closeAllConnections(); secondServer.close(); second.close();
+  }
 });
 
 test('the log names users and outcomes, never a password, a token or data', () => {

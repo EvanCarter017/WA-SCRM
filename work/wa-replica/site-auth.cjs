@@ -51,7 +51,10 @@ function validPassword(password) {
 // Opens (and creates) the account database. now() is replaceable for tests.
 function openAuth(file, { now = () => Date.now() } = {}) {
   const db = new DatabaseSync(file);
+  // The servers of several sub-sites and the administration tool use this file at the same time: a write waits
+  // for another one that is under way instead of failing.
   db.exec(`
+    PRAGMA busy_timeout = 5000;
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS users (
