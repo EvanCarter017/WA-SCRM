@@ -167,6 +167,33 @@
       clearTimeout(timer);
       timer = setTimeout(flush, SAVE_DELAY);
     }
+    // Takes a field out for good: the server removes it with every trace of it (purge in site-data.cjs). What is
+    // still waiting is saved first; afterwards the field is gone here too, without a save that would name it.
+    // Answers whether it was done.
+    async function purge(field) {
+      for (let rounds = 0; (saving || pending || timer) && rounds < 400 && !stopped && !failures; rounds += 1) {
+        if (saving) await new Promise(resolve => setTimeout(resolve, 50));
+        else await flush();
+      }
+      if (saving || pending || stopped || failures) return false;
+      saving = true;
+      let answer;
+      try {
+        answer = await request('/api/data', { method: 'DELETE', body: { baseVersion: version, field } });
+      } catch {
+        answer = { status: 0, body: {} };
+      }
+      saving = false;
+      if (answer.status === 409) stop('数据已在别处更新', '这个子站的数据刚刚在另一个页面或设备上被修改。请刷新后继续；本页最近一次修改没有保存。');
+      if (answer.status === 401) stop('登录已失效', '请刷新页面后重新登录；本页最近一次修改没有保存。');
+      if (answer.status === 200) {
+        version = answer.body.version;
+        for (const key of [...synced.keys()]) if (key === field || key.startsWith(field + '/')) synced.delete(key);
+        delete data[field];
+      }
+      if (pending && !timer && !stopped) timer = setTimeout(flush, SAVE_DELAY);
+      return answer.status === 200;
+    }
     // Resolves when everything is saved (used before signing out, and by tests).
     const idle = () => new Promise(resolve => {
       const check = () => (stopped || (!timer && !saving && !pending) ? resolve() : setTimeout(check, 50));
@@ -181,7 +208,7 @@
     addEventListener('pagehide', () => { flush({ keepalive: true }); });
 
     // halt stops this page with a notice; the app uses it when another page takes over the sub-site.
-    window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop };
+    window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, purge };
     $('#subsite-login').hidden = true;
     $('#app-shell').hidden = false;
     $('.skip-link').hidden = false;

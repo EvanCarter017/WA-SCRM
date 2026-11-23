@@ -175,6 +175,49 @@ test('data: saved by key with a version; a save based on an old version is refus
   assert.deepEqual(site.data.lastSaves(2).map(save => [save.version, save.by, save.keys]), [[9, 'eli', 'odd activities'], [8, 'eli', 'odd']]);
 });
 
+test('data: the price list can be taken out for good — its rows, its name in the log of saves and what it left in the files; only the sub-site\'s employee may, and only for a field meant for it', async () => {
+  const cookie = await member('kai', 'agent', 's1');
+  const send = (method, body, options = {}) => call('/api/data', { method, cookie, body, ...options });
+  const files = () => ['', '-wal', '-shm'].map(ending => path.join(tmp, 'main', 'site-s1.db' + ending)).filter(file => fs.existsSync(file)).map(file => fs.readFileSync(file).toString('latin1')).join('');
+  const start = (await call('/api/data', { cookie })).json.version;
+  // a list is saved, then replaced by another in a save that also changes something else
+  assert.deepEqual((await send('PUT', { baseVersion: start, set: { priceList: { file: 'prices-FIRST-7781.xlsx', rows: [['PRICE-MARK-ALPHA-7781', 40]] } } })).json, { version: start + 1 });
+  assert.deepEqual((await send('PUT', { baseVersion: start + 1, set: { priceList: { file: 'prices-SECOND-7782.xlsx', rows: [['PRICE-MARK-BETA-7782', 55]] }, keep: 'stays' } })).json, { version: start + 2 });
+  assert(files().includes('PRICE-MARK-BETA-7782') && files().includes('priceList'), 'before: the list is in the files');
+  assert.deepEqual(site.data.lastSaves(2).map(save => save.keys), ['priceList keep', 'priceList']);
+  // a removal based on an old version is refused and changes nothing
+  assert.deepEqual((await send('DELETE', { baseVersion: start, field: 'priceList' })).json, { error: 'version-conflict', version: start + 2 });
+  assert.equal((await call('/api/data', { cookie })).json.data.priceList.rows.length, 1);
+  // taken out: gone from the data, the rest untouched, and the version moves on
+  const purged = await send('DELETE', { baseVersion: start + 2, field: 'priceList' });
+  assert.deepEqual([purged.status, purged.json], [200, { version: start + 3 }]);
+  const after = (await call('/api/data', { cookie })).json;
+  assert.deepEqual([after.version, 'priceList' in after.data, after.data.keep], [start + 3, false, 'stays']);
+  // the log of saves: the entry that named only the list is gone, the other one no longer names it, the removal names nothing
+  const log = site.data.lastSaves(10000);
+  assert.deepEqual(log.slice(0, 2).map(save => [save.version, save.by, save.keys]), [[start + 3, 'kai', ''], [start + 2, 'kai', 'keep']]);
+  assert.deepEqual([log.some(save => save.version === start + 1), log.some(save => save.keys.includes('priceList'))], [false, false]);
+  // the files: neither list, neither file name, not even the name of the field
+  for (const word of ['PRICE-MARK-ALPHA-7781', 'PRICE-MARK-BETA-7782', 'prices-FIRST-7781', 'prices-SECOND-7782', 'priceList']) assert.equal(files().includes(word), false, word + ' is still in the files');
+  assert(files().includes('stays'), 'what was kept is still there');
+  // once more with nothing to remove: fine; and saving goes on
+  assert.deepEqual((await send('DELETE', { baseVersion: start + 3, field: 'priceList' })).json, { version: start + 4 });
+  assert.deepEqual((await send('PUT', { baseVersion: start + 4, set: { keep: 'changed' }, remove: [] })).json, { version: start + 5 });
+  // only a field that is meant for it, in a well-formed request
+  for (const body of [{ baseVersion: start + 5, field: 'customers' }, { baseVersion: start + 5, field: 'keep' }, { baseVersion: start + 5, field: 'priceList/1' }, { baseVersion: start + 5, field: 5 }, { baseVersion: start + 5 }, { baseVersion: 'x', field: 'priceList' }, { field: 'priceList' }]) {
+    assert.deepEqual((await send('DELETE', body)).json, { error: 'invalid-request' }, JSON.stringify(body));
+  }
+  // only the sub-site's employee
+  const supervisor = await member('lea', 'supervisor'), other = await member('max', 'agent', 's2');
+  assert.deepEqual((await send('DELETE', { baseVersion: start + 5, field: 'priceList' }, { cookie: supervisor })).json, { error: 'read-only' });
+  assert.deepEqual((await send('DELETE', { baseVersion: start + 5, field: 'priceList' }, { cookie: other })).json, { error: 'forbidden' });
+  assert.equal((await send('DELETE', { baseVersion: start + 5, field: 'priceList' }, { cookie: '' })).status, 401);
+  assert.equal((await send('DELETE', { baseVersion: start + 5, field: 'priceList' }, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
+  assert.deepEqual([(await call('/api/data', { cookie })).json.version, (await call('/api/data', { cookie })).json.data.keep], [start + 5, 'changed'], 'the refused requests changed nothing');
+  // nothing of a removal is written to the server's log
+  assert.equal(logged.some(line => /purge|priceList|price/i.test(line)), false);
+});
+
 test('data: malformed saves are refused and change nothing', async () => {
   const cookie = await member('finn', 'agent', 's1');
   const version = (await call('/api/data', { cookie })).json.version;
@@ -212,7 +255,7 @@ test('access: only the sub-site\'s own employee writes; supervisors and administ
   assert.equal((await call('/api/data', { cookie: owner })).json.data.note, 'mine');
   const crossSite = await call('/api/data', { method: 'PUT', cookie: owner, body: { baseVersion: version + 1, set: { note: 'x' } }, headers: { 'Sec-Fetch-Site': 'cross-site' } });
   assert.deepEqual([crossSite.status, crossSite.json], [403, { error: 'forbidden' }]);
-  assert.equal((await call('/api/data', { method: 'DELETE', cookie: owner })).status, 405);
+  assert.equal((await call('/api/data', { method: 'PATCH', cookie: owner })).status, 405);
   assert.equal((await call('/api/auth/unknown')).status, 404);
 });
 

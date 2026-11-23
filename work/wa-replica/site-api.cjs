@@ -7,6 +7,7 @@
 //   POST /api/auth/password  { current, next }
 //   GET  /api/data           the sub-site's data document
 //   PUT  /api/data           { baseVersion, set, remove }
+//   DELETE /api/data         { baseVersion, field }: takes a field out for good, with every trace of it
 // The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it.
 // A log line carries the action, the user name and the outcome; never a password, a token or data.
 const path = require('node:path');
@@ -16,6 +17,8 @@ const { openData } = require('./site-data.cjs');
 
 const COOKIE = 'scrm_sid';
 const MAX_BODY = 8 * 1024 * 1024;
+// The fields that can be taken out for good, leaving no trace (see purge in site-data.cjs).
+const PURGEABLE = ['priceList'];
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const STATUS = {
   'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
@@ -122,6 +125,15 @@ function create({ dir, siteId = 'default', now }) {
       const body = await readJson(req);
       const saved = data.write({ baseVersion: body.baseVersion, set: body.set, remove: body.remove, by: user.username });
       return { body: saved };
+    },
+    // Nothing of it is written to the log: what was removed is not to be told anywhere.
+    'DELETE /api/data': async req => {
+      const user = signedIn(req);
+      if (!mayRead(user)) throw problem('forbidden');
+      if (!mayWrite(user)) throw problem('read-only');
+      const body = await readJson(req);
+      if (!PURGEABLE.includes(body.field)) throw problem('invalid-request');
+      return { body: data.purge({ baseVersion: body.baseVersion, field: body.field, by: user.username }) };
     },
   };
 

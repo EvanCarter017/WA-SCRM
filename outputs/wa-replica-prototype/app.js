@@ -4391,7 +4391,7 @@ window.WA_START = () => {
         ${fidButton('上传价格表', 'priceUpload', 'File', 'blue')}
         <input type="file" id="price-file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
         <input type="search" class="fid-input" id="price-search" aria-label="搜索价格表" placeholder="搜索简称 / 名称 / 规格" value="${esc(priceView.query)}" ${list ? '' : 'disabled'}>
-        ${list ? fidButton('清空价格表', 'priceClear', 'Trash2') : ''}
+        ${list ? fidButton('彻底删除价格表', 'priceClear', 'Trash2') : ''}
         <span class="fid-small-note" id="price-about">${esc(about)}</span>
       </div>
       <p class="price-note">文件要求：一张表，第一行为表头；内容为数字的列会被识别为价格（可以有多列），其余各列从左到右依次为产品简称、名称、规格。新上传的文件会替换当前价格表。</p>
@@ -4470,14 +4470,14 @@ window.WA_START = () => {
       render();
       toast(`价格表已更新，共 ${pending.rows.length} 个产品。`);
     },
-    priceClear: () => { if (priceList()) fidConfirm('清空价格表', '清空后，聊天界面的「报价」将没有可选的产品。确认清空当前价格表？', 'priceClearDo'); },
-    priceClearDo: () => {
-      delete data.priceList;
-      Object.assign(priceView, { pending: null, query: '' });
-      persist();
+    priceClear: () => { if (priceList()) fidConfirm('彻底删除价格表', '价格表会从系统中彻底删除：页面上、服务器保存的数据和保存记录里都不再留下它，无法恢复。删除后，聊天界面的「报价」将没有可选的产品；已经放进消息或草稿里的报价不受影响。确认彻底删除？', 'priceClearDo'); },
+    // The server takes the list out with every trace of it (WA_SITE.purge); only then is it gone from the page.
+    priceClearDo: async () => {
       close();
+      if (!(await window.WA_SITE.purge('priceList'))) return toast('价格表没有删除：暂时无法连接服务器，请稍后重试。');
+      Object.assign(priceView, { pending: null, query: '' });
       render();
-      toast('价格表已清空。');
+      toast('价格表已彻底删除，没有留下记录。');
     },
     priceQuote: priceQuoteOpen,
     priceOpenPage: () => { close(); navigate('prices'); },

@@ -361,6 +361,15 @@ for (const required of ["const RECEIPTS_BEFORE = ['delivered', 'read', 'played']
 for (const required of ["...(e.fromMe ? { status: e.status || 'sent' } : {}) };", "Object.assign(mine, { wa: e.id, status: e.status || 'sent' });", "if (known.side !== 'out' || !e.status || order.indexOf(e.status) <= order.indexOf(known.status)) return named;"]) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }
+// The price list is taken out for good: the page asks the server to remove it with every trace, never by an
+// ordinary save that would name it in the log of saves.
+for (const required of ["if (!(await window.WA_SITE.purge('priceList'))) return toast('价格表没有删除：暂时无法连接服务器，请稍后重试。');", "fidButton('彻底删除价格表', 'priceClear', 'Trash2')"]) {
+  assert(read(path.join(__dirname, 'fidelity-pricelist.js')).includes(required), `fidelity-pricelist.js is missing ${required}`);
+}
+assert(!read(path.join(__dirname, 'fidelity-pricelist.js')).includes('delete data.priceList'), 'the price list must not be removed by an ordinary save');
+for (const [file, required] of [['fidelity-boot.js', "answer = await request('/api/data', { method: 'DELETE', body: { baseVersion: version, field } });"], ['site-api.cjs', "const PURGEABLE = ['priceList'];"], ['site-api.cjs', "'DELETE /api/data': async req => {"], ['site-data.cjs', "db.exec('VACUUM');"], ['site-data.cjs', "db.exec('PRAGMA wal_checkpoint(TRUNCATE)');"], ['site-data.cjs', "else db.prepare('DELETE FROM saves WHERE version = ?').run(row.version);"]]) {
+  assert(read(path.join(__dirname, file)).includes(required), `${file} is missing ${required}`);
+}
 // The list of conversations keeps its place when the page is drawn again.
 for (const required of ["const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\\n');", "if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });", 'else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
@@ -371,7 +380,7 @@ for (const required of ["fetch('/api/wa/' + path, {", "openwaCall('POST', 'link'
 }
 assert(!/openwaDemoQr|openwaScan|openwaDrop|openwaRestore|openwaAddSampleChat|openwaNextNumber|模拟|演示/.test(openwaSource), 'fidelity-openwa.js must not simulate linking, losing or restoring a connection');
 assert(!/lcSimLeadOpen|lcSimReply|openSimLeadModal|lcSimulateCustomerReply|lc-sim-lead|模拟/.test(moduleSource), 'fidelity-lifecycle.js must not simulate leads or replies');
-assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop };'), 'fidelity-boot.js must let the app stop the page with a notice');
+assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, purge };'), 'fidelity-boot.js must let the app stop the page with a notice');
 // A release does not speak of a demonstration, a prototype, a review or of saving on this machine (plan 032),
 // and the materials screen is hidden.
 for (const word of ['演示', '原型', '评审', '本机', '示例', '体验']) {
@@ -413,7 +422,7 @@ const summary = {
   signIn: 'the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty',
   leftovers: 'removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview',
   whatsappConnection: 'real, through the sub-site\'s own server: QR code, incoming events, sending; no simulation',
-  priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing',
+  priceList: 'an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product\'s price into the message box and sends nothing; the list can be taken out for good: its rows, its name in the log of saves and what it left in the database files',
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',

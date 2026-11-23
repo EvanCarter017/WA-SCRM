@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-22T23:29:58.489Z",
+  "checkedAt": "2026-11-23T09:10:38.967Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -49,7 +49,7 @@
   "signIn": "the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty",
   "leftovers": "removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview",
   "whatsappConnection": "real, through the sub-site's own server: QR code, incoming events, sending; no simulation",
-  "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product's price into the message box and sends nothing",
+  "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product's price into the message box and sends nothing; the list can be taken out for good: its rows, its name in the log of saves and what it left in the database files",
   "messageTranslation": "once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again",
   "fileSending": "up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "customerPictures": "the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp's own servers or the gateway, kept for a day; the initials stay when there is none",

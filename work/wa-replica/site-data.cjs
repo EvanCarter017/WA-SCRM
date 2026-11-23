@@ -102,8 +102,34 @@ function openData(file, { now = () => Date.now() } = {}) {
     });
   }
 
+  // Takes a field out for good — for content that must leave no trace, such as a price list. Its rows go; its
+  // name goes from the log of saves, and an entry that named nothing else goes entirely; one entry without a name
+  // is added so that the version moves on. Then the file is written anew, which drops what the rows had left in
+  // pages no longer in use, and the write-ahead log is emptied.
+  function purge({ baseVersion, field, by }) {
+    if (!Number.isInteger(baseVersion) || typeof field !== 'string' || !KEY.test(field) || field.includes('/')) throw problem('invalid-request');
+    const saved = transaction(() => {
+      const current = version();
+      if (baseVersion !== current) throw problem('version-conflict', { version: current });
+      db.prepare('DELETE FROM doc WHERE key = ? OR substr(key, 1, ?) = ?').run(field, field.length + 1, field + '/');
+      for (const row of db.prepare('SELECT version, keys FROM saves').all()) {
+        const keys = row.keys.split(' '), rest = keys.filter(key => key !== field && !key.startsWith(field + '/'));
+        if (rest.length === keys.length) continue;
+        if (rest.length) db.prepare('UPDATE saves SET keys = ? WHERE version = ?').run(rest.join(' '), row.version);
+        else db.prepare('DELETE FROM saves WHERE version = ?').run(row.version);
+      }
+      db.prepare('INSERT INTO saves (version, at, by, keys) VALUES (?, ?, ?, ?)').run(current + 1, new Date(now()).toISOString(), String(by), '');
+      return { version: current + 1 };
+    });
+    // Someone else who is reading the file at this moment (the administration tool, a copy being made) is waited for.
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.exec('VACUUM');
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    return saved;
+  }
+
   const lastSaves = (count = 20) => db.prepare('SELECT version, at, by, keys FROM saves ORDER BY version DESC LIMIT ?').all(count);
-  return { read, write, replace, lastSaves, close: () => db.close() };
+  return { read, write, replace, purge, lastSaves, close: () => db.close() };
 }
 
 module.exports = { openData, KEY, MAX_VALUE };
