@@ -1107,6 +1107,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-master-table .fid-btn + .fid-master-acts { margin-top:var(--fid-px-6); }
 .fid-master-acts .link { padding:0; border:0; background:none; color:var(--color-accent); font:inherit; cursor:pointer; }
 .fid-master-acts .link:hover { text-decoration:underline; }
+.fid-master-acts .link.danger { color:var(--color-danger); }
 .fid-master-dialog p { margin:0 0 var(--fid-px-8); font-size:var(--fid-px-14); line-height:var(--fid-px-22); }
 .fid-master-form { display:grid; gap:var(--fid-px-14); }
 .fid-master-form p { margin:0; }

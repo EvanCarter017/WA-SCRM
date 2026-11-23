@@ -127,6 +127,16 @@ function openAuth(file, { now = () => Date.now() } = {}) {
     return publicUser(byName(row.username));
   }
 
+  // An account deleted for good: with it its sessions (the table deletes them with the account) and what was
+  // counted of its sign-ins.
+  function deleteUser(username) {
+    const row = byName(username);
+    if (!row) throw problem('unknown-user');
+    db.prepare('DELETE FROM users WHERE id = ?').run(row.id);
+    failures.delete(row.username);
+    return publicUser(row);
+  }
+
   // Checks a sign-in. Resolves to { token, user }; every failure is the same error, except a temporary lock.
   async function signIn(username, password) {
     const key = String(username || '').trim().toLowerCase();
@@ -165,7 +175,7 @@ function openAuth(file, { now = () => Date.now() } = {}) {
   }
 
   const listUsers = () => db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser);
-  return { createUser, resetPassword, changePassword, setDisabled, signIn, sessionUser, signOut, listUsers, close: () => db.close() };
+  return { createUser, resetPassword, changePassword, setDisabled, deleteUser, signIn, sessionUser, signOut, listUsers, close: () => db.close() };
 }
 
 module.exports = { openAuth, validPassword, ROLES, PASSWORD_MIN, SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_AFTER, LOCK_MS };

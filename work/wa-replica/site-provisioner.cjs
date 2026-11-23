@@ -8,6 +8,7 @@
 //   GET  /sites                 every sub-site with its state, and how much room is left
 //   POST /sites  { id }         a new sub-site (202, the work goes on in the background) — or 409 with the reason
 //   POST /sites/<id>/start      POST /sites/<id>/stop
+//   POST /sites/<id>/remove     the sub-site deleted for good (see remove below)
 // Settings (environment):
 //   WA_SCRM_PROVISIONER_SECRET_FILE   file with the shared secret, at least 32 characters (required)
 //   WA_SCRM_SERVER_IMAGE              image of the sub-site's server (required)
@@ -30,6 +31,8 @@ const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const RESERVED = ['master', 'gateway', 'provisioner'];
 const MAX_BODY = 4096;
 const HEALTH_WAIT_MS = 180000;
+// How long a sub-site that is deleted is waited for: its OpenWA to come up, and a number's connection to be up.
+const SIGN_OUT_WAIT_MS = 30000;
 const ENGINE_TIMEOUT_MS = 120000;
 const STATUS = { 'invalid-request': 400, 'not-allowed': 401, 'unknown-site': 404, 'not-found': 404, 'method-not-allowed': 405, exists: 409, full: 409, 'low-memory': 409, busy: 409 };
 const problem = code => Object.assign(new Error(code), { code });
@@ -60,15 +63,16 @@ function engine(socketPath) {
 const openwaAddress = id => `http://wa-scrm-openwa-${id}:2785`;
 
 // config: see the settings above. docker: (method, path, body) → { status, body }. freeMb: () → the host's free
-// memory. openwaUrl: id → the address of a sub-site's OpenWA; wait and healthWaitMs: how the provisioner waits
-// for an OpenWA to come up (all three replaceable for tests).
-function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = sleep, healthWaitMs = HEALTH_WAIT_MS }) {
+// memory. openwaUrl: id → the address of a sub-site's OpenWA; wait, healthWaitMs and signOutWaitMs: how the
+// provisioner waits for an OpenWA to come up, and for a number's connection when it is deleted (all replaceable
+// for tests).
+function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = sleep, healthWaitMs = HEALTH_WAIT_MS, signOutWaitMs = SIGN_OUT_WAIT_MS }) {
   const names = id => ({ server: `wa-scrm-site-${id}`, openwa: `wa-scrm-openwa-${id}`, volume: `wa-scrm-openwa-${id}`, settings: `openwa-${id}.env` });
   const labels = (id, part) => ({ 'wa-scrm.site': id, 'wa-scrm.part': part });
-  // What is being made or started right now ('working'), what is being stopped ('stopping'), and what went
-  // wrong the last time (the reason it failed), by id.
+  // What is being made or started right now ('working'), what is being stopped ('stopping') or deleted
+  // ('removing'), and what went wrong the last time (the reason it failed), by id.
   const work = new Map();
-  const busy = id => work.get(id) === 'working' || work.get(id) === 'stopping';
+  const busy = id => ['working', 'stopping', 'removing'].includes(work.get(id));
   // Does this part take memory: it runs, or Docker is starting it again this moment.
   const up = part => part?.state === 'running' || part?.state === 'restarting';
 
@@ -85,12 +89,14 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     }
     return sites;
   }
-  // ready: both run and OpenWA answers. starting: on the way there. stopping: on the way down. stopped: its
-  // OpenWA is there and does not run, and no server runs (the server may be gone: an upgrade takes it away, and
-  // the next start makes it anew). failed: the last attempt to make or start it went wrong, or a part is missing.
+  // ready: both run and OpenWA answers. starting: on the way there. stopping: on the way down. removing: being
+  // deleted. stopped: its OpenWA is there and does not run, and no server runs (the server may be gone: an
+  // upgrade takes it away, and the next start makes it anew). failed: the last attempt to make or start it went
+  // wrong, or a part is missing.
   function stateOf(id, parts) {
     if (work.get(id) === 'working') return 'starting';
     if (work.get(id) === 'stopping') return 'stopping';
+    if (work.get(id) === 'removing') return 'removing';
     const { server, openwa } = parts || {};
     if (server?.state === 'running' && openwa?.state === 'running') return openwa.health === 'healthy' ? 'ready' : openwa.health === 'unhealthy' ? 'failed' : 'starting';
     if (work.has(id)) return 'failed';
@@ -152,8 +158,8 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     },
   });
 
-  async function healthy(id) {
-    for (const end = Date.now() + healthWaitMs; Date.now() < end;) {
+  async function healthy(id, patience = healthWaitMs) {
+    for (const end = Date.now() + patience; Date.now() < end;) {
       const state = ok(await docker('GET', `/containers/${names(id).openwa}/json`), 200).body.State;
       if (state.Health?.Status === 'healthy') return;
       if (!state.Running) throw problem('openwa-stopped');
@@ -179,17 +185,19 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     const n = names(id), parts = (await containers()).get(id) || {};
     const kept = fs.existsSync(path.join(config.dataDir, n.settings));
     if (!parts.openwa) {
-      const volume = await docker('GET', `/volumes/${n.volume}`);
-      if (volume.status === 200 && !kept) throw problem('settings-missing');
-      if (volume.status !== 200 && kept) throw problem('data-missing');
+      // Whether its OpenWA has data already: the volume is there (200) or not (404). Any other answer is the
+      // engine's trouble, and nothing is made or taken away on it.
+      const volume = ok(await docker('GET', `/volumes/${n.volume}`), 200, 404), fresh = volume.status === 404;
+      if (!fresh && !kept) throw problem('settings-missing');
+      if (fresh && kept) throw problem('data-missing');
       const masterKey = kept ? '' : crypto.randomBytes(36).toString('base64url');
-      if (volume.status !== 200) ok(await docker('POST', '/volumes/create', { Name: n.volume, Labels: labels(id, 'openwa') }), 201);
+      if (fresh) ok(await docker('POST', '/volumes/create', { Name: n.volume, Labels: labels(id, 'openwa') }), 201);
       try {
         ok(await docker('POST', `/containers/create?name=${n.openwa}`, openwaSpec(id, masterKey)), 201);
       } catch (error) {
         // A volume made a moment ago for a container that then cannot be made — the image is not there — holds
         // nothing. Left behind it would pass for data whose settings are missing, and the id could never be used.
-        if (volume.status !== 200) await docker('DELETE', `/volumes/${n.volume}`).catch(() => {});
+        if (fresh) await docker('DELETE', `/volumes/${n.volume}`).catch(() => {});
         throw error;
       }
       ok(await docker('POST', `/containers/${n.openwa}/start`), 204, 304);
@@ -213,6 +221,66 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
       work.set(id, error.code || 'error');
       console.error(`provisioner ${what} failed site=${id} error=${error.code || error.name}${error.detail ? ' detail=' + error.detail : ''}`);
     });
+  }
+
+  // The numbers of a sub-site signed out at WhatsApp — so that the phone lists them no more — and their sessions
+  // taken away, asked of its OpenWA with the key of the sub-site's settings file. An OpenWA that does not run is
+  // started for this when the host has the memory to spare. Resolves to true (every number that was linked is
+  // signed out), false (one could not be, or OpenWA could not be asked) or null (no number was linked).
+  async function signOut(id, parts, volume) {
+    const n = names(id), file = path.join(config.dataDir, n.settings);
+    if (!parts.openwa) return volume ? false : null;
+    const key = fs.existsSync(file) ? ((fs.readFileSync(file, 'utf8').match(/^OPENWA_API_KEY=(.+)$/m) || [])[1] || '').trim() : '';
+    if (!key) return false;
+    if (!up(parts.openwa)) {
+      if (freeMb() < config.minFreeMb) return false;
+      ok(await docker('POST', `/containers/${n.openwa}/start`), 204, 304);
+      try {
+        await healthy(id, signOutWaitMs);
+      } catch {
+        return false;
+      }
+    }
+    const openwaAsk = async (method, pathname) => {
+      try {
+        const answer = await fetch(openwaUrl(id) + pathname, { method, headers: { 'X-API-Key': key }, signal: AbortSignal.timeout(20000) });
+        return { status: answer.status, body: await answer.json().catch(() => null) };
+      } catch {
+        return { status: 0, body: null };
+      }
+    };
+    const listed = await openwaAsk('GET', '/api/sessions');
+    if (listed.status !== 200 || !Array.isArray(listed.body)) return false;
+    let linked = 0, out = 0;
+    for (const session of listed.body) {
+      if (typeof session?.id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(session.id)) continue;
+      if (session.phone) {
+        linked += 1;
+        // A linked number is signed out once its connection is up again.
+        for (const end = Date.now() + signOutWaitMs; session.status !== 'ready' && Date.now() < end;) {
+          await wait(2000);
+          session.status = (await openwaAsk('GET', `/api/sessions/${session.id}`)).body?.status;
+        }
+        const logout = await openwaAsk('POST', `/api/sessions/${session.id}/logout`);
+        if (logout.status >= 200 && logout.status < 300) out += 1;
+      }
+      await openwaAsk('DELETE', `/api/sessions/${session.id}`);
+    }
+    return linked ? out === linked : null;
+  }
+  // The sub-site deleted for good: its numbers signed out, its two containers, the data of its OpenWA, its
+  // settings file and its data files — the document of its customers and chats, its WhatsApp store and media.
+  // What is not there is skipped; the names come from the id alone, so nothing of another sub-site is touched.
+  async function remove(id) {
+    const n = names(id), parts = (await containers()).get(id) || {};
+    const files = [n.settings, ...['site', 'wa'].flatMap(kind => ['', '-wal', '-shm'].map(end => `${kind}-${id}.db${end}`)), `wa-media-${id}`].map(name => path.join(config.dataDir, name));
+    const volume = ok(await docker('GET', `/volumes/${n.volume}`), 200, 404).status === 200;
+    if (!parts.server && !parts.openwa && !volume && !files.some(file => fs.existsSync(file))) throw problem('unknown-site');
+    const signedOut = await signOut(id, parts, volume);
+    for (const name of [n.server, n.openwa]) ok(await docker('DELETE', `/containers/${name}?force=true`), 204, 404);
+    if (volume) ok(await docker('DELETE', `/volumes/${n.volume}`), 204, 404);
+    for (const file of files) fs.rmSync(file, { recursive: true, force: true });
+    return signedOut;
   }
 
   const known = id => { if (typeof id !== 'string' || !SITE_ID.test(id) || RESERVED.includes(id)) throw problem('invalid-request'); return id; };
@@ -262,6 +330,25 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
       console.log(`provisioner stop ok site=${id}`);
       return { status: 200, body: { id, state: 'stopped' } };
     },
+    'POST /sites/remove': async (body, id) => {
+      known(id);
+      if (busy(id)) throw problem('busy');
+      // While it is being deleted a sub-site is busy: nothing else is begun with it.
+      const before = work.get(id);
+      work.set(id, 'removing');
+      let signedOut;
+      try {
+        signedOut = await remove(id);
+      } catch (error) {
+        // When nothing of it was there, a mark of what went wrong with it before goes as well.
+        if (error.code === 'unknown-site' || before === undefined) work.delete(id);
+        else work.set(id, before);
+        throw error;
+      }
+      work.delete(id);
+      console.log(`provisioner remove ok site=${id} signed-out=${signedOut === null ? 'none' : signedOut ? 'yes' : 'no'}`);
+      return { status: 200, body: { id, state: 'removed', signedOut } };
+    },
   };
 
   async function handle(req, res) {
@@ -273,7 +360,7 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
       // The address is looked at only now; what is no address is nothing the provisioner knows.
       let pathname;
       try { pathname = new URL(req.url, 'http://localhost').pathname; } catch { throw problem('not-found'); }
-      const named = pathname.match(/^\/sites\/([^/]+)\/(start|stop)$/);
+      const named = pathname.match(/^\/sites\/([^/]+)\/(start|stop|remove)$/);
       const route = routes[`${req.method} ${named ? '/sites/' + named[2] : pathname}`];
       if (!route) throw problem(pathname === '/sites' || named ? 'method-not-allowed' : 'not-found');
       let body = {};
@@ -321,6 +408,8 @@ function client({ url, secret, timeoutMs = 20000, listTimeoutMs = 5000, stopTime
     start: id => ask('POST', named(id, 'start')),
     // Stopping takes as long as OpenWA needs to put its session away.
     stop: id => ask('POST', named(id, 'stop'), undefined, stopTimeoutMs),
+    // Deleting takes as long as signing its numbers out: { id, state: 'removed', signedOut: true | false | null }.
+    remove: id => ask('POST', named(id, 'remove'), undefined, stopTimeoutMs),
   };
 }
 // The first server's client from its environment — or null where the platform makes no sub-sites:

@@ -26,7 +26,7 @@ for (const level of ['log', 'error']) {
 // containers: name → { spec, state: 'created' | 'running' | 'exited', polls }. calls: what was asked, in order.
 // mood: how an OpenWA behaves after it was started — 'ok' (healthy at the second look), 'never', 'dies'.
 const containers = new Map(), volumes = new Set(), calls = [];
-let mood = 'ok', free = 4000, stopDelay = 0;
+let mood = 'ok', free = 4000, stopDelay = 0, volumeTrouble = false;
 const isOpenwa = c => c.spec.Labels['wa-scrm.part'] === 'openwa';
 const health = c => (!isOpenwa(c) ? '' : mood === 'ok' && c.polls >= 2 ? 'healthy' : 'starting');
 const fake = http.createServer((req, res) => {
@@ -47,6 +47,8 @@ const fake = http.createServer((req, res) => {
       containers.set(name, { spec: body, state: 'created', polls: 0 });
       return send(201, { Id: name });
     }
+    const gone = url.pathname.match(/^\/containers\/([^/]+)$/);
+    if (gone && req.method === 'DELETE') return containers.delete(gone[1]) ? send(204) : send(404, { message: 'No such container: ' + gone[1] });
     if (one) {
       const c = containers.get(one[1]);
       if (!c) return send(404, { message: 'No such container: ' + one[1] });
@@ -58,6 +60,7 @@ const fake = http.createServer((req, res) => {
     }
     if (url.pathname === '/volumes/create') { volumes.add(body.Name); return send(201, { Name: body.Name }); }
     const volume = url.pathname.match(/^\/volumes\/([^/]+)$/);
+    if (volume && volumeTrouble) return send(500, { message: 'the engine is in trouble' });
     if (volume && req.method === 'DELETE') { volumes.delete(volume[1]); return send(204); }
     if (volume) return send(volumes.has(volume[1]) ? 200 : 404, volumes.has(volume[1]) ? { Name: volume[1] } : { message: 'no such volume' });
     return send(404, { message: 'page not found' });
@@ -65,10 +68,34 @@ const fake = http.createServer((req, res) => {
 });
 // ---- the stand-in OpenWA: gives a restricted key to whoever shows the key its container was started with ----
 const keys = [];
+// The sessions of the sub-sites' numbers, by sub-site: { id, status, phone, polls }. A sub-site is known by the
+// restricted key its settings file holds. sessionCalls: what was asked of them, in order.
+const sessions = new Map(), sessionCalls = [];
+let logoutDelay = 0;
+const siteOfKey = key => keys.find(k => k.apiKey === key)?.name.replace(/^wa-scrm-(.+)-[0-9a-z]+$/, '$1');
+function sessionAnswer(site, req, res) {
+  const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
+  const [, id, action] = req.url.slice('/api/sessions'.length).split('/'), list = sessions.get(site) || [];
+  sessionCalls.push(`${req.method} ${site}${id ? ' ' + id : ''}${action ? ' ' + action : ''}`);
+  if (!id) return send(200, list.map(({ polls, ...session }) => session));
+  const session = list.find(s => s.id === id);
+  if (!session) return send(404, { message: 'no such session' });
+  if (req.method === 'GET') {
+    // a linked number whose connection is down is up again after it was asked about twice
+    if (session.status === 'disconnected' && session.phone && ++session.polls >= 2) session.status = 'ready';
+    const { polls, ...shown } = session;
+    return send(200, shown);
+  }
+  if (action === 'logout') return void setTimeout(() => (session.status === 'ready' ? (session.status = 'logged-out', send(200, { ok: true })) : send(400, { message: 'not running' })), logoutDelay);
+  if (req.method === 'DELETE' && !action) { sessions.set(site, list.filter(s => s !== session)); return send(204); }
+  return send(404, { message: 'no such route' });
+}
 const openwa = http.createServer((req, res) => {
   const chunks = [];
   req.on('data', chunk => chunks.push(chunk));
   req.on('end', () => {
+    const site = siteOfKey(req.headers['x-api-key']);
+    if (site && req.url.startsWith('/api/sessions')) return sessionAnswer(site, req, res);
     const started = [...containers.values()].filter(isOpenwa).flatMap(c => c.spec.Env).filter(line => line.startsWith('API_MASTER_KEY=')).map(line => line.slice(15));
     if (req.method !== 'POST' || req.url !== '/api/auth/api-keys' || !started.includes(req.headers['x-api-key'])) { res.writeHead(401); return res.end('{}'); }
     const asked = JSON.parse(Buffer.concat(chunks).toString('utf8')), apiKey = `owa_restricted_${keys.length + 1}_${'k'.repeat(40)}`;
@@ -79,7 +106,7 @@ const openwa = http.createServer((req, res) => {
 });
 
 let base, openwaBase;
-const provisioner = () => create({ config, docker: engine(socket), freeMb: () => free, openwaUrl: () => openwaBase, wait: () => new Promise(resolve => setImmediate(resolve)), healthWaitMs: 150 });
+const provisioner = () => create({ config, docker: engine(socket), freeMb: () => free, openwaUrl: () => openwaBase, wait: () => new Promise(resolve => setImmediate(resolve)), healthWaitMs: 150, signOutWaitMs: 150 });
 let front;
 const call = (pathname, { method = 'GET', body, secret = SECRET } = {}) =>
   fetch(base + pathname, { method, headers: { ...(secret ? { Authorization: 'Bearer ' + secret } : {}), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body) })
@@ -113,7 +140,7 @@ test.after(() => {
 test('nobody without the secret; only what the provisioner knows; an id is a sub-site\'s id and none of the platform\'s own names', async () => {
   assert.deepEqual([(await call('/health', { secret: '' })).json, (await call('/sites', { secret: '' })).json, (await call('/sites', { secret: SECRET + 'x' })).status, (await call('/sites', { secret: SECRET.slice(1) })).status], [{ ok: true }, { error: 'not-allowed' }, 401, 401]);
   assert.deepEqual((await call('/sites')).json, { sites: [], room: { max: 2, running: 0, freeMb: 4000, minFreeMb: 1400, canStart: true } });
-  assert.deepEqual([(await call('/nothing')).status, (await call('/sites', { method: 'DELETE' })).status, (await call('/sites/t1/start')).status, (await call('/sites/t1/remove', { method: 'POST' })).status], [404, 405, 405, 404]);
+  assert.deepEqual([(await call('/nothing')).status, (await call('/sites', { method: 'DELETE' })).status, (await call('/sites/t1/start')).status, (await call('/sites/t1/delete', { method: 'POST' })).status], [404, 405, 405, 404]);
   // what is no address at all: the secret is asked first, and nothing of it is written down
   assert.deepEqual([(await call('//', { secret: '' })).json, (await call('//')).json, (await call('/health?x=1', { secret: '' })).status, logged.some(line => line.includes('//'))], [{ error: 'not-allowed' }, { error: 'not-found' }, 401, false]);
   const from = calls.length;
@@ -318,6 +345,89 @@ test('the first server\'s side: it asks with the secret and reads the answers �
   assert.throws(() => clientFromEnv({ WA_SCRM_PROVISIONER_URL: base }), /WA_SCRM_PROVISIONER_SECRET_FILE/);
   fs.writeFileSync(secretFile, 'too short');
   assert.throws(() => clientFromEnv(env), /at least 32/);
+});
+
+test('deleting a sub-site: its numbers signed out at WhatsApp — an OpenWA that is stopped is started for it when there is memory —, its containers, the data of its OpenWA, its settings and data files; nothing of another; busy meanwhile; afterwards its name is free', async () => {
+  const filesOf = id => [`openwa-${id}.env`, `site-${id}.db`, `site-${id}.db-wal`, `wa-${id}.db`, `wa-${id}.db-shm`, `wa-media-${id}`].map(name => path.join(dataDir, name));
+  const lay = id => {
+    for (const file of filesOf(id).slice(1)) {
+      if (!file.endsWith('wa-media-' + id)) fs.writeFileSync(file, 'data of ' + id);
+      else { fs.mkdirSync(file); fs.writeFileSync(path.join(file, 'a.jpg'), 'picture of ' + id); }
+    }
+  };
+  const there = id => filesOf(id).map(file => fs.existsSync(file));
+  const make = async id => { assert.equal((await call('/sites', { method: 'POST', body: { id } })).status, 202, id); assert.equal((await settled(id)).state, 'ready', id); };
+  fs.writeFileSync(path.join(dataDir, 'site-t1.db'), 'data of t1');
+  // one that runs, with a linked number and one that waits for its scan
+  await make('x1');
+  lay('x1');
+  sessions.set('x1', [{ id: 'aaaa-1', status: 'ready', phone: '15550001', polls: 0 }, { id: 'aaaa-2', status: 'qr_ready', phone: null, polls: 0 }]);
+  let from = calls.length;
+  sessionCalls.length = 0;
+  const removed = await call('/sites/x1/remove', { method: 'POST' });
+  assert.deepEqual([removed.status, removed.json], [200, { id: 'x1', state: 'removed', signedOut: true }]);
+  assert.deepEqual(sessionCalls, ['GET x1', 'POST x1 aaaa-1 logout', 'DELETE x1 aaaa-1', 'DELETE x1 aaaa-2'], 'the linked number signed out, both sessions taken away');
+  assert.deepEqual(changes(from), ['DELETE /containers/wa-scrm-site-x1', 'DELETE /containers/wa-scrm-openwa-x1', 'DELETE /volumes/wa-scrm-openwa-x1']);
+  assert.deepEqual([there('x1'), fs.existsSync(path.join(dataDir, 'site-t1.db')), await stateOf('x1'), await stateOf('t1')], [[false, false, false, false, false, false], true, undefined, { id: 't1', state: 'ready' }], 'all of it is gone, nothing of another');
+  // one that is stopped: its OpenWA is started to sign its number out
+  await make('x2');
+  sessions.set('x2', [{ id: 'bbbb-1', status: 'ready', phone: '15550002', polls: 0 }]);
+  assert.equal((await call('/sites/x2/stop', { method: 'POST' })).status, 200);
+  sessions.get('x2')[0].status = 'disconnected';
+  from = calls.length;
+  sessionCalls.length = 0;
+  assert.deepEqual((await call('/sites/x2/remove', { method: 'POST' })).json, { id: 'x2', state: 'removed', signedOut: true });
+  assert.deepEqual([changes(from)[0], sessionCalls], ['POST /containers/wa-scrm-openwa-x2/start', ['GET x2', 'GET x2 bbbb-1', 'GET x2 bbbb-1', 'POST x2 bbbb-1 logout', 'DELETE x2 bbbb-1']]);
+  // stopped, and too little memory to start it: deleted all the same, and said not to be signed out
+  await make('x3');
+  lay('x3');
+  sessions.set('x3', [{ id: 'cccc-1', status: 'ready', phone: '15550003', polls: 0 }]);
+  assert.equal((await call('/sites/x3/stop', { method: 'POST' })).status, 200);
+  free = 1000;
+  from = calls.length;
+  sessionCalls.length = 0;
+  assert.deepEqual((await call('/sites/x3/remove', { method: 'POST' })).json, { id: 'x3', state: 'removed', signedOut: false });
+  free = 4000;
+  assert.deepEqual([changes(from), sessionCalls, there('x3')], [['DELETE /containers/wa-scrm-site-x3', 'DELETE /containers/wa-scrm-openwa-x3', 'DELETE /volumes/wa-scrm-openwa-x3'], [], [false, false, false, false, false, false]]);
+  // only data files left of it: they go, and there was no number to sign out
+  lay('x4');
+  assert.deepEqual([(await call('/sites/x4/remove', { method: 'POST' })).json, there('x4')], [{ id: 'x4', state: 'removed', signedOut: null }, [false, false, false, false, false, false]]);
+  // nothing at all of it, the platform's own names, no names: refused, and nothing reached the engine
+  from = calls.length;
+  assert.deepEqual([(await call('/sites/x9/remove', { method: 'POST' })).json, (await call('/sites/master/remove', { method: 'POST' })).status, (await call('/sites/X1/remove', { method: 'POST' })).status, changes(from)], [{ error: 'unknown-site' }, 400, 400, []]);
+  // busy while it is being made, and while it is being deleted
+  assert.equal((await call('/sites', { method: 'POST', body: { id: 'x5' } })).status, 202);
+  assert.deepEqual((await call('/sites/x5/remove', { method: 'POST' })).json, { error: 'busy' });
+  assert.equal((await settled('x5')).state, 'ready');
+  sessions.set('x5', [{ id: 'dddd-1', status: 'ready', phone: '15550005', polls: 0 }]);
+  logoutDelay = 60;
+  const going = call('/sites/x5/remove', { method: 'POST' });
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual([await stateOf('x5'), (await call('/sites/x5/start', { method: 'POST' })).json, (await call('/sites/x5/remove', { method: 'POST' })).json], [{ id: 'x5', state: 'removing' }, { error: 'busy' }, { error: 'busy' }]);
+  assert.deepEqual((await going).json, { id: 'x5', state: 'removed', signedOut: true });
+  logoutDelay = 0;
+  // afterwards the name is free: made anew from nothing, with a new key
+  const asked = keys.length;
+  await make('x1');
+  assert.deepEqual([keys.length, settingsOf('x1').includes(keys.at(-1).apiKey)], [asked + 1, true]);
+  assert.equal((await call('/sites/x1/remove', { method: 'POST' })).status, 200);
+  // the first server's side: a sub-site that is not there is said so
+  await assert.rejects(client({ url: base, secret: SECRET }).remove('x9'), { code: 'workspace-unknown-site' });
+  assert.deepEqual(await client({ url: base, secret: SECRET }).remove((lay('x6'), 'x6')), { id: 'x6', state: 'removed', signedOut: null });
+  // the lines say what went, and whether its numbers were signed out
+  const lines = logged.filter(line => line.startsWith('provisioner remove'));
+  for (const line of ['provisioner remove ok site=x1 signed-out=yes', 'provisioner remove ok site=x2 signed-out=yes', 'provisioner remove ok site=x3 signed-out=no', 'provisioner remove ok site=x4 signed-out=none']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+});
+
+test('an answer of the engine about a volume that is neither "there" nor "not there" makes nothing and takes nothing away', async () => {
+  volumeTrouble = true;
+  const from = calls.length;
+  assert.equal((await call('/sites', { method: 'POST', body: { id: 'v1' } })).status, 202);
+  assert.deepEqual(await settled('v1'), { id: 'v1', state: 'failed', reason: 'engine' });
+  assert.deepEqual([changes(from), (await call('/sites/v1/remove', { method: 'POST' })).status, await stateOf('v1')], [[], 500, { id: 'v1', state: 'failed', reason: 'engine' }], 'no volume made, none taken away, no container; a deletion waits for a clear answer');
+  volumeTrouble = false;
+  // nothing of it is there: deleting it says so, and the mark of what went wrong goes
+  assert.deepEqual([(await call('/sites/v1/remove', { method: 'POST' })).json, await stateOf('v1')], [{ error: 'unknown-site' }, undefined]);
 });
 
 test('the settings from the environment: what is needed is asked for, the secret is long enough, the rest has its defaults', () => {

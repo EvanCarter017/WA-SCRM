@@ -11,6 +11,8 @@
 //   POST /api/auth/users     { username, name, role: 'supervisor', password? } → a new supervisor's account;
 //                            with role 'agent', where the platform makes sub-sites, a new employee's
 //   POST /api/auth/users/reset | disable | enable   { username }: a new temporary password; the account off, on
+//   POST /api/auth/users/remove   { username }: the account deleted for good — an employee's together with the
+//                            sub-site when it is the last account of it, where the platform makes sub-sites
 //   GET  /api/data           the sub-site's data document; ?fields=a,b gives only these top-level fields
 //   PUT  /api/data           { baseVersion, set, remove }
 //   DELETE /api/data         { baseVersion, field }: takes a field out for good, with every trace of it
@@ -30,6 +32,8 @@
 // sub-site checks the session and the account's sub-site itself.
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
 const { openAuth, validPassword } = require('./site-auth.cjs');
 const { openData } = require('./site-data.cjs');
 const { RESERVED } = require('./site-provisioner.cjs');
@@ -48,7 +52,7 @@ const STATUS = {
   'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
   'password-change-required': 403, 'forbidden': 403, 'read-only': 403, 'version-conflict': 409, 'too-long': 413, 'too-many-attempts': 429,
   'invalid-username': 400, 'invalid-name': 400, 'invalid-role': 400, 'own-account': 400, 'unknown-user': 404, 'username-taken': 409,
-  'workspace-exists': 409, 'workspace-full': 409, 'workspace-low-memory': 409, 'workspace-busy': 409, 'workspace-unavailable': 503,
+  'workspace-exists': 409, 'workspace-full': 409, 'workspace-low-memory': 409, 'workspace-busy': 409, 'workspace-unknown-site': 409, 'workspace-unavailable': 503,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
 
@@ -152,6 +156,8 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
     if (!body.name.trim()) throw problem('invalid-name');
     if (given && !validPassword(body.password)) throw problem('invalid-password');
     if (auth.listUsers().some(user => user.username === id)) throw problem('username-taken');
+    // A sub-site that an account has already — also one the provisioner does not know — is no other's.
+    if (auth.listUsers().some(user => user.site === id)) throw problem('workspace-exists');
     await asked('make', actor, id, async () => {
       try {
         await workspaces.make(id);
@@ -177,16 +183,88 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
     }
   }
   // An employee's sub-site is started before the account is switched on: when it cannot be — no room for it —
-  // the account stays off.
+  // the account stays off. A sub-site that is not there — its making went wrong before anything of it was made,
+  // or it was never made — is made now, where its name does as a sub-site's; elsewhere the account is all.
   async function workspaceOn(actor, target) {
     if (!workspaces || target.role !== 'agent') return {};
     try {
       await asked('start', actor, target.site, () => workspaces.start(target.site));
-      return { workspace: 'starting' };
     } catch (error) {
-      if (error.code === 'workspace-unknown-site') return {};
-      throw error;
+      if (error.code !== 'workspace-unknown-site') throw error;
+      if (!SITE_ID.test(target.site) || RESERVED.includes(target.site)) return {};
+      await asked('make', actor, target.site, () => workspaces.make(target.site));
     }
+    return { workspace: 'starting' };
+  }
+  // The fingerprints under which the relay keeps the translations of a sub-site's messages for everyone
+  // (ai-relay.cjs: the language and the text), read from the sub-site's data before it is deleted: every text of
+  // its messages, for every language they were translated into and the one its employee reads in.
+  function translationsOf(id) {
+    const file = path.join(dir, `site-${id}.db`);
+    if (!fs.existsSync(file)) return [];
+    const doc = openData(file);
+    let data;
+    try {
+      data = doc.read(['messages', 'ai']).data;
+    } finally {
+      doc.close();
+    }
+    const languages = new Set(), texts = new Set();
+    if (typeof data.ai?.readLanguage === 'string') languages.add(data.ai.readLanguage.trim());
+    for (const list of Object.values(data.messages && typeof data.messages === 'object' ? data.messages : {})) {
+      for (const message of Array.isArray(list) ? list : []) {
+        if (typeof message?.text === 'string' && message.text.trim()) texts.add(message.text.trim());
+        if (typeof message?.translatedTo === 'string') languages.add(message.translatedTo.trim());
+      }
+    }
+    languages.delete('');
+    return [...languages].flatMap(language => [...texts].map(text => crypto.createHash('sha256').update(language + '\n' + text).digest('hex')));
+  }
+  // Those translations taken out of the relay's store; nothing else of it is touched.
+  function forgetTranslations(id, keys) {
+    const file = path.join(dir, 'ai-translations.db');
+    if (!keys.length || !fs.existsSync(file)) return;
+    const db = new DatabaseSync(file);
+    try {
+      db.exec('PRAGMA busy_timeout = 5000');
+      const drop = db.prepare('DELETE FROM translations WHERE key = ?');
+      let rows = 0;
+      db.exec('BEGIN');
+      for (const key of keys) rows += Number(drop.run(key).changes);
+      db.exec('COMMIT');
+      console.log(`site workspace translations removed site=${id} rows=${rows}`);
+    } finally {
+      db.close();
+    }
+  }
+  // An employee's sub-site goes with the last account of it — the account is deleted only once it is gone — and
+  // the translations of its messages with it. A sub-site the platform does not know, or whose name no sub-site
+  // can have, is nothing to delete. Where the platform does not make sub-sites an employee's account is not
+  // deleted here: its data would stay behind.
+  async function workspaceRemove(actor, target) {
+    if (target.role !== 'agent' || auth.listUsers().some(user => user.site === target.site && user.username !== target.username)) return {};
+    if (!workspaces) throw problem('workspace-unavailable');
+    if (!SITE_ID.test(target.site) || RESERVED.includes(target.site)) return {};
+    let keys = [], removed = null;
+    try {
+      keys = translationsOf(target.site);
+    } catch (error) {
+      console.error(`site workspace translations unread site=${target.site} error=${error.code || error.name}`);
+    }
+    await asked('remove', actor, target.site, async () => {
+      try {
+        removed = await workspaces.remove(target.site);
+      } catch (error) {
+        if (error.code !== 'workspace-unknown-site') throw error;
+      }
+    });
+    if (!removed) return {};
+    try {
+      forgetTranslations(target.site, keys);
+    } catch (error) {
+      console.error(`site workspace translations failed site=${target.site} error=${error.code || error.name}`);
+    }
+    return { workspace: 'removed', ...(removed.signedOut === false ? { phone: 'not-signed-out' } : {}) };
   }
 
   const routes = {
@@ -272,6 +350,14 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
       const workspace = await workspaceOn(actor, target);
       auth.setDisabled(target.username, false);
       console.log(`site account enabled by=${actor.username} user=${target.username}`);
+      return { body: { ok: true, ...workspace } };
+    },
+    // An account deleted for good, with its sessions — and an employee's sub-site with it (workspaceRemove).
+    'POST /api/auth/users/remove': async req => {
+      const actor = manager(req), target = managed(actor, (await readJson(req)).username);
+      const workspace = await workspaceRemove(actor, target);
+      auth.deleteUser(target.username);
+      console.log(`site account removed by=${actor.username} user=${target.username} role=${target.role}`);
       return { body: { ok: true, ...workspace } };
     },
     'GET /api/data': req => {

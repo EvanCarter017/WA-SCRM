@@ -5,7 +5,7 @@
 // else, so that several can be read side by side, and the server of a sub-site leaves a log line for every read
 // of its data by someone who is not its own employee. What the page changes are accounts and nothing else: a new
 // supervisor — or, where the platform makes sub-sites, a new employee, who gets a sub-site of their own —, a new
-// temporary password for someone, an account switched off or on — and it signs out.
+// temporary password for someone, an account switched off or on, an account deleted — and it signs out.
 (() => {
   'use strict';
   const $ = selector => document.querySelector(selector);
@@ -85,7 +85,7 @@
     };
   }
   // What the list says of a sub-site the platform made, while it is not ready to be read.
-  const WORKSPACE = { starting: '正在准备，大约需要一分钟…', ready: '已就绪', stopping: '正在停止…', stopped: '已停止', failed: '启动失败，可先「停用」再「启用」重试', missing: '尚未创建' };
+  const WORKSPACE = { starting: '正在准备，大约需要一分钟…', ready: '已就绪', stopping: '正在停止…', removing: '正在删除…', stopped: '已停止', failed: '启动失败，可先「停用」再「启用」重试', missing: '尚未创建' };
   const workspaceText = value => '工作区：' + (WORKSPACE[value] || '状态未知');
   // quiet: asked in passing, while a sub-site is being made or started — what is shown stays until the answer is
   // there, and a sub-site that was read already and is as it was is not read again.
@@ -115,11 +115,11 @@
     if (made?.state) line.textContent = workspaceText(made.state);
     watch();
   }
-  // While a sub-site is being made, started or stopped, the list is asked again every few seconds — until all
-  // have settled, and not while an employee's conversations are open.
+  // While a sub-site is being made, started, stopped or deleted, the list is asked again every few seconds —
+  // until all have settled, and not while an employee's conversations are open.
   function watch() {
     clearTimeout(watch.timer);
-    if (!state.open && state.sites.some(entry => entry.state === 'starting' || entry.state === 'stopping')) watch.timer = setTimeout(() => load(true), 4000);
+    if (!state.open && state.sites.some(entry => ['starting', 'stopping', 'removing'].includes(entry.state))) watch.timer = setTimeout(() => load(true), 4000);
   }
   function listHTML() {
     if (state.loading) return '<p class="fid-master-note">正在读取…</p>';
@@ -148,7 +148,7 @@
     return `<div class="fid-table-scroll" tabindex="0" aria-label="员工总览表格"><table class="fid-table fid-master-table"><thead><tr>${['员工', 'WhatsApp 号码', '客户', '未读会话', '待跟进', '最近消息', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${table}</tbody></table></div>`;
   }
 
-  // ---- accounts: a new supervisor or employee, a new temporary password, an account off or on ----
+  // ---- accounts: a new supervisor or employee, a new temporary password, an account off or on, deleted ----
   const ROLE = { agent: '员工', supervisor: '主管', admin: '管理员' };
   const PROBLEM = {
     'invalid-username': '登录名需为 3–32 位：小写字母、数字、点、下划线或连字符，并以字母或数字开头。', 'username-taken': '这个登录名已经有人使用。', 'invalid-name': '请填写显示名称（最多 60 个字）。',
@@ -164,11 +164,14 @@
     return user ? `${user.name}（${user.username}）` : username;
   };
   // What can be done with someone else's account. One's own has none, and an administrator's only an administrator.
+  // An employee's account (the list's rows carry no role) can be deleted where the platform makes sub-sites:
+  // elsewhere their data would stay behind.
   function accountActs(account) {
     if (account.username === state.user.username) return '<span class="fid-master-quiet">当前账号</span>';
     if (account.role === 'admin' && state.user.role !== 'admin') return '<span class="fid-master-quiet">由管理员管理</span>';
     const id = esc(account.username);
-    return `<button type="button" class="link" data-master="reset" data-id="${id}">重置密码</button>` + (account.disabled ? `<button type="button" class="link" data-master="enable" data-id="${id}">启用</button>` : `<button type="button" class="link" data-master="disable" data-id="${id}">停用</button>`);
+    return `<button type="button" class="link" data-master="reset" data-id="${id}">重置密码</button>` + (account.disabled ? `<button type="button" class="link" data-master="enable" data-id="${id}">启用</button>` : `<button type="button" class="link" data-master="disable" data-id="${id}">停用</button>`)
+      + ((account.role || 'agent') !== 'agent' || state.provisioned ? `<button type="button" class="link danger" data-master="remove" data-id="${id}">删除</button>` : '');
   }
   function managersHTML() {
     const list = state.users.filter(user => user.role !== 'agent');
@@ -236,13 +239,49 @@
   // employee of a sub-site who can sign in?
   const stops = username => state.provisioned && state.sites.some(entry => entry.employees.some(employee => employee.username === username) && entry.employees.every(employee => employee.disabled || employee.username === username));
   async function switchAccount(username, on) {
-    // Stopping a sub-site can take a moment: the dialog that asked stays, and says so.
+    // Stopping a sub-site can take a moment: the dialog that asked stays, and says so. The answer closes that
+    // dialog only — not one that was opened meanwhile.
+    const asking = $('#dialog').open ? $('#dialog-content').firstElementChild : null;
     for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
     if (!on && $('#dialog [data-master="disableDo"]')) $('#dialog [data-master="disableDo"]').textContent = '正在停用…';
     const answer = await post(on ? '/api/auth/users/enable' : '/api/auth/users/disable', { username });
-    closeDialog();
+    if (asking?.isConnected) closeDialog();
     const also = { starting: '，工作区正在启动', stopped: '，工作区已停止', running: '，但工作区没能停止' }[answer.body.workspace] || '';
     say(answer.status === 200 ? (on ? '账号已启用' : '账号已停用') + also : problemText(answer));
+    load();
+  }
+  // Deleting an account: asked first, and the sign-in name is typed to confirm — what is deleted cannot come back.
+  // The question says what goes: an employee's workspace with the last account of it.
+  function removeForm(username, problem = '') {
+    const account = state.users.find(user => user.username === username) || { username, role: 'agent' };
+    const shared = state.sites.some(entry => entry.employees.length > 1 && entry.employees.some(employee => employee.username === username));
+    const text = account.role !== 'agent' ? `删除「${label(username)}」的账号？账号会被永久删除，无法恢复。`
+      : shared ? `删除「${label(username)}」的账号？账号会被永久删除。工作区还有其他员工的账号，会保留。`
+        : `删除「${label(username)}」的账号？账号、工作区、WhatsApp 连接（手机上也会退出）以及全部客户和聊天记录都会被永久删除，无法恢复。如需保留数据，请改用「停用」。`;
+    showDialog('删除账号', `<form id="master-remove" class="fid-master-form" data-id="${esc(username)}" novalidate>
+        <p>${esc(text)}</p>
+        <label class="field">请输入登录名「${esc(username)}」以确认<input name="confirm" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+        <p class="fid-master-problem" role="alert" ${problem ? '' : 'hidden'}>${esc(problem)}</p>
+      </form>`, '<button type="button" class="fid-btn" data-master="close">取消</button><button type="submit" form="master-remove" class="fid-btn danger">删除</button>');
+    $('#master-remove [name="confirm"]').focus();
+  }
+  const REMOVE_PROBLEM = { 'workspace-busy': '这个工作区正在准备或停止中，请稍后再试。', 'workspace-unavailable': '暂时无法删除工作区，请稍后再试。' };
+  async function removeAccount(form) {
+    const username = form.dataset.id;
+    if (form.elements.confirm.value.trim().toLowerCase() !== username) return removeForm(username, '输入的登录名不一致。');
+    // Deleting a workspace takes a moment — its numbers are signed out first: the dialog waits, and says so. The
+    // answer closes that dialog only — not one that was opened meanwhile.
+    const asking = $('#dialog-content').firstElementChild;
+    for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
+    $('#dialog [type="submit"]').textContent = '正在删除…';
+    const answer = await post('/api/auth/users/remove', { username });
+    if (!asking.isConnected) say(answer.status === 200 ? '账号已删除' : problemText(answer));
+    else if (answer.status !== 200) removeForm(username, REMOVE_PROBLEM[answer.body.error] || problemText(answer));
+    else if (answer.body.phone === 'not-signed-out') showDialog('账号已删除', '<p>账号已删除。WhatsApp 号码没能在手机上自动退出：如果这位员工绑定过号码，请在手机 WhatsApp 的「设置 → 已关联的设备」中把它移除。</p>', DONE);
+    else {
+      closeDialog();
+      say('账号已删除');
+    }
     load();
   }
 
@@ -371,6 +410,7 @@
     disable: username => askFirst('停用账号', `停用「${label(username)}」的账号？对方将无法登录，已经登录的页面也会失效。${stops(username) ? '对方的工作区和 WhatsApp 连接会停止，数据保留；重新启用时再启动。' : ''}`, '停用', 'disableDo', username),
     disableDo: username => switchAccount(username, false),
     enable: username => switchAccount(username, true),
+    remove: username => removeForm(username),
   };
 
   window.WA_MASTER = user => {
@@ -387,6 +427,7 @@
     $('#dialog').addEventListener('submit', event => {
       event.preventDefault();
       if (event.target.id === 'master-create') createAccount(event.target);
+      else if (event.target.id === 'master-remove') removeAccount(event.target);
     });
     // The Escape key closes a dialog as its buttons do.
     $('#dialog').addEventListener('close', closeDialog);

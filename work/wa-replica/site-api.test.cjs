@@ -5,10 +5,13 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const net = require('node:net');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { DatabaseSync } = require('node:sqlite');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const siteApi = require('./site-api.cjs');
+const { openData } = require('./site-data.cjs');
 const { PASSWORD_MIN, SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_MS } = require('./site-auth.cjs');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-site-'));
@@ -518,7 +521,7 @@ test('employees from the supervisor page, where the platform makes sub-sites: th
     }
     delete refuse.make;
     asked.length = 0;
-    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'depot', name: 'Depot', role: 'agent' })).json, asked, await count()], [{ error: 'workspace-exists' }, ['make depot'], before], 'the sub-site of another account is not taken');
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'depot', name: 'Depot', role: 'agent' })).json, asked, await count()], [{ error: 'workspace-exists' }, [], before], 'the sub-site of another account is not taken — the provisioner is not even asked');
     // a sub-site that is there and is nobody's — its account was not made the last time — is taken and started
     asked.length = 0;
     const taken = await send('/api/auth/users', ivo, { username: 'orphan', name: 'Orphan', role: 'agent' });
@@ -526,6 +529,10 @@ test('employees from the supervisor page, where the platform makes sub-sites: th
     refuse.start = 'workspace-full';
     states.set('second', 'stopped');
     assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'second', name: 'Second', role: 'agent' })).json, await account('second')], [{ error: 'workspace-full' }, undefined], 'not when it cannot be started');
+    // there when asked, and gone when it is to be started: refused, and nothing made
+    refuse.start = 'workspace-unknown-site';
+    states.set('ghost', 'stopped');
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'ghost', name: 'Ghost', role: 'agent' })).status, await account('ghost')], [409, undefined]);
     delete refuse.start;
     // off: the session ends, and the sub-site stops — its place is free
     asked.length = 0;
@@ -552,9 +559,13 @@ test('employees from the supervisor page, where the platform makes sub-sites: th
     refuse.stop = 'workspace-unavailable';
     assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'otto' })).json, (await account('otto')).disabled], [{ ok: true, workspace: 'running' }, true]);
     delete refuse.stop;
-    // an employee whose sub-site the platform did not make, and a supervisor: the account only
+    // an employee whose sub-site the platform does not know: off is the account only, on makes the sub-site
     asked.length = 0;
-    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'zed' })).json, (await send('/api/auth/users/enable', ivo, { username: 'zed' })).json, (await account('zed')).disabled, asked], [{ ok: true }, { ok: true }, false, ['stop nowhere', 'start nowhere']]);
+    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'zed' })).json, (await send('/api/auth/users/enable', ivo, { username: 'zed' })).json, (await account('zed')).disabled, asked, states.get('nowhere')], [{ ok: true }, { ok: true, workspace: 'starting' }, false, ['stop nowhere', 'start nowhere', 'make nowhere'], 'starting']);
+    // which is that account's: a new employee of that name is refused before the provisioner is asked
+    asked.length = 0;
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'nowhere', name: 'Nowhere', role: 'agent' })).json, asked], [{ error: 'workspace-exists' }, []]);
+    // a supervisor: the account only
     asked.length = 0;
     assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'sven' })).json, (await send('/api/auth/users/enable', ivo, { username: 'sven' })).json, asked], [{ ok: true }, { ok: true }, []]);
     // the provisioner does not answer: the list is there without the states, and no employee is made
@@ -564,10 +575,102 @@ test('employees from the supervisor page, where the platform makes sub-sites: th
     reachable = true;
     // each thing asked of the provisioner is in the log with who asked; no password is
     const lines = logged.filter(line => line.startsWith('site workspace '));
-    for (const line of ['site workspace make ok by=ivo site=lena', 'site workspace make ok by=joy site=mia-2', 'site workspace make failed by=ivo site=rita error=workspace-full', 'site workspace make failed by=ivo site=depot error=workspace-exists', 'site workspace make ok by=ivo site=orphan', 'site workspace stop ok by=ivo site=lena', 'site workspace start failed by=ivo site=lena error=workspace-full', 'site workspace start ok by=joy site=lena', 'site workspace stop failed by=ivo site=depot error=workspace-unavailable']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+    for (const line of ['site workspace make ok by=ivo site=lena', 'site workspace make ok by=joy site=mia-2', 'site workspace make failed by=ivo site=rita error=workspace-full', 'site workspace make ok by=ivo site=orphan', 'site workspace stop ok by=ivo site=lena', 'site workspace start failed by=ivo site=lena error=workspace-full', 'site workspace start ok by=joy site=lena', 'site workspace stop failed by=ivo site=depot error=workspace-unavailable']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
     assert(logged.includes('site account created by=ivo user=lena role=agent'));
     for (const secret of [made.json.password, 'mia-own-password']) assert(!logged.join('\n').includes(secret), 'a password in the log');
   } finally {
+    firstServer.closeAllConnections(); firstServer.close(); first.close();
+  }
+});
+
+test('deleting an account: for supervisors and administrators, never one\'s own, an administrator\'s only as an administrator; an employee\'s sub-site goes with the last account of it, and the translations of its messages with it; the account goes only once its sub-site is gone; a server that makes no sub-sites deletes no employee; each step in the log', async () => {
+  // a stand-in for the first server's client of the provisioner: what it was asked, and how it answers
+  const asked = [], states = new Map([['rosa', 'ready'], ['vera', 'stopped'], ['pair', 'ready']]);
+  let refuse = null, signedOut = true;
+  const no = code => Object.assign(new Error(code), { code });
+  const workspaces = {
+    list: async () => ({ sites: [...states].map(([id, state]) => ({ id, state })), room: { max: 4, running: 1, freeMb: 3000, minFreeMb: 1400, canStart: true } }),
+    make: async id => { asked.push('make ' + id); throw no('workspace-full'); },
+    start: async id => { asked.push('start ' + id); throw no('workspace-full'); },
+    stop: async id => { asked.push('stop ' + id); return { id, state: 'stopped' }; },
+    remove: async id => {
+      asked.push('remove ' + id);
+      if (refuse) throw no(refuse);
+      if (!states.has(id)) throw no('workspace-unknown-site');
+      states.delete(id);
+      return { id, state: 'removed', signedOut };
+    },
+  };
+  const dir = path.join(tmp, 'main');
+  const first = siteApi.create({ dir, siteId: 'hq3', now: () => clock, workspaces });
+  const firstServer = http.createServer((req, res) => first.handle(req, res, new URL(req.url, 'http://localhost').pathname));
+  await new Promise(resolve => firstServer.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${firstServer.address().port}`;
+  // rosa's sub-site: messages, some translated, and the language she reads in; the relay keeps translations of
+  // its messages and of another's under a fingerprint of the language and the text (ai-relay.cjs)
+  const fingerprint = (to, text) => crypto.createHash('sha256').update(to + '\n' + text).digest('hex');
+  const rosaData = openData(path.join(dir, 'site-rosa.db'));
+  rosaData.write({ baseVersion: 0, by: 'test', set: {
+    'messages/c1': [{ id: 'm1', text: ' Hola, ¿tienen cajas? ', translated: '你好，有箱子吗？', translatedTo: '简体中文' }, { id: 'm2', text: 'Gracias', translatedTo: 'English' }],
+    'messages/c2': [{ id: 'm3', text: '[图片]' }],
+    ai: { readLanguage: '简体中文' },
+  } });
+  rosaData.close();
+  const store = new DatabaseSync(path.join(dir, 'ai-translations.db'));
+  store.exec('CREATE TABLE IF NOT EXISTS translations (key TEXT PRIMARY KEY, text TEXT NOT NULL, at TEXT NOT NULL)');
+  for (const [to, text] of [['简体中文', 'Hola, ¿tienen cajas?'], ['English', 'Gracias'], ['简体中文', 'Gracias'], ['简体中文', 'Bonjour à tous']]) store.prepare('INSERT OR REPLACE INTO translations (key, text, at) VALUES (?, ?, ?)').run(fingerprint(to, text), 'translated', 'now');
+  const kept = () => store.prepare('SELECT key FROM translations').all().map(row => row.key);
+  try {
+    const rosa = await member('rosa', 'agent', 'rosa');
+    await member('vera', 'agent', 'vera');
+    await member('tim', 'agent', 'pair');
+    await member('tom', 'agent', 'pair');
+    site.auth.setDisabled('tom', true);
+    await site.auth.createUser({ username: 'odd', role: 'agent', name: 'Odd', site: 'bad_site' });
+    await site.auth.createUser({ username: 'drift', role: 'agent', name: 'Drift', site: 'nobody-knows' });
+    const zara = await member('zara', 'supervisor');
+    const signIn = async username => cookieOf(await call('/api/auth/login', { method: 'POST', body: { username, password: PASSWORD } }));
+    const [gus, ivo, joy] = [await signIn('gus'), await signIn('ivo'), await signIn('joy')];
+    const send = (cookie, username) => call('/api/auth/users/remove', { method: 'POST', cookie, base, body: { username } });
+    const exists = username => site.auth.listUsers().some(user => user.username === username);
+    // who may: supervisors and administrators; never one's own; an administrator's only as an administrator
+    assert.deepEqual([(await send(gus, 'zara')).json, (await call('/api/auth/users/remove', { method: 'POST', base, body: { username: 'zara' } })).status, (await send(ivo, 'ivo')).json, (await send(ivo, 'joy')).json, (await send(ivo, 'nobody')).json, (await call('/api/auth/users/remove', { method: 'POST', cookie: ivo, base, body: { username: 'zara' }, headers: { 'Sec-Fetch-Site': 'cross-site' } })).status], [{ error: 'forbidden' }, 401, { error: 'own-account' }, { error: 'forbidden' }, { error: 'unknown-user' }, 403]);
+    assert.deepEqual([asked, exists('zara'), exists('joy')], [[], true, true], 'none of the refused did anything');
+    // a supervisor's account: deleted with its sessions; the provisioner is not asked
+    assert.deepEqual((await send(joy, 'zara')).json, { ok: true });
+    assert.deepEqual([exists('zara'), (await call('/api/auth/me', { cookie: zara, base })).status, (await call('/api/auth/login', { method: 'POST', base, body: { username: 'zara', password: PASSWORD } })).status, asked], [false, 401, 401, []]);
+    // an employee whose sub-site another account still has — also one that is switched off: the account only
+    assert.deepEqual([(await send(ivo, 'tim')).json, exists('tim'), asked, states.has('pair')], [{ ok: true }, false, [], true]);
+    // the last account of it: the sub-site goes too — and while the provisioner refuses, the account stays
+    for (const [reason, status] of [['workspace-busy', 409], ['workspace-unavailable', 503]]) {
+      refuse = reason;
+      const refused = await send(ivo, 'tom');
+      assert.deepEqual([refused.status, refused.json, exists('tom')], [status, { error: reason }, true]);
+    }
+    refuse = null;
+    asked.length = 0;
+    assert.deepEqual([(await send(ivo, 'tom')).json, exists('tom'), asked, states.has('pair')], [{ ok: true, workspace: 'removed' }, false, ['remove pair'], false]);
+    // rosa's: her sub-site, and the translations of its messages — those of another stay; her session ends
+    asked.length = 0;
+    assert.deepEqual((await send(ivo, 'rosa')).json, { ok: true, workspace: 'removed' });
+    assert.deepEqual([exists('rosa'), asked, kept(), (await call('/api/auth/me', { cookie: rosa, base })).status], [false, ['remove rosa'], [fingerprint('简体中文', 'Bonjour à tous')], 401]);
+    // a number that could not be signed out at WhatsApp is said so
+    signedOut = false;
+    assert.deepEqual((await send(joy, 'vera')).json, { ok: true, workspace: 'removed', phone: 'not-signed-out' });
+    signedOut = true;
+    // a sub-site the provisioner does not know, and a name no sub-site can have: the account only
+    asked.length = 0;
+    assert.deepEqual([(await send(ivo, 'drift')).json, (await send(ivo, 'odd')).json, exists('drift'), exists('odd'), asked], [{ ok: true }, { ok: true }, false, false, ['remove nobody-knows']]);
+    // a server that makes no sub-sites deletes no employee's account — the data would stay behind — but a supervisor's
+    await member('ulla', 'agent', 'ulla');
+    await member('quint', 'supervisor');
+    assert.deepEqual([(await call('/api/auth/users/remove', { method: 'POST', cookie: ivo, body: { username: 'ulla' } })).json, exists('ulla'), (await call('/api/auth/users/remove', { method: 'POST', cookie: ivo, body: { username: 'quint' } })).json, exists('quint')], [{ error: 'workspace-unavailable' }, true, { ok: true }, false]);
+    // every step in the log, with who did it; no password
+    const lines = logged.filter(line => /^site (account removed|workspace (remove|translations))/.test(line));
+    for (const line of ['site account removed by=joy user=zara role=supervisor', 'site account removed by=ivo user=tim role=agent', 'site workspace remove failed by=ivo site=pair error=workspace-busy', 'site workspace remove ok by=ivo site=pair', 'site workspace remove ok by=ivo site=rosa', 'site workspace translations removed site=rosa rows=3', 'site account removed by=ivo user=rosa role=agent', 'site account removed by=ivo user=quint role=supervisor']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+    assert(!logged.join('\n').includes(PASSWORD), 'a password in the log');
+  } finally {
+    store.close();
     firstServer.closeAllConnections(); firstServer.close(); first.close();
   }
 });
@@ -673,6 +776,9 @@ test('the preview server: without a data folder the routes are off; with one, th
       socket.on('error', reject);
     });
     assert.deepEqual([await plainly('POST', '/api/wa/\\..\\..\\auth/login'), await plainly('GET', '/api/site\\status'), await plainly('GET', '/api/site/status'), await plainly('GET', '/api/site/status?note=a\\b')], [400, 400, 200, 200]);
+    // as are a slash written as %2F with parts of dots, a backslash written as %5C, an empty part, a part of dots
+    assert.deepEqual(await Promise.all(['/api/wa/a%2Fb/../../auth/login', '/api/wa/a%2fb/../hook', '/api/site%5Cstatus', '//api/site/status', '/api/./site/status', '/x/%2e%2e/api/site/status', '/api/site/status/..'].map(pathname => plainly('GET', pathname))), [400, 400, 400, 400, 400, 400, 400]);
+    assert.deepEqual([await plainly('GET', '/api/site/status?next=%2F..%2Fx//y'), await plainly('GET', '/')], [200, 200], 'what follows the question mark is no part of the path');
     // the server is for this machine only, unless it is told to listen elsewhere — as it is in a container
     const outside = Object.values(os.networkInterfaces()).flat().find(address => address.family === 'IPv4' && !address.internal)?.address;
     if (outside) {

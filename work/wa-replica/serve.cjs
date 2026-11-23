@@ -59,9 +59,11 @@ const isSiteRoute = pathname => pathname.startsWith('/api/site/') || pathname.st
 
 const server = http.createServer(async (req, res) => {
   try {
-    // A backslash in the path is a slash to this server and none to a gateway in front of it: such a request
-    // would be passed for one route and answered as another. Nobody asks so in earnest.
-    if (req.url.split('?')[0].includes('\\')) return sendJson(res, 400, { error: 'invalid-request' });
+    // An address that this server and a gateway in front of it could read differently is refused, so that a
+    // request is answered as the route it was passed for: a backslash (a slash here, none there), a slash or a
+    // backslash written as %2F or %5C, an empty part, or a part of dots. Nobody asks so in earnest.
+    const raw = req.url.split('?')[0];
+    if (/\\|%2f|%5c|\/\//i.test(raw) || raw.split('/').some(part => /^(\.|%2e){1,2}$/i.test(part))) return sendJson(res, 400, { error: 'invalid-request' });
     let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (named && (pathname === named + '/api/data' || pathname.startsWith(named + '/api/wa/'))) pathname = pathname.slice(named.length);
     if (isSiteRoute(pathname)) {

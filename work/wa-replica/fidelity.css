@@ -666,6 +666,7 @@
 .fid-master-table .fid-btn + .fid-master-acts { margin-top:6px; }
 .fid-master-acts .link { padding:0; border:0; background:none; color:var(--color-accent); font:inherit; cursor:pointer; }
 .fid-master-acts .link:hover { text-decoration:underline; }
+.fid-master-acts .link.danger { color:var(--color-danger); }
 .fid-master-dialog p { margin:0 0 8px; font-size:14px; line-height:22px; }
 .fid-master-form { display:grid; gap:14px; }
 .fid-master-form p { margin:0; }
