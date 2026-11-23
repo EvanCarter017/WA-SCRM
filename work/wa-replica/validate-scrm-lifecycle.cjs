@@ -370,6 +370,8 @@ assert(!read(path.join(__dirname, 'fidelity-pricelist.js')).includes('delete dat
 for (const [file, required] of [['fidelity-boot.js', "answer = await request('/api/data', { method: 'DELETE', body: { baseVersion: version, field } });"], ['site-api.cjs', "const PURGEABLE = ['priceList'];"], ['site-api.cjs', "'DELETE /api/data': async req => {"], ['site-data.cjs', "db.exec('VACUUM');"], ['site-data.cjs', "db.exec('PRAGMA wal_checkpoint(TRUNCATE)');"], ['site-data.cjs', "else db.prepare('DELETE FROM saves WHERE version = ?').run(row.version);"]]) {
   assert(read(path.join(__dirname, file)).includes(required), `${file} is missing ${required}`);
 }
+// The shortest password: the server's rule and what the page checks and says are the same number.
+assert(read(path.join(__dirname, 'site-auth.cjs')).includes('const PASSWORD_MIN = 8;') && bootSource.includes("if (next.length < 8) return fail(form, '新密码至少 8 位。');") && read(path.join(__dirname, 'fidelity-index.html')).includes('新密码（至少 8 位）'), 'the page and the server must agree on the shortest password');
 // The list of conversations keeps its place when the page is drawn again.
 for (const required of ["const openwaListKey = () => [ui.account, ui.conversationFilter, ui.query].join('\\n');", "if (event.target.id === 'conversation-list') Object.assign(openwaListPlace, { key: openwaListKey(), top: event.target.scrollTop });", 'else if (openwaListPlace.top) list.scrollTop = openwaListPlace.top;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);

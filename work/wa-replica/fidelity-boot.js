@@ -241,7 +241,7 @@
   screen.password.addEventListener('submit', async event => {
     event.preventDefault();
     const form = screen.password, current = form.elements.current.value, next = form.elements.next.value;
-    if (next.length < 10) return fail(form, '新密码至少 10 位。');
+    if (next.length < 8) return fail(form, '新密码至少 8 位。');
     if (next !== form.elements.repeat.value) return fail(form, '两次输入的新密码不一致。');
     busy(form, true);
     let answer;
@@ -253,7 +253,7 @@
     busy(form, false);
     if (answer.status === 200) return begin();
     if (answer.status === 401) return fail(form, '当前密码不正确。');
-    if (answer.status === 400) return fail(form, '新密码至少 10 位，且不能与当前密码相同。');
+    if (answer.status === 400) return fail(form, '新密码至少 8 位，且不能与当前密码相同。');
     return fail(form, '暂时无法修改密码，请稍后再试。');
   });
 

@@ -16,7 +16,7 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/serve.cjs
 ```bash
 WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user add <用户名> <agent|supervisor|admin> <显示名>
 ```
-工具只显示一次临时密码，持有人首次登录后必须修改。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
+工具只显示一次临时密码，持有人首次登录后必须修改；自己设置的密码至少 8 位。员工登录后进入自己的子站，新子站从空白开始；主管与管理员的查看入口将随主站提供。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
 
 如果在服务前面放置反向代理（nginx、OpenResty 等），代理允许的请求体大小必须不低于 8 MB（例如 nginx 的 `client_max_body_size 10m;`）：页面把较大的修改拆成多次请求保存，但单个数据项最大 2 MB，服务本身一次请求最多接收 8 MB。上限过低时页面会提示「修改未能保存：内容超过服务器允许的大小」。
 

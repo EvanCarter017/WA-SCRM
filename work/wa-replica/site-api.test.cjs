@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const siteApi = require('./site-api.cjs');
-const { SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_MS } = require('./site-auth.cjs');
+const { PASSWORD_MIN, SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_MS } = require('./site-auth.cjs');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-site-'));
 let clock = Date.parse('2026-11-21T08:00:00Z');
@@ -56,6 +56,10 @@ test('accounts: rules for names, roles and passwords; the password is not stored
   await assert.rejects(add({ site: null }), { code: 'site-required' });
   await assert.rejects(add({ name: '  ' }), { code: 'invalid-name' });
   await assert.rejects(add({ password: 'short' }), { code: 'invalid-password' });
+  // eight characters are the least; the page says the same number
+  assert.equal(PASSWORD_MIN, 8);
+  await assert.rejects(add({ password: '1234567' }), { code: 'invalid-password' });
+  assert.equal((await add({ username: 'eight', password: '12345678' })).user.username, 'eight');
   const created = await add({ username: ' Rules ' });
   assert.equal(created.user.username, 'rules');
   assert.equal(created.user.mustChangePassword, true);

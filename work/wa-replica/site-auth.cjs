@@ -7,7 +7,9 @@ const crypto = require('node:crypto');
 
 const ROLES = ['agent', 'supervisor', 'admin'];
 const USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
-const PASSWORD_MIN = 10;
+// Eight characters since 2026-11-23, on the owner's decision: the system is used internally for now. To be
+// raised again (it was ten) before it is opened to outside services.
+const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 32 };
 const SESSION_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
