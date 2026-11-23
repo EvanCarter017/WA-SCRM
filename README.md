@@ -18,7 +18,7 @@ WA_SCRM_DATA_DIR=/path/to/private/data node work/wa-replica/site-admin.cjs user 
 ```
 工具只显示一次临时密码，持有人首次登录后必须修改；自己设置的密码至少 8 位。员工登录后进入自己的子站，新子站从空白开始。主管与管理员登录后进入「主管视图」：员工总览列出每位员工的 WhatsApp 号码及连接状态、客户数、未读会话数、待跟进数和最近消息时间；点击「查看」可以只读方式查看该员工的客户与会话（含图片、语音、文件和已有译文）。主管视图不能发送消息，也不能修改任何数据；主管或管理员每读取一次子站数据，该子站的服务器都会记录一行日志（谁、哪个子站、读取了哪些内容）。未设置 `WA_SCRM_DATA_DIR` 时页面只显示「服务器尚未启用账号」。
 
-多个子站可以共用同一个访问地址：每个子站各运行一个服务进程（`WA_SCRM_SITE_ID` 和端口各不相同，`WA_SCRM_DATA_DIR` 相同，账号只有一套），并通过各自的 `WA_SCRM_OPENWA_ENV` 连接自己的 OpenWA。登录时服务器除登录凭证外还会写入名为 `scrm_site` 的 Cookie，记录该员工所属的子站；前面的网关（nginx 或 OpenResty）按这个 Cookie 把 `/api/data` 和 `/api/wa/*` 转发到对应子站的进程，其余请求（页面文件、`/api/auth/*`、`/api/site/status`、`/api/ai/*`）固定交给其中一个进程。这个 Cookie 只决定请求的去向，不代表权限：每个子站都会自行核对登录状态和账号所属的子站。每个子站的进程也用子站自己的名字应答：`/site/<子站编号>/api/…` 等同于该子站的 `/api/…`。主管视图用这种地址同时读取多个子站，各子站的 OpenWA 事件通知也送到 `/site/<子站编号>/api/wa/hook`；网关按路径里的子站编号转发即可。nginx 的写法如下（两个子站 `default` 与 `site-b`）：
+多个子站可以共用同一个访问地址：每个子站各运行一个服务进程（`WA_SCRM_SITE_ID` 和端口各不相同，`WA_SCRM_DATA_DIR` 相同，账号只有一套），并通过各自的 `WA_SCRM_OPENWA_ENV` 连接自己的 OpenWA。登录时服务器除登录凭证外还会写入名为 `scrm_site` 的 Cookie，记录该员工所属的子站；前面的网关（nginx 或 OpenResty）按这个 Cookie 把 `/api/data` 和 `/api/wa/*` 转发到对应子站的进程，其余请求（页面文件、`/api/auth/*`、`/api/site/status`、`/api/ai/*`）固定交给其中一个进程。这个 Cookie 只决定请求的去向，不代表权限：每个子站都会自行核对登录状态和账号所属的子站。每个子站的进程也用子站自己的名字应答它的数据和 WhatsApp 连接：`/site/<子站编号>/api/data` 和 `/site/<子站编号>/api/wa/…` 等同于该子站的 `/api/data` 和 `/api/wa/…`；登录等其余接口只有原来的地址，输错密码的次数因此只由一个进程统计。主管视图用这种地址同时读取多个子站，各子站的 OpenWA 事件通知也送到 `/site/<子站编号>/api/wa/hook`；网关按路径里的子站编号转发即可。nginx 的写法如下（两个子站 `default` 与 `site-b`）：
 
 ```nginx
 map $cookie_scrm_site $scrm_node {
@@ -35,7 +35,7 @@ server {
     location / { proxy_pass http://127.0.0.1:56141; }
     location = /api/data { proxy_pass http://$scrm_node; }
     location /api/wa/ { proxy_pass http://$scrm_node; }
-    location ~ ^/site/(?<scrm_named>[a-z0-9-]+)/api/ { proxy_pass http://$scrm_named_node; }
+    location ~ ^/site/(?<scrm_named>[a-z0-9-]+)/api/(data$|wa/) { proxy_pass http://$scrm_named_node; }
 }
 ```
 

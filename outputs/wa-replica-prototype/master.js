@@ -12,6 +12,12 @@
   const get = path => fetch(path).then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }), () => ({ status: 0, body: {} }));
   // The address of a sub-site's own server for a path of its API.
   const at = (site, path) => '/site/' + encodeURIComponent(site) + path;
+  // What a sub-site saved is taken where it has the shape the page expects and left out where it has not: one
+  // sub-site's odd data must not stop the page for the others.
+  const rows = value => (Array.isArray(value) ? value.filter(item => item && typeof item === 'object') : []);
+  const guarded = (make, instead) => { try { return make(); } catch { return instead; } };
+  // The colour of a customer's initials is one word of the style sheet, whatever was saved.
+  const tone = c => String(c.color || '').replace(/[^a-z]/g, '') || 'jade';
 
   // user: who is signed in. sites: the list, each { site, employees, reached, data, link }.
   // open: the sub-site that is being looked at, { site, name, data, customer, query, chat } — or null for the list.
@@ -37,11 +43,13 @@
   const dayOf = at => new Date(at).toLocaleDateString('sv-SE');
   const clock = at => new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
   const dayWord = at => (dayOf(at) === dayOf(Date.now()) ? '今天' : dayOf(at) === dayOf(Date.now() - 86400000) ? '昨天' : dayOf(at));
-  const lastLabel = c => (!c.lastAt ? c.last || '' : dayOf(c.lastAt) === dayOf(Date.now()) ? clock(c.lastAt) : dayOf(c.lastAt) === dayOf(Date.now() - 86400000) ? '昨天' : dayOf(c.lastAt).slice(5));
-  const messageDay = m => (m.at ? dayWord(m.at) : String(m.time || '').startsWith('昨天') ? '昨天' : '今天');
-  const messageTime = m => (m.at ? clock(m.at) : String(m.time || '').replace('昨天 ', ''));
+  // A time that was saved as something else than a number counts as none.
+  const time = value => (Number.isFinite(value) ? value : 0);
+  const lastLabel = c => (!time(c.lastAt) ? c.last || '' : dayOf(c.lastAt) === dayOf(Date.now()) ? clock(c.lastAt) : dayOf(c.lastAt) === dayOf(Date.now() - 86400000) ? '昨天' : dayOf(c.lastAt).slice(5));
+  const messageDay = m => (time(m.at) ? dayWord(m.at) : String(m.time || '').startsWith('昨天') ? '昨天' : '今天');
+  const messageTime = m => (time(m.at) ? clock(m.at) : String(m.time || '').replace('昨天 ', ''));
   // The conversation with the latest message comes first; the others keep their order after them.
-  const ordered = list => list.map((c, i) => [c, i]).sort((x, y) => (y[0].lastAt || 0) - (x[0].lastAt || 0) || x[1] - y[1]).map(x => x[0]);
+  const ordered = list => list.map((c, i) => [c, i]).sort((x, y) => time(y[0].lastAt) - time(x[0].lastAt) || x[1] - y[1]).map(x => x[0]);
 
   // ---- the list of employees ----
   const LINK = { online: '已连接', scan: '等待扫码', starting: '连接中', verifying: '连接中', offline: '已掉线', attention: '需要在手机上处理', failed: '连接失败', missing: '需要重新绑定' };
@@ -53,19 +61,19 @@
   // The state of each of a sub-site's numbers: what its WhatsApp link says now, or — when the link cannot be
   // asked or does not know the number — what the employee's page saved last (never "connected" on that alone).
   function numbers(entry) {
-    return (entry.data.accounts || []).map(account => {
-      const live = entry.link?.configured && entry.link.reachable ? entry.link.accounts.find(a => a.account === account.id)?.state : '';
+    return rows(entry.data.accounts).map(account => {
+      const live = entry.link?.configured && entry.link.reachable ? rows(entry.link.accounts).find(a => a.account === account.id)?.state : '';
       return { name: account.number || account.name || '', on: live === 'online', text: live ? LINK[live] || '已掉线' : SAVED[account.state === 'online' ? 'reconnect' : account.state] || '待绑定' };
     });
   }
   function figures(entry) {
-    const customers = entry.data.customers || [], open = (entry.data.tasks || []).filter(task => !task.done);
+    const customers = rows(entry.data.customers), open = rows(entry.data.tasks).filter(task => !task.done);
     return {
       customers: customers.length,
       unread: customers.filter(c => c.unread > 0).length,
       tasks: open.length,
       late: open.filter(task => Date.parse(task.due) < Date.now()).length,
-      last: Math.max(0, ...customers.map(c => c.lastAt || 0)),
+      last: Math.max(0, ...customers.map(c => time(c.lastAt))),
     };
   }
   async function load() {
@@ -75,7 +83,7 @@
     state.failed = list.status !== 200;
     state.sites = state.failed ? [] : await Promise.all(list.body.sites.map(async entry => {
       const [doc, link] = await Promise.all([get(at(entry.site, '/api/data?fields=accounts,customers,tasks')), get(at(entry.site, '/api/wa/status'))]);
-      return { ...entry, reached: doc.status === 200, data: doc.status === 200 ? doc.body.data : {}, link: link.status === 200 ? link.body : null };
+      return { ...entry, reached: doc.status === 200, data: doc.status === 200 && doc.body.data && typeof doc.body.data === 'object' ? doc.body.data : {}, link: link.status === 200 ? link.body : null };
     }));
     state.loading = false;
     render();
@@ -84,10 +92,12 @@
     if (state.loading) return '<p class="fid-master-note">正在读取…</p>';
     if (state.failed) return '<p class="fid-master-note">暂时无法读取员工列表，请稍后点击「刷新」。</p>';
     if (!state.sites.length) return '<p class="fid-master-note">还没有员工账号。</p>';
-    const rows = state.sites.map(entry => {
+    const table = state.sites.map(entry => {
       const who = `<strong>${esc(names(entry))}</strong><small>${esc(entry.employees.map(employee => employee.username).join('、'))}</small>`;
-      if (!entry.reached) return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">暂时无法读取这位员工的工作区</td><td></td></tr>`;
-      const f = figures(entry), list = numbers(entry);
+      // A sub-site whose saved data cannot be worked with is listed like one that cannot be read.
+      const drawn = entry.reached ? guarded(() => ({ f: figures(entry), list: numbers(entry) }), null) : null;
+      if (!drawn) return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">暂时无法读取这位员工的工作区</td><td></td></tr>`;
+      const { f, list } = drawn;
       return `<tr>
         <td class="fid-master-who">${who}</td>
         <td>${list.map(n => `<span class="fid-master-number"><span class="fid-master-dot ${n.on ? 'on' : 'warn'}"></span>${esc(n.name)}<small>${esc(n.text)}</small></span>`).join('') || '<span class="fid-master-quiet">还没有绑定号码</span>'}</td>
@@ -98,7 +108,7 @@
         <td><button type="button" class="fid-btn tint" data-master="open" data-id="${esc(entry.site)}">${icon('MessagesSquare')}查看</button></td>
       </tr>`;
     }).join('');
-    return `<div class="fid-table-scroll" tabindex="0" aria-label="员工总览表格"><table class="fid-table fid-master-table"><thead><tr>${['员工', 'WhatsApp 号码', '客户', '未读会话', '待跟进', '最近消息', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div class="fid-table-scroll" tabindex="0" aria-label="员工总览表格"><table class="fid-table fid-master-table"><thead><tr>${['员工', 'WhatsApp 号码', '客户', '未读会话', '待跟进', '最近消息', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${table}</tbody></table></div>`;
   }
 
   // ---- one employee's customers and conversations ----
@@ -120,14 +130,14 @@
     : m.status === 'read' || m.status === 'played' ? icon('CheckCheck') + '<span>已读</span>' : icon(m.status === 'delivered' ? 'CheckCheck' : 'Check'));
   const selected = () => state.open.data.customers.find(c => c.id === state.open.customer);
   const matches = c => {
-    const words = state.open.query.trim().toLowerCase().split(/\s+/).filter(Boolean), text = (c.name + ' ' + c.phone).toLowerCase(), digits = String(c.phone || '').replace(/\D/g, '');
+    const words = state.open.query.trim().toLowerCase().split(/\s+/).filter(Boolean), text = (c.name + ' ' + c.phone).toLowerCase(), digits = String(c.phone ?? '').replace(/\D/g, '');
     return words.every(word => text.includes(word) || (/^\d+$/.test(word) && digits.includes(word)));
   };
   function peopleHTML() {
     const list = ordered(state.open.data.customers).filter(matches);
     if (!list.length) return `<p class="fid-master-note">${state.open.data.customers.length ? '没有匹配的客户' : '这位员工还没有客户'}</p>`;
     return list.map(c => `<button type="button" class="fid-master-row ${c.id === state.open.customer ? 'selected' : ''}" data-master="customer" data-id="${esc(c.id)}" aria-label="查看${esc(c.name)}的会话">
-      <span class="avatar ${esc(c.color || 'jade')}">${esc(c.initials || [...String(c.name || '')].slice(0, 1).join(''))}</span>
+      <span class="avatar ${tone(c)}">${esc(c.initials || [...String(c.name || '')].slice(0, 1).join(''))}</span>
       <span class="fid-master-row-main"><span class="fid-master-row-line"><strong>${esc(c.name)}</strong><time>${esc(lastLabel(c))}</time></span>
       <span class="fid-master-row-line"><span class="fid-master-preview">${esc(c.preview)}</span>${c.unread > 0 ? `<span class="fid-master-unread">${Number(c.unread)}</span>` : ''}</span></span>
     </button>`).join('');
@@ -135,18 +145,18 @@
   function chatHTML() {
     const c = selected(), data = state.open.data;
     if (!c) return '<p class="fid-master-note">选择左侧的客户查看会话</p>';
-    const number = (data.accounts || []).find(a => a.id === c.account), tags = (c.tags || []).map(id => (data.tags || []).find(tag => tag.id === id)?.name).filter(Boolean);
-    const tasks = (data.tasks || []).filter(task => task.customer === c.id && !task.done), list = data.messages?.[c.id] || [];
+    const number = data.accounts.find(a => a.id === c.account), tags = (Array.isArray(c.tags) ? c.tags : []).map(id => data.tags.find(tag => tag.id === id)?.name).filter(Boolean);
+    const tasks = data.tasks.filter(task => task.customer === c.id && !task.done), list = rows(data.messages[c.id]);
     let lastDay = '';
     const messages = list.map(m => {
       const day = messageDay(m), separator = day !== lastDay ? `<div class="fid-master-day">${esc(day)}</div>` : '';
       lastDay = day;
       return `${separator}<div class="fid-master-msg ${m.side === 'out' ? 'out' : ''}"><div class="fid-master-bubble">${mediaHTML(c, m)}${caption(c, m) ? `<div class="fid-master-text">${esc(caption(c, m))}</div>` : ''}${m.translated ? `<div class="fid-master-translation">${icon('Languages')}${esc(m.translated)}</div>` : ''}</div><div class="fid-master-meta"><time>${esc(messageTime(m))}</time>${m.side === 'out' ? mark(m) : ''}</div></div>`;
     }).join('');
-    return `<div class="fid-master-chat-head"><button type="button" class="fid-btn fid-master-back" data-master="people" aria-label="返回客户列表">${icon('ArrowLeft')}</button><span class="avatar ${esc(c.color || 'jade')}">${esc(c.initials || [...String(c.name || '')].slice(0, 1).join(''))}</span><div><h2>${esc(c.name)}</h2><p>${esc([c.phone, number?.name, c.language].filter(Boolean).join(' · '))}</p></div></div>
+    return `<div class="fid-master-chat-head"><button type="button" class="fid-btn fid-master-back" data-master="people" aria-label="返回客户列表">${icon('ArrowLeft')}</button><span class="avatar ${tone(c)}">${esc(c.initials || [...String(c.name || '')].slice(0, 1).join(''))}</span><div><h2>${esc(c.name)}</h2><p>${esc([c.phone, number?.name, c.language].filter(Boolean).join(' · '))}</p></div></div>
       <dl class="fid-master-facts">
         <div><dt>标签</dt><dd>${esc(tags.join('、') || '无')}</dd></div>
-        <div><dt>待跟进</dt><dd>${tasks.length ? tasks.map(task => esc(task.title) + (task.due ? `（${esc(dayOf(Date.parse(task.due)).slice(5))} 到期${Date.parse(task.due) < Date.now() ? '，已逾期' : ''}）` : '')).join('；') : '无'}</dd></div>
+        <div><dt>待跟进</dt><dd>${tasks.length ? tasks.map(task => esc(task.title) + (Number.isFinite(Date.parse(task.due)) ? `（${esc(dayOf(Date.parse(task.due)).slice(5))} 到期${Date.parse(task.due) < Date.now() ? '，已逾期' : ''}）` : '')).join('；') : '无'}</dd></div>
         ${c.notes ? `<div><dt>备注</dt><dd>${esc(c.notes)}</dd></div>` : ''}
       </dl>
       <div class="fid-master-messages" id="master-messages" tabindex="0" aria-label="${esc(c.name)}的会话">${messages || '<p class="fid-master-note">还没有会话消息</p>'}</div>`;
@@ -159,8 +169,9 @@
     if (state.open?.site !== site) return;
     if (doc.status !== 200) state.open.failed = true;
     else {
-      const data = doc.body.data;
-      data.customers ??= [];
+      // Only what has the expected shape is kept (see rows above).
+      const saved = doc.body.data && typeof doc.body.data === 'object' ? doc.body.data : {};
+      const data = { accounts: rows(saved.accounts), customers: rows(saved.customers), tasks: rows(saved.tasks), tags: rows(saved.tags), messages: saved.messages && typeof saved.messages === 'object' ? saved.messages : {} };
       state.open.data = data;
       state.open.customer = data.customers.some(c => c.id === keep) ? keep : ordered(data.customers)[0]?.id || '';
     }
@@ -168,14 +179,17 @@
   }
   function siteHTML() {
     const open = state.open;
-    const bar = `<div class="fid-master-bar"><button type="button" class="fid-btn" data-master="list">${icon('ArrowLeft')}返回员工总览</button><h1>${esc(open.name)} 的工作区</h1><span class="fid-master-readonly">${icon('LockKeyhole')}只读</span><button type="button" class="fid-btn" data-master="reload">${icon('RefreshCw')}刷新</button><p>这里只能查看：不能发送消息，也不能修改客户资料。每次查看都会记入服务器日志。</p></div>`;
+    const bar = `<div class="fid-master-bar"><button type="button" class="fid-btn" data-master="list">${icon('ArrowLeft')}返回员工总览</button><h1>${esc(open.name)} 的工作区</h1><span class="fid-master-readonly">${icon('LockKeyhole')}只读</span><button type="button" class="fid-btn" data-master="reload">${icon('RefreshCw')}刷新</button><p>这里只能查看：不能发送消息，也不能修改客户资料。每次打开一位员工的工作区，服务器都会记下是谁在查看。</p></div>`;
     if (open.failed) return bar + '<p class="fid-master-note">暂时无法读取这位员工的工作区，请稍后点击「刷新」。</p>';
     if (!open.data) return bar + '<p class="fid-master-note">正在读取…</p>';
     return `${bar}<div class="fid-master-site ${open.chat ? 'chat-open' : ''}">
-      <aside class="fid-master-people" aria-label="客户列表"><div class="fid-master-search"><input id="master-search" type="search" placeholder="搜索客户姓名或号码" aria-label="搜索客户" value="${esc(open.query)}"></div><div class="fid-master-list" id="master-list">${peopleHTML()}</div></aside>
-      <section class="fid-master-chat" id="master-chat">${chatHTML()}</section>
+      <aside class="fid-master-people" aria-label="客户列表"><div class="fid-master-search"><input id="master-search" type="search" placeholder="搜索客户姓名或号码" aria-label="搜索客户" value="${esc(open.query)}"></div><div class="fid-master-list" id="master-list">${guarded(peopleHTML, UNSHOWN)}</div></aside>
+      <section class="fid-master-chat" id="master-chat">${guarded(chatHTML, UNSHOWN)}</section>
     </div>`;
   }
+
+  // What stands in the place of a part of the page that cannot be drawn from what a sub-site saved.
+  const UNSHOWN = '<p class="fid-master-note">这部分内容暂时无法显示</p>';
 
   // ---- the page ----
   function render() {
@@ -194,8 +208,8 @@
     Object.assign(state, { atEnd: true, endTop: box.scrollTop });
   }
   function showCustomer() {
-    $('#master-list').innerHTML = peopleHTML();
-    $('#master-chat').innerHTML = chatHTML();
+    $('#master-list').innerHTML = guarded(peopleHTML, UNSHOWN);
+    $('#master-chat').innerHTML = guarded(chatHTML, UNSHOWN);
     $('.fid-master-site').classList.toggle('chat-open', state.open.chat);
     paintIcons($('#master'));
     showEnd();
@@ -224,7 +238,7 @@
     root.addEventListener('input', event => {
       if (event.target.id !== 'master-search') return;
       state.open.query = event.target.value;
-      $('#master-list').innerHTML = peopleHTML();
+      $('#master-list').innerHTML = guarded(peopleHTML, UNSHOWN);
     });
     // Media that cannot be had — gone from the phone, or the number is not connected — gives way to a short note.
     root.addEventListener('error', event => {

@@ -10,6 +10,9 @@ const MAX_VALUE = 2 * 1024 * 1024;
 const SAVES_KEPT = 10000;
 
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
+// Sets a property of an object's own, whatever it is called: a field or a part can have a name that every object
+// has ("constructor") or one that is special ("__proto__"), and must touch nothing but the document.
+const own = (target, name, value) => Object.defineProperty(target, name, { value, enumerable: true, writable: true, configurable: true });
 
 // Opens (and creates) the database of one sub-site. now() is replaceable for tests.
 function openData(file, { now = () => Date.now() } = {}) {
@@ -27,8 +30,11 @@ function openData(file, { now = () => Date.now() } = {}) {
     for (const { key, json } of db.prepare('SELECT key, json FROM doc ORDER BY key').all()) {
       const [field, id] = key.split('/');
       if (fields && !fields.includes(field)) continue;
-      if (id === undefined) data[field] = JSON.parse(json);
-      else (data[field] ??= {})[id] = JSON.parse(json);
+      if (id === undefined) own(data, field, JSON.parse(json));
+      else {
+        if (!Object.hasOwn(data, field)) own(data, field, {});
+        if (data[field] && typeof data[field] === 'object') own(data[field], id, JSON.parse(json));
+      }
     }
     return { version: version(), data };
   }

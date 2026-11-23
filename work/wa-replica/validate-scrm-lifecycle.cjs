@@ -290,7 +290,11 @@ assert.deepEqual([...new Set(masterSource.match(/'\/api\/[^']*'/g))].sort(), ["'
 assert.deepEqual(masterSource.match(/method: '[A-Z]+'/g), ["method: 'POST'"], 'the supervisor page must send nothing but its sign-out');
 assert(masterSource.includes("await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});") && masterSource.includes("const at = (site, path) => '/site/' + encodeURIComponent(site) + path;"), 'the supervisor page must ask each sub-site under its own name');
 assert(!/演示|原型|评审|本机|示例|体验/.test(masterSource) && !/WA_SITE|localStorage|sessionStorage/.test(masterSource), 'the supervisor page must not speak of a demonstration, nor touch the app or the browser\'s storage');
-for (const required of ["const named = site ? '/site/' + site.siteId : null;", "if (named && pathname.startsWith(named + '/api/')) pathname = pathname.slice(named.length);"]) {
+// Under a sub-site's name the server gives its data and its WhatsApp link only; the supervisor page takes what a
+// sub-site saved where it has the expected shape; a name every object has touches nothing but the document.
+assert(masterSource.includes("const rows = value => (Array.isArray(value) ? value.filter(item => item && typeof item === 'object') : []);") && masterSource.includes('const drawn = entry.reached ? guarded(() => ({ f: figures(entry), list: numbers(entry) }), null) : null;') && !masterSource.includes("esc(c.color"), 'the supervisor page must not be stopped by one sub-site\'s odd data');
+assert(siteSources['site-data.cjs'].includes('const own = (target, name, value) => Object.defineProperty(target, name, { value, enumerable: true, writable: true, configurable: true });') && !siteSources['site-data.cjs'].includes('(data[field] ??= {})[id]'), 'reading the document must set nothing but properties of the document');
+for (const required of ["const named = site ? '/site/' + site.siteId : null;", "if (named && (pathname === named + '/api/data' || pathname.startsWith(named + '/api/wa/'))) pathname = pathname.slice(named.length);"]) {
   assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
 }
 for (const required of ["'GET /api/auth/sites': req => {", "if (signedIn(req).role === 'agent') throw problem('forbidden');", "if (user.role !== 'agent') console.log(`site data read user=${user.username} role=${user.role} site=${siteId} fields=${fields ? fields.join(',') : 'all'}`);", 'return { body: data.read(fields) };']) {

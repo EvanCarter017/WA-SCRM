@@ -14,9 +14,11 @@ const site = process.env.WA_SCRM_DATA_DIR
   ? require('./site-api.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: process.env.WA_SCRM_SITE_ID || 'default' })
   : null;
 const waLink = site ? require('./openwa-link.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: site.siteId, site }) : null;
-// A sub-site's server also answers under the sub-site's name: /site/<id>/api/… is /api/… of the sub-site <id>.
-// The supervisor page reads several sub-sites side by side this way, and a gateway in front of several servers
-// passes such a request to the right one by its path.
+// A sub-site's server also answers under the sub-site's name, for its data and its WhatsApp link:
+// /site/<id>/api/data and /site/<id>/api/wa/… are /api/data and /api/wa/… of the sub-site <id>. The supervisor
+// page reads several sub-sites side by side this way, and a gateway in front of several servers passes such a
+// request to the right one by its path. Everything else — signing in above all — has the plain address only, so
+// that wrong attempts to sign in are counted by one server.
 const named = site ? '/site/' + site.siteId : null;
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -57,7 +59,7 @@ const isSiteRoute = pathname => pathname.startsWith('/api/site/') || pathname.st
 const server = http.createServer(async (req, res) => {
   try {
     let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-    if (named && pathname.startsWith(named + '/api/')) pathname = pathname.slice(named.length);
+    if (named && (pathname === named + '/api/data' || pathname.startsWith(named + '/api/wa/'))) pathname = pathname.slice(named.length);
     if (isSiteRoute(pathname)) {
       if (site) await site.handle(req, res, pathname);
       else if (pathname === '/api/site/status') sendJson(res, 200, { enabled: false });

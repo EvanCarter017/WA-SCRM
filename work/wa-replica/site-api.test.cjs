@@ -341,6 +341,16 @@ test('the supervisor page\'s questions: the sub-sites and their employees; only 
     assert.deepEqual((await call('/api/data?fields=' + encodeURIComponent(fields), { cookie: ivo })).json, { error: 'invalid-request' }, JSON.stringify(fields));
   }
   assert.deepEqual((await call('/api/data?fields=customers', { cookie: await member('olga', 'agent', 's2') })).json, { error: 'forbidden' }, 'not for an employee of another sub-site');
+  // a field or a part called like something every object has, or like something special, is a name like any other:
+  // it is in the document as it was saved, and reading the document touches nothing else
+  const odd = (await call('/api/data', { cookie: gus })).json.version;
+  assert.equal((await call('/api/data', { method: 'PUT', cookie: gus, body: { baseVersion: odd, set: { 'constructor/keys': 1, 'messages/__proto__': [{ id: 'odd' }], toString: 'a field' } } })).status, 200);
+  const read = (await call('/api/data', { cookie: ivo })).raw;
+  for (const part of ['"constructor":{"keys":1}', '"__proto__":[{"id":"odd"}]', '"toString":"a field"']) assert(read.includes(part), part);
+  assert.deepEqual([typeof Object.keys, Object.keys({ a: 1 }), {}.id, String({})], ['function', ['a'], undefined, '[object Object]'], 'nothing but the document was touched');
+  assert.deepEqual((await call('/api/data?fields=constructor,toString', { cookie: ivo })).json.data, { constructor: { keys: 1 }, toString: 'a field' });
+  assert.equal((await call('/api/data', { method: 'PUT', cookie: gus, body: { baseVersion: odd + 1, remove: ['constructor/keys', 'messages/__proto__', 'toString'] } })).status, 200, 'and saving goes on');
+  assert.deepEqual(Object.keys((await call('/api/data', { cookie: gus })).json.data.messages), ['c1', 'c2']);
   // the lines: one for each read of a supervisor or an administrator, none for the employee's own
   const reads = logged.filter(line => line.startsWith('site data read '));
   assert(reads.includes('site data read user=ivo role=supervisor site=s1 fields=customers,tasks,nothing') && reads.includes('site data read user=ivo role=supervisor site=s1 fields=all') && reads.includes('site data read user=joy role=admin site=s1 fields=all'), reads.join('\n'));
@@ -428,11 +438,14 @@ test('the preview server: without a data folder the routes are off; with one, th
     assert.equal((await call('/api/auth/password', { base: on.base, method: 'POST', cookie: cookieOf(first), body: { current: password, next: PASSWORD } })).status, 200);
     assert.deepEqual((await call('/api/ai/status', { base: on.base, cookie: cookieOf(first) })).json, { configured: false, reason: 'no-settings-file', voice: { configured: false, reason: 'no-settings-file' } });
     assert.deepEqual((await call('/api/data', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
-    // the server also answers under the name of its sub-site, and under no other
+    // the server also answers under the name of its sub-site — for its data and its WhatsApp link, nothing else —
+    // and under no other name
     assert.deepEqual((await call('/site/default/api/data?fields=customers', { base: on.base, cookie: cookieOf(first) })).json, { version: 0, data: {} });
-    assert.deepEqual([(await call('/site/default/api/site/status', { base: on.base })).json, (await call('/site/default/api/data', { base: on.base })).status, (await call('/site/default/api/wa/status', { base: on.base })).status], [{ enabled: true, site: 'default' }, 401, 401]);
-    assert.deepEqual((await call('/site/default/api/ai/status', { base: on.base })).json, { error: 'not-signed-in' });
-    assert.deepEqual([(await fetch(on.base + '/site/other/api/data', { headers: { Cookie: cookieOf(first) } })).status, (await fetch(on.base + '/site/default/index.html')).status, (await fetch(on.base + '/site/default')).status], [404, 404, 404]);
+    assert.deepEqual([(await call('/site/default/api/data', { base: on.base })).status, (await call('/site/default/api/wa/status', { base: on.base })).status, (await call('/site/default/api/wa/status', { base: on.base, cookie: cookieOf(first) })).status], [401, 401, 200]);
+    const named = async (pathname, options = {}) => (await fetch(on.base + pathname, { ...options, headers: { Cookie: cookieOf(first), ...options.headers } })).status;
+    assert.deepEqual([await named('/site/default/api/site/status'), await named('/site/default/api/auth/session'), await named('/site/default/api/auth/me'), await named('/site/default/api/ai/status'), await named('/site/default/api/data/more'), await named('/site/default/api/wax')], [404, 404, 404, 404, 404, 404], 'signing in, the status and the relay have the plain address only');
+    assert.notEqual(await named('/site/default/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'lia', password: PASSWORD }) }), 200, 'nobody signs in under the name of a sub-site');
+    assert.deepEqual([await named('/site/other/api/data'), await named('/site/default/index.html'), await named('/site/default')], [404, 404, 404]);
     for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
     assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
   } finally {
