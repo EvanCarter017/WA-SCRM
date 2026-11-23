@@ -286,9 +286,16 @@ const masterSource = read(path.join(__dirname, 'fidelity-master.js'));
 assert.equal(read(path.join(out, 'master.js')), masterSource, 'master.js must be the built copy of fidelity-master.js');
 assert(indexHtml.includes('<main id="master" class="fid-master" aria-label="主管视图" hidden></main>') && indexHtml.includes('<script src="app.js"></script><script src="master.js"></script><script src="boot.js"></script>'), 'index.html must hold the supervisor page and load master.js before boot.js');
 assert(bootSource.includes("if (user.role !== 'agent') {") && bootSource.includes('return window.WA_MASTER(user);') && !bootSource.includes('主管与管理员入口尚未开放'), 'fidelity-boot.js must hand a supervisor over to the supervisor page');
-assert.deepEqual([...new Set(masterSource.match(/'\/api\/[^']*'/g))].sort(), ["'/api/auth/logout'", "'/api/auth/sites'", "'/api/data'", "'/api/data?fields=accounts,customers,tasks'", "'/api/wa/media?account='", "'/api/wa/status'"], 'the supervisor page asks an unexpected address');
-assert.deepEqual(masterSource.match(/method: '[A-Z]+'/g), ["method: 'POST'"], 'the supervisor page must send nothing but its sign-out');
-assert(masterSource.includes("await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});") && masterSource.includes("const at = (site, path) => '/site/' + encodeURIComponent(site) + path;"), 'the supervisor page must ask each sub-site under its own name');
+assert.deepEqual([...new Set(masterSource.match(/'\/api\/[^']*'/g))].sort(), ["'/api/auth/logout'", "'/api/auth/sites'", "'/api/auth/users'", "'/api/auth/users/disable'", "'/api/auth/users/enable'", "'/api/auth/users/reset'", "'/api/data'", "'/api/data?fields=accounts,customers,tasks'", "'/api/wa/media?account='", "'/api/wa/status'"], 'the supervisor page asks an unexpected address');
+// What the page changes goes through one helper, and only to the addresses of accounts and of signing out —
+// never to a sub-site, which it only reads.
+assert.deepEqual(masterSource.match(/method: '[A-Z]+'/g), ["method: 'POST'"], 'the supervisor page must send its changes through one helper');
+assert.deepEqual([...new Set(masterSource.match(/\bpost\([^,]+,/g))].sort(), ["post('/api/auth/logout',", "post('/api/auth/users',", "post('/api/auth/users/reset',", "post(on ? '/api/auth/users/enable' : '/api/auth/users/disable',"], 'the supervisor page must change accounts only, and sign out');
+assert(masterSource.includes("const at = (site, path) => '/site/' + encodeURIComponent(site) + path;") && !/fetch\(at\(/.test(masterSource), 'the supervisor page must ask each sub-site under its own name, and only ask');
+for (const required of ["'GET /api/auth/users': req => {", "'POST /api/auth/users': async req => {", "if (body.role !== 'supervisor') throw problem('invalid-role');", "if (target.username === actor.username) throw problem('own-account');", "if (target.role === 'admin' && actor.role !== 'admin') throw problem('forbidden');", 'console.log(`site account created by=${actor.username} user=${user.username} role=${user.role}`);']) {
+  assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
+}
+assert(siteSources['site-auth.cjs'].includes('async function createUser({ username, name, role, site = null, password, mustChange = true }) {'), 'an account made with a given password must be able to keep it');
 assert(!/演示|原型|评审|本机|示例|体验/.test(masterSource) && !/WA_SITE|localStorage|sessionStorage/.test(masterSource), 'the supervisor page must not speak of a demonstration, nor touch the app or the browser\'s storage');
 // Under a sub-site's name the server gives its data and its WhatsApp link only; the supervisor page takes what a
 // sub-site saved where it has the expected shape; a name every object has touches nothing but the document.

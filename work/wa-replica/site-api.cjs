@@ -6,11 +6,16 @@
 //   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
 //   POST /api/auth/password  { current, next }
 //   GET  /api/auth/sites     the sub-sites and their employees, for supervisors and administrators
+//   GET  /api/auth/users     every account, for supervisors and administrators
+//   POST /api/auth/users     { username, name, role: 'supervisor', password? } → a new supervisor's account
+//   POST /api/auth/users/reset | disable | enable   { username }: a new temporary password; the account off, on
 //   GET  /api/data           the sub-site's data document; ?fields=a,b gives only these top-level fields
 //   PUT  /api/data           { baseVersion, set, remove }
 //   DELETE /api/data         { baseVersion, field }: takes a field out for good, with every trace of it
 // The employee the sub-site belongs to reads and writes its data; supervisors and administrators read it, and
 // each of their reads leaves a log line that says who read which sub-site and which fields.
+// Supervisors and administrators manage the accounts: never their own, and an administrator's only as an
+// administrator. Each of these actions leaves a log line with who did it and to which account.
 // A log line carries the action, the user name and the outcome; never a password, a token or data.
 //
 // Several sub-sites can share one address. Each runs this server with its own WA_SCRM_SITE_ID on the same data
@@ -30,9 +35,11 @@ const MAX_BODY = 8 * 1024 * 1024;
 const PURGEABLE = ['priceList'];
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const FIELD = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
+const NAME_MAX = 60;
 const STATUS = {
   'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
   'password-change-required': 403, 'forbidden': 403, 'read-only': 403, 'version-conflict': 409, 'too-long': 413, 'too-many-attempts': 429,
+  'invalid-username': 400, 'invalid-name': 400, 'invalid-role': 400, 'own-account': 400, 'unknown-user': 404, 'username-taken': 409,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
 
@@ -100,6 +107,22 @@ function create({ dir, siteId = 'default', now }) {
     return user;
   }
 
+  // Who manages accounts: a supervisor or an administrator.
+  function manager(req) {
+    const user = signedIn(req);
+    if (user.role === 'agent') throw problem('forbidden');
+    return user;
+  }
+  // The account a manager acts on: another one than their own, and an administrator's only for an administrator.
+  function managed(actor, username) {
+    const target = auth.listUsers().find(user => user.username === String(username || '').trim().toLowerCase());
+    if (!target) throw problem('unknown-user');
+    if (target.username === actor.username) throw problem('own-account');
+    if (target.role === 'admin' && actor.role !== 'admin') throw problem('forbidden');
+    return target;
+  }
+  const brief = user => ({ username: user.username, name: user.name, role: user.role });
+
   const routes = {
     'GET /api/site/status': () => ({ body: { enabled: true, site: siteId } }),
     'POST /api/auth/login': async req => {
@@ -142,6 +165,42 @@ function create({ dir, siteId = 'default', now }) {
         sites.get(account.site).push({ username: account.username, name: account.name, disabled: account.disabled });
       }
       return { body: { sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([site, employees]) => ({ site, employees })) } };
+    },
+    // Accounts, managed from the supervisor page.
+    'GET /api/auth/users': req => {
+      manager(req);
+      return { body: { users: auth.listUsers().map(({ username, name, role, site, mustChangePassword, disabled }) => ({ username, name, role, site, mustChangePassword, disabled })) } };
+    },
+    'POST /api/auth/users': async req => {
+      const actor = manager(req), body = await readJson(req);
+      if (typeof body.username !== 'string' || typeof body.name !== 'string') throw problem('invalid-request');
+      if (body.role !== 'supervisor') throw problem('invalid-role');
+      if (body.name.trim().length > NAME_MAX) throw problem('invalid-name');
+      if (body.password !== undefined && typeof body.password !== 'string') throw problem('invalid-password');
+      // A password that is given is the account's own. Without one a temporary password is made, which its
+      // owner has to change at the first sign-in; it goes back in this answer and is kept nowhere.
+      const given = Boolean(body.password);
+      const { user, password } = await auth.createUser({ username: body.username, name: body.name, role: body.role, password: given ? body.password : undefined, mustChange: !given });
+      console.log(`site account created by=${actor.username} user=${user.username} role=${user.role}`);
+      return { body: { user: brief(user), ...(given ? {} : { password }) } };
+    },
+    'POST /api/auth/users/reset': async req => {
+      const actor = manager(req), target = managed(actor, (await readJson(req)).username);
+      const { password } = await auth.resetPassword(target.username);
+      console.log(`site account reset by=${actor.username} user=${target.username}`);
+      return { body: { user: brief(target), password } };
+    },
+    'POST /api/auth/users/disable': async req => {
+      const actor = manager(req), target = managed(actor, (await readJson(req)).username);
+      auth.setDisabled(target.username, true);
+      console.log(`site account disabled by=${actor.username} user=${target.username}`);
+      return { body: { ok: true } };
+    },
+    'POST /api/auth/users/enable': async req => {
+      const actor = manager(req), target = managed(actor, (await readJson(req)).username);
+      auth.setDisabled(target.username, false);
+      console.log(`site account enabled by=${actor.username} user=${target.username}`);
+      return { body: { ok: true } };
     },
     'GET /api/data': req => {
       const user = signedIn(req);

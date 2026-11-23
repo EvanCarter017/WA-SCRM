@@ -1100,6 +1100,24 @@ dialog>#toast,dialog>#toast.show{transform:none}
   .fid-master-msg { max-width:88%; }
 }
 
+/* The supervisor page: accounts — what can be done with one, the second list, and the dialogs. */
+.fid-master-sub { margin:var(--fid-px-8) 0 0; font-size:var(--fid-px-15); font-weight:650; line-height:var(--fid-px-22); }
+.fid-master-acts { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:var(--fid-px-2) var(--fid-px-10); font-size:var(--fid-px-13); }
+.fid-master-acts > span { display:inline-flex; flex-wrap:wrap; align-items:center; gap:var(--fid-px-2) var(--fid-px-10); }
+.fid-master-table .fid-btn + .fid-master-acts { margin-top:var(--fid-px-6); }
+.fid-master-acts .link { padding:0; border:0; background:none; color:var(--color-accent); font:inherit; cursor:pointer; }
+.fid-master-acts .link:hover { text-decoration:underline; }
+.fid-master-dialog p { margin:0 0 var(--fid-px-8); font-size:var(--fid-px-14); line-height:var(--fid-px-22); }
+.fid-master-form { display:grid; gap:var(--fid-px-14); }
+.fid-master-form p { margin:0; }
+.fid-master-kind { color:var(--fid-ink); font-size:var(--fid-px-13); }
+.fid-master-problem { color:var(--color-danger); font-size:var(--fid-px-13); }
+.fid-master-secret { display:flex; align-items:center; gap:var(--fid-px-8); margin:var(--fid-px-12) 0 var(--fid-px-8); font-size:var(--fid-px-13); }
+.fid-master-secret input { flex:1; min-width:0; height:var(--fid-px-36); padding:0 var(--fid-px-12); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface-alt); color:var(--color-text); font:inherit; letter-spacing:var(--fid-px-1); }
+/* On a narrow screen the two lists keep a width that can be read and are moved sideways inside their frame. */
+.fid-master-table { min-width:var(--fid-px-820); }
+.fid-master-table.fid-master-accounts { min-width:var(--fid-px-640); }
+
 .dash {
   --dash-ink: var(--color-text);
   --dash-muted: var(--color-text-muted);

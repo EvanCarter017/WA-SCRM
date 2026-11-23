@@ -357,6 +357,79 @@ test('the supervisor page\'s questions: the sub-sites and their employees; only 
   assert(!reads.some(line => line.includes('user=gus')), 'the employee\'s own reads leave no line');
 });
 
+test('accounts from the supervisor page: the list; a new supervisor with a temporary or a given password; a new temporary password; an account off and on — for supervisors and administrators, never their own account, an administrator\'s only as an administrator, each action in the log', async () => {
+  const signIn = async username => cookieOf(await call('/api/auth/login', { method: 'POST', body: { username, password: PASSWORD } }));
+  const [gus, ivo, joy] = [await signIn('gus'), await signIn('ivo'), await signIn('joy')];
+  const send = (pathname, cookie, body) => call(pathname, { method: 'POST', cookie, body });
+  const count = async () => (await call('/api/auth/users', { cookie: ivo })).json.users.length;
+  // the list: every account with its role, its sub-site and its state — and nothing of a password
+  const list = await call('/api/auth/users', { cookie: ivo });
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.json.users.find(user => user.username === 'gus'), { username: 'gus', name: 'gus name', role: 'agent', site: 's1', mustChangePassword: false, disabled: false });
+  assert.deepEqual(list.json.users.find(user => user.username === 'joy'), { username: 'joy', name: 'joy name', role: 'admin', site: null, mustChangePassword: false, disabled: false });
+  assert(!list.raw.includes('scrypt') && !/"(password|id|token)[a-z_]*":/i.test(list.raw), 'no password, no hash, no number of a row');
+  assert.deepEqual((await call('/api/auth/users', { cookie: joy })).json, list.json, 'an administrator gets the same');
+  assert.deepEqual([(await call('/api/auth/users', { cookie: gus })).json, (await call('/api/auth/users')).status], [{ error: 'forbidden' }, 401]);
+  // a new supervisor without a password: a temporary one comes back, once, and has to be changed
+  const made = await send('/api/auth/users', ivo, { username: ' Pia ', name: ' Pia P ', role: 'supervisor' });
+  assert.deepEqual([made.status, made.json.user, made.json.password.length], [200, { username: 'pia', name: 'Pia P', role: 'supervisor' }, 16]);
+  const first = await call('/api/auth/login', { method: 'POST', body: { username: 'pia', password: made.json.password } });
+  assert.deepEqual([first.status, first.json.user.mustChangePassword, first.json.user.site, first.json.user.role], [200, true, null, 'supervisor']);
+  assert.equal((await call('/api/auth/users', { cookie: cookieOf(first) })).status, 403, 'not before the temporary password is changed');
+  // with a password: it is the account's own, it does not come back, and the supervisor is one at once
+  const own = await send('/api/auth/users', joy, { username: 'quin', name: 'Quin', role: 'supervisor', password: 'quin-own-password' });
+  assert.deepEqual([own.status, own.json], [200, { user: { username: 'quin', name: 'Quin', role: 'supervisor' } }]);
+  const quin = await call('/api/auth/login', { method: 'POST', body: { username: 'quin', password: 'quin-own-password' } });
+  assert.deepEqual([quin.status, quin.json.user.mustChangePassword, (await call('/api/auth/sites', { cookie: cookieOf(quin) })).status], [200, false, 200]);
+  // what is refused makes nothing
+  const before = await count();
+  for (const [body, error, status] of [
+    [{ username: 'ab', name: 'Short', role: 'supervisor' }, 'invalid-username', 400],
+    [{ username: 'pia', name: 'Again', role: 'supervisor' }, 'username-taken', 409],
+    [{ username: 'rita', name: '  ', role: 'supervisor' }, 'invalid-name', 400],
+    [{ username: 'rita', name: 'x'.repeat(61), role: 'supervisor' }, 'invalid-name', 400],
+    [{ username: 'rita', name: 'Rita', role: 'supervisor', password: 'short' }, 'invalid-password', 400],
+    [{ username: 'rita', name: 'Rita', role: 'supervisor', password: 12345678 }, 'invalid-password', 400],
+    [{ username: 'rita', name: 'Rita', role: 'admin' }, 'invalid-role', 400],
+    [{ username: 'rita', name: 'Rita', role: 'agent' }, 'invalid-role', 400],
+    [{ username: 'rita', name: 'Rita' }, 'invalid-role', 400],
+    [{ username: ['rita'], name: 'Rita', role: 'supervisor' }, 'invalid-request', 400],
+    [{ username: 'rita', name: { a: 1 }, role: 'supervisor' }, 'invalid-request', 400],
+  ]) {
+    const answer = await send('/api/auth/users', ivo, body);
+    assert.deepEqual([answer.status, answer.json], [status, { error }], JSON.stringify(body));
+  }
+  assert.deepEqual([(await send('/api/auth/users', gus, { username: 'rita', name: 'Rita', role: 'supervisor' })).json, (await call('/api/auth/users', { method: 'POST', body: { username: 'rita', name: 'Rita', role: 'supervisor' } })).status], [{ error: 'forbidden' }, 401]);
+  const crossSite = await call('/api/auth/users', { method: 'POST', cookie: ivo, body: { username: 'rita', name: 'Rita', role: 'supervisor' }, headers: { 'Sec-Fetch-Site': 'cross-site' } });
+  assert.deepEqual([crossSite.status, await count()], [403, before], 'a page of another site makes no account with a supervisor\'s cookie');
+  // a new temporary password: the old password and the sessions end
+  const reset = await send('/api/auth/users/reset', ivo, { username: ' GUS ' });
+  assert.deepEqual([reset.status, reset.json.user, reset.json.password.length], [200, { username: 'gus', name: 'gus name', role: 'agent' }, 16]);
+  assert.deepEqual([(await call('/api/auth/me', { cookie: gus })).status, (await call('/api/auth/login', { method: 'POST', body: { username: 'gus', password: PASSWORD } })).status], [401, 401]);
+  const again = await call('/api/auth/login', { method: 'POST', body: { username: 'gus', password: reset.json.password } });
+  assert.equal(again.json.user.mustChangePassword, true);
+  assert.equal((await call('/api/auth/password', { method: 'POST', cookie: cookieOf(again), body: { current: reset.json.password, next: PASSWORD } })).status, 200);
+  // off: the session ends and nobody signs in; on again
+  const max = await signIn('max');
+  assert.deepEqual((await send('/api/auth/users/disable', ivo, { username: 'max' })).json, { ok: true });
+  assert.deepEqual([(await call('/api/auth/me', { cookie: max })).status, (await call('/api/auth/login', { method: 'POST', body: { username: 'max', password: PASSWORD } })).status, (await call('/api/auth/users', { cookie: ivo })).json.users.find(user => user.username === 'max').disabled], [401, 401, true]);
+  assert.deepEqual((await send('/api/auth/users/enable', ivo, { username: 'max' })).json, { ok: true });
+  assert.equal((await call('/api/auth/login', { method: 'POST', body: { username: 'max', password: PASSWORD } })).status, 200);
+  // never one's own account; an administrator's only as an administrator; an account that is not there; not for an employee
+  const employee = await signIn('gus');
+  for (const pathname of ['/api/auth/users/reset', '/api/auth/users/disable', '/api/auth/users/enable']) {
+    assert.deepEqual([(await send(pathname, ivo, { username: 'ivo' })).json, (await send(pathname, ivo, { username: 'joy' })).json, (await send(pathname, ivo, { username: 'nobody' })).json, (await send(pathname, ivo, {})).json, (await send(pathname, employee, { username: 'max' })).json, (await call(pathname, { method: 'POST', body: { username: 'max' } })).status],
+      [{ error: 'own-account' }, { error: 'forbidden' }, { error: 'unknown-user' }, { error: 'unknown-user' }, { error: 'forbidden' }, 401], pathname);
+  }
+  assert.deepEqual([(await call('/api/auth/me', { cookie: ivo })).status, (await call('/api/auth/me', { cookie: joy })).status, (await call('/api/auth/login', { method: 'POST', body: { username: 'max', password: PASSWORD } })).status], [200, 200, 200], 'none of the refused did anything');
+  // a supervisor acts on another supervisor, an administrator on a supervisor
+  assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'quin' })).status, (await call('/api/auth/me', { cookie: cookieOf(quin) })).status, (await send('/api/auth/users/enable', joy, { username: 'quin' })).status], [200, 401, 200]);
+  // every action is in the log with who did it; no password is
+  const lines = logged.filter(line => line.startsWith('site account '));
+  for (const line of ['site account created by=ivo user=pia role=supervisor', 'site account created by=joy user=quin role=supervisor', 'site account reset by=ivo user=gus', 'site account disabled by=ivo user=max', 'site account enabled by=ivo user=max', 'site account disabled by=ivo user=quin', 'site account enabled by=joy user=quin']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+  for (const secret of [made.json.password, reset.json.password, 'quin-own-password']) assert(!logged.join('\n').includes(secret), 'a password in the log');
+});
+
 test('the log names users and outcomes, never a password, a token or data', () => {
   const lines = logged.filter(line => line.startsWith('site '));
   assert(lines.some(line => line === 'site login ok user=ana') && lines.some(line => line === 'site login failed error=invalid-credentials') && lines.some(line => line === 'site password changed user=ben'), lines.slice(0, 8).join('\n'));

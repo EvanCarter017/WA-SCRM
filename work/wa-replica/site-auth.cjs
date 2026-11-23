@@ -82,7 +82,9 @@ function openAuth(file, { now = () => Date.now() } = {}) {
   // The hash a sign-in is compared with when the account does not exist, so that it takes as long as a real one.
   const decoy = hashPassword(crypto.randomBytes(16).toString('hex'));
 
-  async function createUser({ username, name, role, site = null, password }) {
+  // mustChange: the account's owner has to set a password of their own at the first sign-in. It is so unless
+  // whoever makes the account gives it the password it is to keep.
+  async function createUser({ username, name, role, site = null, password, mustChange = true }) {
     const normalised = String(username || '').trim().toLowerCase();
     if (!USERNAME.test(normalised)) throw problem('invalid-username');
     if (!ROLES.includes(role)) throw problem('invalid-role');
@@ -91,8 +93,8 @@ function openAuth(file, { now = () => Date.now() } = {}) {
     if (byName(normalised)) throw problem('username-taken');
     const initial = password === undefined ? temporaryPassword() : password;
     if (!validPassword(initial)) throw problem('invalid-password');
-    db.prepare('INSERT INTO users (username, name, role, site, password, must_change, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)')
-      .run(normalised, String(name).trim(), role, role === 'agent' ? String(site) : null, await hashPassword(initial), iso());
+    db.prepare('INSERT INTO users (username, name, role, site, password, must_change, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(normalised, String(name).trim(), role, role === 'agent' ? String(site) : null, await hashPassword(initial), mustChange ? 1 : 0, iso());
     return { user: publicUser(byName(normalised)), password: initial };
   }
 

@@ -1,15 +1,18 @@
 // The supervisor page: what a supervisor or an administrator sees after signing in. fidelity-boot.js calls
 // window.WA_MASTER(user) instead of starting the app. The page lists the employees with a few figures of each
 // one's sub-site and shows, read-only, the customers and conversations of one of them.
-// It only reads: every request is a GET, except the one that signs out. A sub-site is asked under its own name,
-// /site/<id>/api/…, so that several sub-sites can be read side by side; the server of a sub-site leaves a log
-// line for every read of its data by someone who is not its own employee.
+// Of a sub-site it only reads: a sub-site is asked under its own name, /site/<id>/api/…, with GET and nothing
+// else, so that several can be read side by side, and the server of a sub-site leaves a log line for every read
+// of its data by someone who is not its own employee. What the page changes are accounts and nothing else: a new
+// supervisor, a new temporary password for someone, an account switched off or on — and it signs out.
 (() => {
   'use strict';
   const $ = selector => document.querySelector(selector);
   const esc = text => String(text ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const icon = name => `<span class="icon" data-icon="${name}" aria-hidden="true"></span>`;
   const get = path => fetch(path).then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }), () => ({ status: 0, body: {} }));
+  // The requests that change something: about accounts, and signing out. Never to a sub-site.
+  const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }), () => ({ status: 0, body: {} }));
   // The address of a sub-site's own server for a path of its API.
   const at = (site, path) => '/site/' + encodeURIComponent(site) + path;
   // What a sub-site saved is taken where it has the shape the page expects and left out where it has not: one
@@ -19,10 +22,10 @@
   // The colour of a customer's initials is one word of the style sheet, whatever was saved.
   const tone = c => String(c.color || '').replace(/[^a-z]/g, '') || 'jade';
 
-  // user: who is signed in. sites: the list, each { site, employees, reached, data, link }.
+  // user: who is signed in. sites: the list, each { site, employees, reached, data, link }. users: every account.
   // open: the sub-site that is being looked at, { site, name, data, customer, query, chat } — or null for the list.
   // atEnd, endTop: whether the conversation shows its latest message, and where the page last put it there.
-  const state = { user: null, sites: [], loading: true, failed: false, open: null, atEnd: true, endTop: -1 };
+  const state = { user: null, sites: [], users: [], loading: true, failed: false, open: null, atEnd: true, endTop: -1 };
 
   function paintIcons(root) {
     for (const el of root.querySelectorAll('[data-icon]:empty')) {
@@ -54,10 +57,12 @@
   // ---- the list of employees ----
   const LINK = { online: '已连接', scan: '等待扫码', starting: '连接中', verifying: '连接中', offline: '已掉线', attention: '需要在手机上处理', failed: '连接失败', missing: '需要重新绑定' };
   const SAVED = { online: '已连接', reconnect: '已掉线', pending: '待绑定' };
-  const names = entry => {
+  // The accounts a row of the list stands for: the employees that are not switched off, or all when none is on.
+  const shown = entry => {
     const active = entry.employees.filter(employee => !employee.disabled);
-    return (active.length ? active : entry.employees).map(employee => employee.name + (employee.disabled ? '（已停用）' : '')).join('、');
+    return active.length ? active : entry.employees;
   };
+  const names = entry => shown(entry).map(employee => employee.name + (employee.disabled ? '（已停用）' : '')).join('、');
   // The state of each of a sub-site's numbers: what its WhatsApp link says now, or — when the link cannot be
   // asked or does not know the number — what the employee's page saved last (never "connected" on that alone).
   function numbers(entry) {
@@ -79,8 +84,9 @@
   async function load() {
     state.loading = true;
     render();
-    const list = await get('/api/auth/sites');
+    const [list, accounts] = await Promise.all([get('/api/auth/sites'), get('/api/auth/users')]);
     state.failed = list.status !== 200;
+    state.users = accounts.status === 200 ? rows(accounts.body.users) : [];
     state.sites = state.failed ? [] : await Promise.all(list.body.sites.map(async entry => {
       const [doc, link] = await Promise.all([get(at(entry.site, '/api/data?fields=accounts,customers,tasks')), get(at(entry.site, '/api/wa/status'))]);
       return { ...entry, reached: doc.status === 200, data: doc.status === 200 && doc.body.data && typeof doc.body.data === 'object' ? doc.body.data : {}, link: link.status === 200 ? link.body : null };
@@ -96,7 +102,9 @@
       const who = `<strong>${esc(names(entry))}</strong><small>${esc(entry.employees.map(employee => employee.username).join('、'))}</small>`;
       // A sub-site whose saved data cannot be worked with is listed like one that cannot be read.
       const drawn = entry.reached ? guarded(() => ({ f: figures(entry), list: numbers(entry) }), null) : null;
-      if (!drawn) return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">暂时无法读取这位员工的工作区</td><td></td></tr>`;
+      // Every account of the sub-site can be acted on — also one that is switched off and so not named in front.
+      const acts = `<div class="fid-master-acts">${entry.employees.map(employee => `<span>${entry.employees.length > 1 ? esc(employee.username) + (employee.disabled ? '（已停用）' : '') + '：' : ''}${accountActs(employee)}</span>`).join('')}</div>`;
+      if (!drawn) return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">暂时无法读取这位员工的工作区</td><td>${acts}</td></tr>`;
       const { f, list } = drawn;
       return `<tr>
         <td class="fid-master-who">${who}</td>
@@ -105,10 +113,87 @@
         <td>${f.unread}</td>
         <td>${f.tasks}${f.late ? `<small class="fid-master-late">${f.late} 项已逾期</small>` : ''}</td>
         <td>${f.last ? esc(dayWord(f.last) + ' ' + clock(f.last)) : '—'}</td>
-        <td><button type="button" class="fid-btn tint" data-master="open" data-id="${esc(entry.site)}">${icon('MessagesSquare')}查看</button></td>
+        <td><button type="button" class="fid-btn tint" data-master="open" data-id="${esc(entry.site)}">${icon('MessagesSquare')}查看</button>${acts}</td>
       </tr>`;
     }).join('');
     return `<div class="fid-table-scroll" tabindex="0" aria-label="员工总览表格"><table class="fid-table fid-master-table"><thead><tr>${['员工', 'WhatsApp 号码', '客户', '未读会话', '待跟进', '最近消息', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${table}</tbody></table></div>`;
+  }
+
+  // ---- accounts: a new supervisor, a new temporary password, an account off or on ----
+  const ROLE = { agent: '员工', supervisor: '主管', admin: '管理员' };
+  const PROBLEM = {
+    'invalid-username': '登录名需为 3–32 位：小写字母、数字、点、下划线或连字符，并以字母或数字开头。', 'username-taken': '这个登录名已经有人使用。', 'invalid-name': '请填写显示名称（最多 60 个字）。',
+    'invalid-password': '密码至少 8 位；留空则生成临时密码。', 'own-account': '不能在这里操作自己的账号。', forbidden: '当前账号不能执行这个操作。', 'unknown-user': '这个账号已不存在，请刷新后再试。',
+  };
+  const problemText = answer => PROBLEM[answer.body.error] || (answer.status === 401 ? '登录已失效，请刷新页面后重新登录。' : '暂时无法完成，请稍后再试。');
+  const label = username => {
+    const user = state.users.find(candidate => candidate.username === username);
+    return user ? `${user.name}（${user.username}）` : username;
+  };
+  // What can be done with someone else's account. One's own has none, and an administrator's only an administrator.
+  function accountActs(account) {
+    if (account.username === state.user.username) return '<span class="fid-master-quiet">当前账号</span>';
+    if (account.role === 'admin' && state.user.role !== 'admin') return '<span class="fid-master-quiet">由管理员管理</span>';
+    const id = esc(account.username);
+    return `<button type="button" class="link" data-master="reset" data-id="${id}">重置密码</button>` + (account.disabled ? `<button type="button" class="link" data-master="enable" data-id="${id}">启用</button>` : `<button type="button" class="link" data-master="disable" data-id="${id}">停用</button>`);
+  }
+  function managersHTML() {
+    const list = state.users.filter(user => user.role !== 'agent');
+    if (state.loading || state.failed || !list.length) return '';
+    const body = list.map(user => `<tr><td class="fid-master-who"><strong>${esc(user.name)}</strong><small>${esc(user.username)}</small></td><td>${ROLE[user.role] || ''}</td><td>${user.disabled ? '<span class="fid-master-warn">已停用</span>' : user.mustChangePassword ? '使用临时密码' : '正常'}</td><td><div class="fid-master-acts">${accountActs(user)}</div></td></tr>`).join('');
+    return `<h2 class="fid-master-sub">主管与管理员账号</h2><div class="fid-table-scroll" tabindex="0" aria-label="主管与管理员账号表格"><table class="fid-table fid-master-table fid-master-accounts"><thead><tr>${['账号', '类型', '状态', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+  function showDialog(title, body, footer) {
+    const box = $('#dialog');
+    $('#dialog-content').innerHTML = `<div class="modal-head"><h2>${esc(title)}</h2><button type="button" class="icon-button" data-master="close" aria-label="关闭弹窗">${icon('X')}</button></div><div class="modal-body fid-master-dialog">${body}</div><div class="modal-footer">${footer}</div>`;
+    paintIcons(box);
+    if (!box.open) box.showModal();
+  }
+  // A dialog that is closed keeps nothing: a temporary password that was shown in it is gone from the page.
+  function closeDialog() {
+    if ($('#dialog').open) $('#dialog').close();
+    $('#dialog-content').innerHTML = '';
+  }
+  function say(text) {
+    const toast = $('#toast');
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(say.timer);
+    say.timer = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+  const askFirst = (title, text, word, action, username) => showDialog(title, `<p>${esc(text)}</p>`, `<button type="button" class="fid-btn" data-master="close">取消</button><button type="button" class="fid-btn blue" data-master="${action}" data-id="${esc(username)}">${word}</button>`);
+  // The one time a temporary password is shown.
+  const secretHTML = password => `<div class="fid-master-secret"><span>临时密码</span><input id="master-secret" readonly value="${esc(password)}" aria-label="临时密码"><button type="button" class="fid-btn" data-master="copy">复制</button></div><p class="fid-master-quiet">临时密码只显示这一次。对方首次登录时需要设置自己的密码。</p>`;
+  const DONE = '<button type="button" class="fid-btn blue" data-master="close">完成</button>';
+  function createForm(problem = '', values = {}) {
+    showDialog('新建账号', `<form id="master-create" class="fid-master-form" novalidate>
+        <p class="fid-master-kind">类型：主管（只读查看全部员工，并可管理账号）</p>
+        <label class="field">登录名<input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(values.username)}"></label>
+        <label class="field">显示名称<input name="name" autocomplete="off" value="${esc(values.name)}"></label>
+        <label class="field">密码<input name="password" type="password" autocomplete="new-password" placeholder="留空则生成临时密码"></label>
+        <p class="fid-master-problem" role="alert" ${problem ? '' : 'hidden'}>${esc(problem)}</p>
+      </form>`, '<button type="button" class="fid-btn" data-master="close">取消</button><button type="submit" form="master-create" class="fid-btn blue">创建</button>');
+    $('#master-create [name="username"]').focus();
+  }
+  async function createAccount(form) {
+    const values = { username: form.elements.username.value.trim().toLowerCase(), name: form.elements.name.value.trim(), password: form.elements.password.value };
+    for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
+    const answer = await post('/api/auth/users', { ...values, role: 'supervisor' });
+    if (answer.status !== 200) return createForm(problemText(answer), values);
+    showDialog('账号已创建', `<p>登录名：<strong>${esc(answer.body.user.username)}</strong>（${esc(answer.body.user.name)}，${ROLE[answer.body.user.role] || ''}）</p>${answer.body.password ? secretHTML(answer.body.password) : '<p class="fid-master-quiet">请使用刚才填写的密码登录。</p>'}`, DONE);
+    load();
+  }
+  async function resetAccount(username) {
+    const answer = await post('/api/auth/users/reset', { username });
+    if (answer.status !== 200) return showDialog('重置密码', `<p>${esc(problemText(answer))}</p>`, DONE);
+    showDialog('密码已重置', `<p>登录名：<strong>${esc(username)}</strong></p>${secretHTML(answer.body.password)}`, DONE);
+    load();
+  }
+  async function switchAccount(username, on) {
+    const answer = await post(on ? '/api/auth/users/enable' : '/api/auth/users/disable', { username });
+    closeDialog();
+    say(answer.status === 200 ? (on ? '账号已启用' : '账号已停用') : problemText(answer));
+    load();
   }
 
   // ---- one employee's customers and conversations ----
@@ -195,7 +280,7 @@
   function render() {
     const root = $('#master');
     root.innerHTML = `<header class="fid-master-top"><div class="fid-sign-in-brand" translate="no"><span class="brand-symbol" data-icon="MessagesSquare"></span><strong>WA Desk SCRM</strong></div><span class="fid-master-title">主管视图</span><span class="fid-master-user">已登录：${esc(state.user.name)}（${esc(state.user.username)}）</span><button type="button" class="fid-btn" data-master="leave">${icon('LogOut')}退出登录</button></header>
-      <div class="fid-master-body">${state.open ? siteHTML() : `<div class="fid-master-bar"><h1>员工总览</h1><button type="button" class="fid-btn" data-master="reload">${icon('RefreshCw')}刷新</button><p>每位员工的号码、客户与待办概况。点击「查看」可以只读方式查看该员工的客户与会话。</p></div>${listHTML()}`}</div>`;
+      <div class="fid-master-body">${state.open ? siteHTML() : `<div class="fid-master-bar"><h1>员工总览</h1><button type="button" class="fid-btn" data-master="create">${icon('UserRoundPlus')}新建账号</button><button type="button" class="fid-btn" data-master="reload">${icon('RefreshCw')}刷新</button><p>每位员工的号码、客户与待办概况。点击「查看」可以只读方式查看该员工的客户与会话。</p></div>${listHTML()}${managersHTML()}`}</div>`;
     paintIcons(root);
     showEnd();
   }
@@ -222,19 +307,39 @@
     customer: id => { Object.assign(state.open, { customer: id, chat: true }); showCustomer(); },
     people: () => { state.open.chat = false; showCustomer(); },
     leave: async () => {
-      await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+      await post('/api/auth/logout', {});
       location.reload();
     },
+    create: () => createForm(),
+    close: closeDialog,
+    copy: () => {
+      $('#master-secret').select();
+      $('[data-master="copy"]').textContent = document.execCommand('copy') ? '已复制' : '请手动复制';
+    },
+    reset: username => askFirst('重置密码', `重置「${label(username)}」的密码？对方会被退出登录，需要用新的临时密码重新登录。`, '重置', 'resetDo', username),
+    resetDo: resetAccount,
+    disable: username => askFirst('停用账号', `停用「${label(username)}」的账号？对方将无法登录，已经登录的页面也会失效。`, '停用', 'disableDo', username),
+    disableDo: username => switchAccount(username, false),
+    enable: username => switchAccount(username, true),
   };
 
   window.WA_MASTER = user => {
     const root = $('#master');
     state.user = user;
     root.hidden = false;
-    root.addEventListener('click', event => {
-      const button = event.target.closest('[data-master]');
-      if (button) actions[button.dataset.master](button.dataset.id);
+    // The dialogs for accounts stand outside the page's own element; their buttons are the page's all the same.
+    for (const place of [root, $('#dialog')]) {
+      place.addEventListener('click', event => {
+        const button = event.target.closest('[data-master]');
+        if (button) actions[button.dataset.master](button.dataset.id);
+      });
+    }
+    $('#dialog').addEventListener('submit', event => {
+      event.preventDefault();
+      if (event.target.id === 'master-create') createAccount(event.target);
     });
+    // The Escape key closes a dialog as its buttons do.
+    $('#dialog').addEventListener('close', closeDialog);
     root.addEventListener('input', event => {
       if (event.target.id !== 'master-search') return;
       state.open.query = event.target.value;
