@@ -4,7 +4,8 @@
 // Of a sub-site it only reads: a sub-site is asked under its own name, /site/<id>/api/…, with GET and nothing
 // else, so that several can be read side by side, and the server of a sub-site leaves a log line for every read
 // of its data by someone who is not its own employee. What the page changes are accounts and nothing else: a new
-// supervisor, a new temporary password for someone, an account switched off or on — and it signs out.
+// supervisor — or, where the platform makes sub-sites, a new employee, who gets a sub-site of their own —, a new
+// temporary password for someone, an account switched off or on — and it signs out.
 (() => {
   'use strict';
   const $ = selector => document.querySelector(selector);
@@ -22,10 +23,12 @@
   // The colour of a customer's initials is one word of the style sheet, whatever was saved.
   const tone = c => String(c.color || '').replace(/[^a-z]/g, '') || 'jade';
 
-  // user: who is signed in. sites: the list, each { site, employees, reached, data, link }. users: every account.
+  // user: who is signed in. sites: the list, each { site, employees, state, reached, data, link } (state: of a
+  // sub-site the platform made, as the server tells it). users: every account. provisioned: whether the platform
+  // makes sub-sites, so that an employee can be made here.
   // open: the sub-site that is being looked at, { site, name, data, customer, query, chat } — or null for the list.
   // atEnd, endTop: whether the conversation shows its latest message, and where the page last put it there.
-  const state = { user: null, sites: [], users: [], loading: true, failed: false, open: null, atEnd: true, endTop: -1 };
+  const state = { user: null, sites: [], users: [], provisioned: false, loading: true, failed: false, open: null, atEnd: true, endTop: -1 };
 
   function paintIcons(root) {
     for (const el of root.querySelectorAll('[data-icon]:empty')) {
@@ -81,18 +84,42 @@
       last: Math.max(0, ...customers.map(c => time(c.lastAt))),
     };
   }
-  async function load() {
-    state.loading = true;
-    render();
+  // What the list says of a sub-site the platform made, while it is not ready to be read.
+  const WORKSPACE = { starting: '正在准备，大约需要一分钟…', ready: '已就绪', stopping: '正在停止…', stopped: '已停止', failed: '启动失败，可先「停用」再「启用」重试', missing: '尚未创建' };
+  const workspaceText = value => '工作区：' + (WORKSPACE[value] || '状态未知');
+  // quiet: asked in passing, while a sub-site is being made or started — what is shown stays until the answer is
+  // there, and a sub-site that was read already and is as it was is not read again.
+  async function load(quiet = false) {
+    if (!quiet) {
+      state.loading = true;
+      render();
+    }
+    const before = new Map(quiet ? state.sites.map(entry => [entry.site, entry]) : []);
     const [list, accounts] = await Promise.all([get('/api/auth/sites'), get('/api/auth/users')]);
     state.failed = list.status !== 200;
     state.users = accounts.status === 200 ? rows(accounts.body.users) : [];
+    state.provisioned = !state.failed && list.body.provisioned === true;
     state.sites = state.failed ? [] : await Promise.all(list.body.sites.map(async entry => {
+      // A sub-site that does not run has nobody to answer for it.
+      if (entry.state && entry.state !== 'ready') return { ...entry, reached: false, data: {}, link: null };
+      const known = before.get(entry.site);
+      if (known?.reached && known.state === entry.state) return { ...known, employees: entry.employees };
       const [doc, link] = await Promise.all([get(at(entry.site, '/api/data?fields=accounts,customers,tasks')), get(at(entry.site, '/api/wa/status'))]);
       return { ...entry, reached: doc.status === 200, data: doc.status === 200 && doc.body.data && typeof doc.body.data === 'object' ? doc.body.data : {}, link: link.status === 200 ? link.body : null };
     }));
     state.loading = false;
-    render();
+    // What was asked in passing does not draw over an employee's conversations that were opened meanwhile.
+    if (!quiet || !state.open) render();
+    // The line about the new sub-site in the dialog that follows the making of an employee's account.
+    const line = $('#master-workspace'), made = line && state.sites.find(entry => entry.site === line.dataset.id);
+    if (made?.state) line.textContent = workspaceText(made.state);
+    watch();
+  }
+  // While a sub-site is being made, started or stopped, the list is asked again every few seconds — until all
+  // have settled, and not while an employee's conversations are open.
+  function watch() {
+    clearTimeout(watch.timer);
+    if (!state.open && state.sites.some(entry => entry.state === 'starting' || entry.state === 'stopping')) watch.timer = setTimeout(() => load(true), 4000);
   }
   function listHTML() {
     if (state.loading) return '<p class="fid-master-note">正在读取…</p>';
@@ -104,6 +131,8 @@
       const drawn = entry.reached ? guarded(() => ({ f: figures(entry), list: numbers(entry) }), null) : null;
       // Every account of the sub-site can be acted on — also one that is switched off and so not named in front.
       const acts = `<div class="fid-master-acts">${entry.employees.map(employee => `<span>${entry.employees.length > 1 ? esc(employee.username) + (employee.disabled ? '（已停用）' : '') + '：' : ''}${accountActs(employee)}</span>`).join('')}</div>`;
+      // A sub-site the platform made that is not ready — being prepared, stopped, failed — says so in its row.
+      if (entry.state && entry.state !== 'ready') return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">${esc(workspaceText(entry.state))}</td><td>${acts}</td></tr>`;
       if (!drawn) return `<tr><td class="fid-master-who">${who}</td><td colspan="5" class="fid-master-quiet">暂时无法读取这位员工的工作区</td><td>${acts}</td></tr>`;
       const { f, list } = drawn;
       return `<tr>
@@ -119,13 +148,17 @@
     return `<div class="fid-table-scroll" tabindex="0" aria-label="员工总览表格"><table class="fid-table fid-master-table"><thead><tr>${['员工', 'WhatsApp 号码', '客户', '未读会话', '待跟进', '最近消息', '操作'].map(title => `<th scope="col">${title}</th>`).join('')}</tr></thead><tbody>${table}</tbody></table></div>`;
   }
 
-  // ---- accounts: a new supervisor, a new temporary password, an account off or on ----
+  // ---- accounts: a new supervisor or employee, a new temporary password, an account off or on ----
   const ROLE = { agent: '员工', supervisor: '主管', admin: '管理员' };
   const PROBLEM = {
     'invalid-username': '登录名需为 3–32 位：小写字母、数字、点、下划线或连字符，并以字母或数字开头。', 'username-taken': '这个登录名已经有人使用。', 'invalid-name': '请填写显示名称（最多 60 个字）。',
     'invalid-password': '密码至少 8 位；留空则生成临时密码。', 'own-account': '不能在这里操作自己的账号。', forbidden: '当前账号不能执行这个操作。', 'unknown-user': '这个账号已不存在，请刷新后再试。',
+    'workspace-full': '工作区数量已达上限，无法再启动新的工作区。停用一位员工可以空出位置。', 'workspace-low-memory': '服务器的可用内存不足，暂时无法启动新的工作区。', 'workspace-busy': '这个工作区正在准备中，请稍后再试。',
+    'workspace-exists': '这个登录名对应的工作区已经存在，请换一个登录名。', 'workspace-unavailable': '暂时无法创建或启动工作区，请稍后再试。',
   };
-  const problemText = answer => PROBLEM[answer.body.error] || (answer.status === 401 ? '登录已失效，请刷新页面后重新登录。' : '暂时无法完成，请稍后再试。');
+  // An employee's sign-in name is the name of the sub-site as well, and has a narrower rule.
+  const EMPLOYEE_NAME = '员工的登录名需为 3–32 位：小写字母、数字或连字符，并以字母或数字开头和结尾。';
+  const problemText = (answer, role) => (role === 'agent' && answer.body.error === 'invalid-username' ? EMPLOYEE_NAME : PROBLEM[answer.body.error]) || (answer.status === 401 ? '登录已失效，请刷新页面后重新登录。' : '暂时无法完成，请稍后再试。');
   const label = username => {
     const user = state.users.find(candidate => candidate.username === username);
     return user ? `${user.name}（${user.username}）` : username;
@@ -166,8 +199,16 @@
   const secretHTML = password => `<div class="fid-master-secret"><span>临时密码</span><input id="master-secret" readonly value="${esc(password)}" aria-label="临时密码"><button type="button" class="fid-btn" data-master="copy">复制</button></div><p class="fid-master-quiet">临时密码只显示这一次。对方首次登录时需要设置自己的密码。</p>`;
   const DONE = '<button type="button" class="fid-btn blue" data-master="close">完成</button>';
   function createForm(problem = '', values = {}) {
+    // Where the platform makes sub-sites the new account is an employee's — with a sub-site and a WhatsApp link
+    // of their own — or a supervisor's; elsewhere it is a supervisor's.
+    const kind = state.provisioned
+      ? `<fieldset class="fid-master-kinds"><legend>类型</legend>
+          <label><input type="radio" name="role" value="agent" ${values.role === 'supervisor' ? '' : 'checked'}>员工：独立工作区 + WhatsApp 号码</label>
+          <label><input type="radio" name="role" value="supervisor" ${values.role === 'supervisor' ? 'checked' : ''}>主管：只读查看全部员工，并可管理账号</label>
+        </fieldset>`
+      : '<p class="fid-master-kind">类型：主管（只读查看全部员工，并可管理账号）</p>';
     showDialog('新建账号', `<form id="master-create" class="fid-master-form" novalidate>
-        <p class="fid-master-kind">类型：主管（只读查看全部员工，并可管理账号）</p>
+        ${kind}
         <label class="field">登录名<input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(values.username)}"></label>
         <label class="field">显示名称<input name="name" autocomplete="off" value="${esc(values.name)}"></label>
         <label class="field">密码<input name="password" type="password" autocomplete="new-password" placeholder="留空则生成临时密码"></label>
@@ -176,11 +217,13 @@
     $('#master-create [name="username"]').focus();
   }
   async function createAccount(form) {
-    const values = { username: form.elements.username.value.trim().toLowerCase(), name: form.elements.name.value.trim(), password: form.elements.password.value };
+    const values = { role: form.elements.role?.value || 'supervisor', username: form.elements.username.value.trim().toLowerCase(), name: form.elements.name.value.trim(), password: form.elements.password.value };
     for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
-    const answer = await post('/api/auth/users', { ...values, role: 'supervisor' });
-    if (answer.status !== 200) return createForm(problemText(answer), values);
-    showDialog('账号已创建', `<p>登录名：<strong>${esc(answer.body.user.username)}</strong>（${esc(answer.body.user.name)}，${ROLE[answer.body.user.role] || ''}）</p>${answer.body.password ? secretHTML(answer.body.password) : '<p class="fid-master-quiet">请使用刚才填写的密码登录。</p>'}`, DONE);
+    const answer = await post('/api/auth/users', values);
+    if (answer.status !== 200) return createForm(problemText(answer, values.role), values);
+    const made = answer.body.user;
+    // An employee's sub-site is being made while this is read: the line below it is kept up to date by load.
+    showDialog('账号已创建', `<p>登录名：<strong>${esc(made.username)}</strong>（${esc(made.name)}，${ROLE[made.role] || ''}）</p>${answer.body.password ? secretHTML(answer.body.password) : '<p class="fid-master-quiet">请使用刚才填写的密码登录。</p>'}${made.role === 'agent' ? `<p id="master-workspace" data-id="${esc(made.username)}" role="status">${esc(workspaceText('starting'))}</p>` : ''}`, DONE);
     load();
   }
   async function resetAccount(username) {
@@ -189,10 +232,17 @@
     showDialog('密码已重置', `<p>登录名：<strong>${esc(username)}</strong></p>${secretHTML(answer.body.password)}`, DONE);
     load();
   }
+  // Is this the account whose switching off stops a sub-site: on a platform that makes sub-sites, the last
+  // employee of a sub-site who can sign in?
+  const stops = username => state.provisioned && state.sites.some(entry => entry.employees.some(employee => employee.username === username) && entry.employees.every(employee => employee.disabled || employee.username === username));
   async function switchAccount(username, on) {
+    // Stopping a sub-site can take a moment: the dialog that asked stays, and says so.
+    for (const button of $('#dialog').querySelectorAll('button')) button.disabled = true;
+    if (!on && $('#dialog [data-master="disableDo"]')) $('#dialog [data-master="disableDo"]').textContent = '正在停用…';
     const answer = await post(on ? '/api/auth/users/enable' : '/api/auth/users/disable', { username });
     closeDialog();
-    say(answer.status === 200 ? (on ? '账号已启用' : '账号已停用') : problemText(answer));
+    const also = { starting: '，工作区正在启动', stopped: '，工作区已停止', running: '，但工作区没能停止' }[answer.body.workspace] || '';
+    say(answer.status === 200 ? (on ? '账号已启用' : '账号已停用') + also : problemText(answer));
     load();
   }
 
@@ -318,7 +368,7 @@
     },
     reset: username => askFirst('重置密码', `重置「${label(username)}」的密码？对方会被退出登录，需要用新的临时密码重新登录。`, '重置', 'resetDo', username),
     resetDo: resetAccount,
-    disable: username => askFirst('停用账号', `停用「${label(username)}」的账号？对方将无法登录，已经登录的页面也会失效。`, '停用', 'disableDo', username),
+    disable: username => askFirst('停用账号', `停用「${label(username)}」的账号？对方将无法登录，已经登录的页面也会失效。${stops(username) ? '对方的工作区和 WhatsApp 连接会停止，数据保留；重新启用时再启动。' : ''}`, '停用', 'disableDo', username),
     disableDo: username => switchAccount(username, false),
     enable: username => switchAccount(username, true),
   };

@@ -1111,6 +1111,10 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-master-form { display:grid; gap:var(--fid-px-14); }
 .fid-master-form p { margin:0; }
 .fid-master-kind { color:var(--fid-ink); font-size:var(--fid-px-13); }
+.fid-master-kinds { display:grid; gap:var(--fid-px-8); margin:0; padding:0; border:0; min-width:0; color:var(--fid-ink); font-size:var(--fid-px-13); }
+.fid-master-kinds legend { margin-bottom:var(--fid-px-6); padding:0; }
+.fid-master-kinds label { display:flex; align-items:center; gap:var(--fid-px-8); cursor:pointer; }
+.fid-master-kinds input { flex:none; margin:0; accent-color:var(--color-accent); }
 .fid-master-problem { color:var(--color-danger); font-size:var(--fid-px-13); }
 .fid-master-secret { display:flex; align-items:center; gap:var(--fid-px-8); margin:var(--fid-px-12) 0 var(--fid-px-8); font-size:var(--fid-px-13); }
 .fid-master-secret input { flex:1; min-width:0; height:var(--fid-px-36); padding:0 var(--fid-px-12); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface-alt); color:var(--color-text); font:inherit; letter-spacing:var(--fid-px-1); }

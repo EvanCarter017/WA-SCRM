@@ -670,6 +670,10 @@
 .fid-master-form { display:grid; gap:14px; }
 .fid-master-form p { margin:0; }
 .fid-master-kind { color:var(--fid-ink); font-size:13px; }
+.fid-master-kinds { display:grid; gap:8px; margin:0; padding:0; border:0; min-width:0; color:var(--fid-ink); font-size:13px; }
+.fid-master-kinds legend { margin-bottom:6px; padding:0; }
+.fid-master-kinds label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.fid-master-kinds input { flex:none; margin:0; accent-color:var(--color-accent); }
 .fid-master-problem { color:var(--color-danger); font-size:13px; }
 .fid-master-secret { display:flex; align-items:center; gap:8px; margin:12px 0 8px; font-size:13px; }
 .fid-master-secret input { flex:1; min-width:0; height:36px; padding:0 12px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface-alt); color:var(--color-text); font:inherit; letter-spacing:1px; }

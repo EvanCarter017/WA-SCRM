@@ -168,4 +168,4 @@ function openAuth(file, { now = () => Date.now() } = {}) {
   return { createUser, resetPassword, changePassword, setDisabled, signIn, sessionUser, signOut, listUsers, close: () => db.close() };
 }
 
-module.exports = { openAuth, ROLES, PASSWORD_MIN, SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_AFTER, LOCK_MS };
+module.exports = { openAuth, validPassword, ROLES, PASSWORD_MIN, SESSION_IDLE_MS, SESSION_MAX_MS, LOCK_AFTER, LOCK_MS };

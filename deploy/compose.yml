@@ -46,7 +46,7 @@ services:
       - ALL
     security_opt:
       - 'no-new-privileges:true'
-    mem_limit: 256m
+    mem_limit: ${WA_SCRM_SERVER_MEMORY_MB:-512}m
     environment:
       - WA_SCRM_DATA_DIR=/data
       - WA_SCRM_SITE_ID=master
@@ -54,6 +54,7 @@ services:
       - WA_SCRM_AI_ENV=/run/wa-scrm/ai.env
       - WA_SCRM_PROVISIONER_URL=http://wa-scrm-provisioner:8090
       - WA_SCRM_PROVISIONER_SECRET_FILE=/run/wa-scrm/provisioner.secret
+      - WA_SCRM_COOKIE_SECURE=${WA_SCRM_COOKIE_SECURE:-0}
     volumes:
       - ${WA_SCRM_HOST_DATA_DIR:?}:/data
       - ${WA_SCRM_HOST_AI_ENV:?}:/run/wa-scrm/ai.env:ro
@@ -97,6 +98,8 @@ services:
       - WA_SCRM_RUN_AS=${WA_SCRM_RUN_AS:-1000:1000}
       - WA_SCRM_MAX_SITES=${WA_SCRM_MAX_SITES:-4}
       - WA_SCRM_MIN_FREE_MB=${WA_SCRM_MIN_FREE_MB:-1400}
+      - WA_SCRM_OPENWA_MEMORY_MB=${WA_SCRM_OPENWA_MEMORY_MB:-1536}
+      - WA_SCRM_SERVER_MEMORY_MB=${WA_SCRM_SERVER_MEMORY_MB:-512}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${WA_SCRM_HOST_DATA_DIR:?}:/data

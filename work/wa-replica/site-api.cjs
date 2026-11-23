@@ -5,9 +5,11 @@
 //   GET  /api/auth/me        the signed-in user (401 when nobody is signed in)
 //   GET  /api/auth/session   the signed-in user or null; what the page asks when it opens
 //   POST /api/auth/password  { current, next }
-//   GET  /api/auth/sites     the sub-sites and their employees, for supervisors and administrators
+//   GET  /api/auth/sites     the sub-sites and their employees, for supervisors and administrators; where the
+//                            platform makes sub-sites, also the state of each
 //   GET  /api/auth/users     every account, for supervisors and administrators
-//   POST /api/auth/users     { username, name, role: 'supervisor', password? } → a new supervisor's account
+//   POST /api/auth/users     { username, name, role: 'supervisor', password? } → a new supervisor's account;
+//                            with role 'agent', where the platform makes sub-sites, a new employee's
 //   POST /api/auth/users/reset | disable | enable   { username }: a new temporary password; the account off, on
 //   GET  /api/data           the sub-site's data document; ?fields=a,b gives only these top-level fields
 //   PUT  /api/data           { baseVersion, set, remove }
@@ -16,6 +18,9 @@
 // each of their reads leaves a log line that says who read which sub-site and which fields.
 // Supervisors and administrators manage the accounts: never their own, and an administrator's only as an
 // administrator. Each of these actions leaves a log line with who did it and to which account.
+// Where the platform makes its sub-sites itself (workspaces: the first server's client of site-provisioner.cjs),
+// an employee's account is made together with a sub-site that bears the employee's sign-in name; the sub-site
+// stops when the account is switched off and is started before the account is switched on again.
 // A log line carries the action, the user name and the outcome; never a password, a token or data.
 //
 // Several sub-sites can share one address. Each runs this server with its own WA_SCRM_SITE_ID on the same data
@@ -25,8 +30,9 @@
 // sub-site checks the session and the account's sub-site itself.
 const path = require('node:path');
 const fs = require('node:fs');
-const { openAuth } = require('./site-auth.cjs');
+const { openAuth, validPassword } = require('./site-auth.cjs');
 const { openData } = require('./site-data.cjs');
+const { RESERVED } = require('./site-provisioner.cjs');
 
 const COOKIE = 'scrm_sid';
 const SITE_COOKIE = 'scrm_site';
@@ -36,10 +42,13 @@ const PURGEABLE = ['priceList'];
 const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const FIELD = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
 const NAME_MAX = 60;
+// An employee's sign-in name where it is the name of a sub-site as well: what does as the name of a host.
+const EMPLOYEE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 const STATUS = {
   'invalid-request': 400, 'invalid-password': 400, 'key-conflict': 400, 'not-signed-in': 401, 'invalid-credentials': 401,
   'password-change-required': 403, 'forbidden': 403, 'read-only': 403, 'version-conflict': 409, 'too-long': 413, 'too-many-attempts': 429,
   'invalid-username': 400, 'invalid-name': 400, 'invalid-role': 400, 'own-account': 400, 'unknown-user': 404, 'username-taken': 409,
+  'workspace-exists': 409, 'workspace-full': 409, 'workspace-low-memory': 409, 'workspace-busy': 409, 'workspace-unavailable': 503,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
 
@@ -85,7 +94,7 @@ function cookieHeader(req, token, maxAgeSeconds, name = COOKIE) {
 // The cookie that names an employee's sub-site, for as long as a session lasts at most; anyone else's is taken away.
 const siteCookie = (req, user) => (user?.role === 'agent' ? cookieHeader(req, user.site, 30 * 24 * 60 * 60, SITE_COOKIE) : cookieHeader(req, '', 0, SITE_COOKIE));
 
-function create({ dir, siteId = 'default', now }) {
+function create({ dir, siteId = 'default', now, workspaces = null }) {
   if (!SITE_ID.test(siteId)) throw new Error('WA_SCRM_SITE_ID must be lower-case letters, digits and hyphens');
   // The databases hold password hashes and customer data: every file this process creates from now on is private.
   process.umask(0o077);
@@ -123,6 +132,63 @@ function create({ dir, siteId = 'default', now }) {
   }
   const brief = user => ({ username: user.username, name: user.name, role: user.role });
 
+  // ---- sub-sites, where the platform makes them itself ----
+  // Each thing asked of the provisioner leaves a line: what, who asked, for which sub-site, and how it went.
+  async function asked(what, actor, id, work) {
+    try {
+      await work();
+    } catch (error) {
+      console.error(`site workspace ${what} failed by=${actor.username} site=${id} error=${error.code || error.name}`);
+      throw error;
+    }
+    console.log(`site workspace ${what} ok by=${actor.username} site=${id}`);
+  }
+  // The sub-site of a new employee, asked for before the account is made: it is the part that can be refused —
+  // no room, too little memory. It bears the employee's sign-in name. What would stop the account is looked at
+  // first, so that no sub-site is made for an account that then is not.
+  async function newWorkspace(actor, body, given) {
+    const id = body.username.trim().toLowerCase();
+    if (!EMPLOYEE.test(id) || RESERVED.includes(id)) throw problem('invalid-username');
+    if (!body.name.trim()) throw problem('invalid-name');
+    if (given && !validPassword(body.password)) throw problem('invalid-password');
+    if (auth.listUsers().some(user => user.username === id)) throw problem('username-taken');
+    await asked('make', actor, id, async () => {
+      try {
+        await workspaces.make(id);
+      } catch (error) {
+        // A sub-site that is there already and is nobody's — the making of its account went wrong the last
+        // time — is taken, and started in case it does not run.
+        if (error.code !== 'workspace-exists' || auth.listUsers().some(user => user.site === id)) throw error;
+        await workspaces.start(id);
+      }
+    });
+    return id;
+  }
+  // An employee's sub-site stops with the account, so that its place is free for another — unless another
+  // employee of the same sub-site can still sign in. The account is off whatever comes of this.
+  async function workspaceOff(actor, target) {
+    if (!workspaces || target.role !== 'agent' || auth.listUsers().some(user => user.site === target.site && !user.disabled)) return {};
+    try {
+      await asked('stop', actor, target.site, () => workspaces.stop(target.site));
+      return { workspace: 'stopped' };
+    } catch (error) {
+      // A sub-site the platform did not make has nothing to stop; one that could not be stopped still runs.
+      return error.code === 'workspace-unknown-site' ? {} : { workspace: 'running' };
+    }
+  }
+  // An employee's sub-site is started before the account is switched on: when it cannot be — no room for it —
+  // the account stays off.
+  async function workspaceOn(actor, target) {
+    if (!workspaces || target.role !== 'agent') return {};
+    try {
+      await asked('start', actor, target.site, () => workspaces.start(target.site));
+      return { workspace: 'starting' };
+    } catch (error) {
+      if (error.code === 'workspace-unknown-site') return {};
+      throw error;
+    }
+  }
+
   const routes = {
     'GET /api/site/status': () => ({ body: { enabled: true, site: siteId } }),
     'POST /api/auth/login': async req => {
@@ -156,7 +222,7 @@ function create({ dir, siteId = 'default', now }) {
       return { body: { user: changed } };
     },
     // The sub-sites and the employees of each, from the accounts: what the supervisor page lists.
-    'GET /api/auth/sites': req => {
+    'GET /api/auth/sites': async req => {
       if (signedIn(req).role === 'agent') throw problem('forbidden');
       const sites = new Map();
       for (const account of auth.listUsers()) {
@@ -164,7 +230,10 @@ function create({ dir, siteId = 'default', now }) {
         if (!sites.has(account.site)) sites.set(account.site, []);
         sites.get(account.site).push({ username: account.username, name: account.name, disabled: account.disabled });
       }
-      return { body: { sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([site, employees]) => ({ site, employees })) } };
+      // Where the platform makes the sub-sites: the state of each, as the provisioner tells it — when it answers.
+      const made = workspaces ? await workspaces.list().catch(() => null) : null;
+      const state = site => (made ? { state: made.sites.find(entry => entry.id === site)?.state || 'missing' } : {});
+      return { body: { sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([site, employees]) => ({ site, employees, ...state(site) })), ...(workspaces ? { provisioned: true } : {}) } };
     },
     // Accounts, managed from the supervisor page.
     'GET /api/auth/users': req => {
@@ -174,13 +243,15 @@ function create({ dir, siteId = 'default', now }) {
     'POST /api/auth/users': async req => {
       const actor = manager(req), body = await readJson(req);
       if (typeof body.username !== 'string' || typeof body.name !== 'string') throw problem('invalid-request');
-      if (body.role !== 'supervisor') throw problem('invalid-role');
+      // A supervisor's account — or, where the platform makes sub-sites, an employee's, which comes with one.
+      if (body.role !== 'supervisor' && !(body.role === 'agent' && workspaces)) throw problem('invalid-role');
       if (body.name.trim().length > NAME_MAX) throw problem('invalid-name');
       if (body.password !== undefined && typeof body.password !== 'string') throw problem('invalid-password');
       // A password that is given is the account's own. Without one a temporary password is made, which its
       // owner has to change at the first sign-in; it goes back in this answer and is kept nowhere.
       const given = Boolean(body.password);
-      const { user, password } = await auth.createUser({ username: body.username, name: body.name, role: body.role, password: given ? body.password : undefined, mustChange: !given });
+      const site = body.role === 'agent' ? await newWorkspace(actor, body, given) : null;
+      const { user, password } = await auth.createUser({ username: body.username, name: body.name, role: body.role, site, password: given ? body.password : undefined, mustChange: !given });
       console.log(`site account created by=${actor.username} user=${user.username} role=${user.role}`);
       return { body: { user: brief(user), ...(given ? {} : { password }) } };
     },
@@ -194,13 +265,14 @@ function create({ dir, siteId = 'default', now }) {
       const actor = manager(req), target = managed(actor, (await readJson(req)).username);
       auth.setDisabled(target.username, true);
       console.log(`site account disabled by=${actor.username} user=${target.username}`);
-      return { body: { ok: true } };
+      return { body: { ok: true, ...(await workspaceOff(actor, target)) } };
     },
     'POST /api/auth/users/enable': async req => {
       const actor = manager(req), target = managed(actor, (await readJson(req)).username);
+      const workspace = await workspaceOn(actor, target);
       auth.setDisabled(target.username, false);
       console.log(`site account enabled by=${actor.username} user=${target.username}`);
-      return { body: { ok: true } };
+      return { body: { ok: true, ...workspace } };
     },
     'GET /api/data': req => {
       const user = signedIn(req);

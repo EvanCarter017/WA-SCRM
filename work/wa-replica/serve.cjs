@@ -9,9 +9,10 @@ const port = Number(process.argv[2] || 56141);
 // With WA_SCRM_DATA_DIR set, the server keeps the accounts and the data of one sub-site (site-api.cjs; needs
 // Node 22.13 or newer), the AI relay answers signed-in users only, and the sub-site can be linked to its own
 // OpenWA (openwa-link.cjs; settings file named by WA_SCRM_OPENWA_ENV). Without it, the server serves the page
-// and the relay as before.
+// and the relay as before. With WA_SCRM_PROVISIONER_URL set as well — on the first server of a platform that
+// makes its sub-sites itself (site-provisioner.cjs) — an employee's account is made together with a sub-site.
 const site = process.env.WA_SCRM_DATA_DIR
-  ? require('./site-api.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: process.env.WA_SCRM_SITE_ID || 'default' })
+  ? require('./site-api.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: process.env.WA_SCRM_SITE_ID || 'default', workspaces: require('./site-provisioner.cjs').clientFromEnv() })
   : null;
 const waLink = site ? require('./openwa-link.cjs').create({ dir: process.env.WA_SCRM_DATA_DIR, siteId: site.siteId, site }) : null;
 // A sub-site's server also answers under the sub-site's name, for its data and its WhatsApp link:
@@ -58,6 +59,9 @@ const isSiteRoute = pathname => pathname.startsWith('/api/site/') || pathname.st
 
 const server = http.createServer(async (req, res) => {
   try {
+    // A backslash in the path is a slash to this server and none to a gateway in front of it: such a request
+    // would be passed for one route and answered as another. Nobody asks so in earnest.
+    if (req.url.split('?')[0].includes('\\')) return sendJson(res, 400, { error: 'invalid-request' });
     let pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (named && (pathname === named + '/api/data' || pathname.startsWith(named + '/api/wa/'))) pathname = pathname.slice(named.length);
     if (isSiteRoute(pathname)) {

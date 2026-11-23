@@ -7,7 +7,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { create, engine, configFromEnv, openwaAddress, RESERVED } = require('./site-provisioner.cjs');
+const { create, engine, configFromEnv, client, clientFromEnv, openwaAddress, RESERVED } = require('./site-provisioner.cjs');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-prov-'));
 // The path of a socket can be about a hundred characters long; the folder for temporary files may lie deeper.
@@ -26,7 +26,7 @@ for (const level of ['log', 'error']) {
 // containers: name → { spec, state: 'created' | 'running' | 'exited', polls }. calls: what was asked, in order.
 // mood: how an OpenWA behaves after it was started — 'ok' (healthy at the second look), 'never', 'dies'.
 const containers = new Map(), volumes = new Set(), calls = [];
-let mood = 'ok', free = 4000;
+let mood = 'ok', free = 4000, stopDelay = 0;
 const isOpenwa = c => c.spec.Labels['wa-scrm.part'] === 'openwa';
 const health = c => (!isOpenwa(c) ? '' : mood === 'ok' && c.polls >= 2 ? 'healthy' : 'starting');
 const fake = http.createServer((req, res) => {
@@ -51,13 +51,14 @@ const fake = http.createServer((req, res) => {
       const c = containers.get(one[1]);
       if (!c) return send(404, { message: 'No such container: ' + one[1] });
       if (one[2] === 'start') { if (c.state === 'running') return send(304); Object.assign(c, { state: 'running', polls: 0 }); return send(204); }
-      if (one[2] === 'stop') { if (c.state !== 'running') return send(304); c.state = 'exited'; return send(204); }
+      if (one[2] === 'stop') { if (c.state !== 'running') return send(304); return void setTimeout(() => { c.state = 'exited'; send(204); }, stopDelay); }
       c.polls += 1;
       if (isOpenwa(c) && mood === 'dies' && c.polls >= 2) c.state = 'exited';
       return send(200, { Config: { Env: c.spec.Env }, State: { Running: c.state === 'running', Health: isOpenwa(c) ? { Status: health(c) } : undefined } });
     }
     if (url.pathname === '/volumes/create') { volumes.add(body.Name); return send(201, { Name: body.Name }); }
     const volume = url.pathname.match(/^\/volumes\/([^/]+)$/);
+    if (volume && req.method === 'DELETE') { volumes.delete(volume[1]); return send(204); }
     if (volume) return send(volumes.has(volume[1]) ? 200 : 404, volumes.has(volume[1]) ? { Name: volume[1] } : { message: 'no such volume' });
     return send(404, { message: 'page not found' });
   });
@@ -113,6 +114,8 @@ test('nobody without the secret; only what the provisioner knows; an id is a sub
   assert.deepEqual([(await call('/health', { secret: '' })).json, (await call('/sites', { secret: '' })).json, (await call('/sites', { secret: SECRET + 'x' })).status, (await call('/sites', { secret: SECRET.slice(1) })).status], [{ ok: true }, { error: 'not-allowed' }, 401, 401]);
   assert.deepEqual((await call('/sites')).json, { sites: [], room: { max: 2, running: 0, freeMb: 4000, minFreeMb: 1400, canStart: true } });
   assert.deepEqual([(await call('/nothing')).status, (await call('/sites', { method: 'DELETE' })).status, (await call('/sites/t1/start')).status, (await call('/sites/t1/remove', { method: 'POST' })).status], [404, 405, 405, 404]);
+  // what is no address at all: the secret is asked first, and nothing of it is written down
+  assert.deepEqual([(await call('//', { secret: '' })).json, (await call('//')).json, (await call('/health?x=1', { secret: '' })).status, logged.some(line => line.includes('//'))], [{ error: 'not-allowed' }, { error: 'not-found' }, 401, false]);
   const from = calls.length;
   for (const id of [undefined, '', 'T1', 'a b', '../x', 'x/y', '-x', 'x'.repeat(41), 7, ['t1'], ...RESERVED]) {
     assert.deepEqual((await call('/sites', { method: 'POST', body: { id } })).json, { error: 'invalid-request' }, JSON.stringify(id));
@@ -153,7 +156,7 @@ test('a new sub-site: its OpenWA with a key of the platform\'s choice, a restric
       Mounts: [{ Type: 'bind', Source: '/srv/wa-scrm/data', Target: '/data' }, { Type: 'bind', Source: '/srv/wa-scrm/ai.env', Target: '/run/wa-scrm/ai.env', ReadOnly: true }], LogConfig: { Type: 'json-file', Config: { 'max-size': '10m', 'max-file': '3' } },
     },
   }, 'what the caller sent beside the id — an image, a command, a limit — is nowhere');
-  assert.deepEqual([volumes.has('wa-scrm-openwa-t1'), keys.length, keys[0].name, keys[0].role], [true, 1, 'wa-scrm-t1', 'operator']);
+  assert.deepEqual([volumes.has('wa-scrm-openwa-t1'), keys.length, /^wa-scrm-t1-[0-9a-z]+$/.test(keys[0].name), keys[0].role], [true, 1, true, 'operator']);
   // the settings file: where the OpenWA is, the restricted key, where and with what secret it delivers; private
   const settings = settingsOf('t1'), lines = Object.fromEntries(settings.trim().split('\n').map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
   assert.deepEqual([Object.keys(lines), lines.OPENWA_BASE_URL, lines.OPENWA_API_KEY, lines.OPENWA_HOOK_URL, /^[0-9a-f]{64}$/.test(lines.OPENWA_HOOK_SECRET)], [['OPENWA_BASE_URL', 'OPENWA_API_KEY', 'OPENWA_HOOK_URL', 'OPENWA_HOOK_SECRET'], openwaBase, keys[0].apiKey, 'http://wa-scrm-site-t1:8080/api/wa/hook', true]);
@@ -189,6 +192,17 @@ test('stop and start: the server is stopped first, then OpenWA; started again it
   assert.deepEqual([await settled('t1'), changes(again), keys.length, settingsOf('t1') === before], [{ id: 't1', state: 'ready' }, ['POST /containers/wa-scrm-openwa-t1/start', 'POST /containers/wa-scrm-site-t1/start'], asked, true], 'no container, no key and no settings file is made anew');
   assert.equal((await call('/sites/t1/start', { method: 'POST' })).status, 202, 'starting what runs is no mistake');
   assert.deepEqual(await settled('t1'), { id: 't1', state: 'ready' });
+  // while it is being stopped — which takes its time — it is busy: a start or another stop is refused, the list says that it stops
+  stopDelay = 60;
+  const stopping = call('/sites/t1/stop', { method: 'POST' });
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.deepEqual([(await call('/sites/t1/start', { method: 'POST' })).json, (await call('/sites/t1/stop', { method: 'POST' })).json, await stateOf('t1')], [{ error: 'busy' }, { error: 'busy' }, { id: 't1', state: 'stopping' }]);
+  assert.deepEqual([(await stopping).json, await stateOf('t1')], [{ id: 't1', state: 'stopped' }, { id: 't1', state: 'stopped' }]);
+  stopDelay = 0;
+  // a stopped sub-site whose server was taken away — an upgrade does that — is stopped, not failed; the next start makes the server anew
+  containers.delete('wa-scrm-site-t1');
+  const anew = calls.length;
+  assert.deepEqual([await stateOf('t1'), (await call('/sites/t1/start', { method: 'POST' })).status, await settled('t1'), changes(anew)], [{ id: 't1', state: 'stopped' }, 202, { id: 't1', state: 'ready' }, ['POST /containers/wa-scrm-openwa-t1/start', 'POST /containers/create?name=wa-scrm-site-t1', 'POST /containers/wa-scrm-site-t1/start']]);
 });
 
 test('a sub-site that was moved here — its OpenWA\'s data and its settings file exist — is started as it is; one whose making stopped half-way is finished; what cannot be put together says why', async () => {
@@ -208,7 +222,7 @@ test('a sub-site that was moved here — its OpenWA\'s data and its settings fil
   assert.equal(fs.existsSync(path.join(dataDir, 'openwa-h1.env')), false);
   mood = 'ok';
   assert.equal((await call('/sites/h1/start', { method: 'POST' })).status, 202);
-  assert.deepEqual([await settled('h1'), keys.at(-1).name, settingsOf('h1').includes(keys.at(-1).apiKey)], [{ id: 'h1', state: 'ready' }, 'wa-scrm-h1', true], 'finished with the key its OpenWA was started with');
+  assert.deepEqual([await settled('h1'), keys.at(-1).name.startsWith('wa-scrm-h1-'), settingsOf('h1').includes(keys.at(-1).apiKey)], [{ id: 'h1', state: 'ready' }, true, true], 'finished with the key its OpenWA was started with');
   await call('/sites/h1/stop', { method: 'POST' });
   // the settings file without the data, and the data without the settings file
   fs.writeFileSync(path.join(dataDir, 'openwa-o1.env'), 'OPENWA_BASE_URL=x\n', { mode: 0o600 });
@@ -237,7 +251,73 @@ test('an OpenWA that stops again, or an image that is not there: the sub-site is
   } finally {
     server.closeAllConnections(); server.close();
   }
+  // the volume that was made for it is taken away again, so that the name can be used once the image is there
+  assert.deepEqual([volumes.has('wa-scrm-openwa-i1'), calls.includes('DELETE /volumes/wa-scrm-openwa-i1')], [false, true]);
+  assert.equal((await call('/sites', { method: 'POST', body: { id: 'i1' } })).status, 202);
+  assert.deepEqual(await settled('i1'), { id: 'i1', state: 'ready' });
+  // an OpenWA that Docker is starting again this moment takes its place like one that runs
+  containers.get('wa-scrm-openwa-i1').state = 'restarting';
+  assert.deepEqual([(await call('/sites')).json.room.running, (await call('/sites', { method: 'POST', body: { id: 'r1' } })).json], [2, { error: 'full' }]);
+  containers.get('wa-scrm-openwa-i1').state = 'running';
+  assert.equal((await call('/sites/i1/stop', { method: 'POST' })).status, 200);
   assert.deepEqual((await call('/sites')).json.room.running, 1, 'only the one that runs takes a place');
+});
+
+test('an answer of the engine that breaks off is an error, not a wait without end', async () => {
+  const broken = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': 100 }); res.write('{"half":'); setImmediate(() => res.socket.destroy()); });
+  const file = path.join(socketDir, 'broken.sock');
+  await new Promise(resolve => broken.listen(file, resolve));
+  try {
+    await assert.rejects(engine(file)('GET', '/containers/json'));
+  } finally {
+    broken.closeAllConnections(); broken.close();
+  }
+});
+
+test('the first server\'s side: it asks with the secret and reads the answers — a refusal by the name of its reason, everything else as not available', async () => {
+  const ask = client({ url: base, secret: SECRET });
+  assert.deepEqual(await ask.list(), (await call('/sites')).json);
+  assert.deepEqual(await ask.make('c1'), { id: 'c1', state: 'starting' });
+  assert.deepEqual(await settled('c1'), { id: 'c1', state: 'ready' });
+  await assert.rejects(ask.make('c1'), { code: 'workspace-exists' });
+  await assert.rejects(ask.make('c2'), { code: 'workspace-full' });
+  assert.deepEqual(await ask.stop('c1'), { id: 'c1', state: 'stopped' });
+  free = 1000;
+  await assert.rejects(ask.start('c1'), { code: 'workspace-low-memory' });
+  free = 4000;
+  // while a sub-site is being started it is busy
+  mood = 'never';
+  assert.deepEqual(await ask.start('c1'), { id: 'c1', state: 'starting' });
+  await assert.rejects(ask.start('c1'), { code: 'workspace-busy' });
+  await assert.rejects(ask.stop('c1'), { code: 'workspace-busy' });
+  assert.equal((await settled('c1')).state, 'failed');
+  mood = 'ok';
+  await ask.start('c1');
+  assert.deepEqual(await settled('c1'), { id: 'c1', state: 'ready' });
+  await assert.rejects(ask.start('nobody'), { code: 'workspace-unknown-site' });
+  await assert.rejects(ask.stop('nobody'), { code: 'workspace-unknown-site' });
+  // what is no sub-site's id is not available, and nothing of it reaches the engine with a change
+  const from = calls.length;
+  for (const id of ['a/b', '../x', 'A', 'master']) {
+    await assert.rejects(ask.make(id), { code: 'workspace-unavailable' }, id);
+    await assert.rejects(ask.start(id), { code: 'workspace-unavailable' }, id);
+    await assert.rejects(ask.stop(id), { code: 'workspace-unavailable' }, id);
+  }
+  assert.deepEqual(changes(from), []);
+  // a secret that does not fit, nobody at the address, an answer that is not the provisioner's
+  await assert.rejects(client({ url: base, secret: SECRET + 'x' }).list(), { code: 'workspace-unavailable' });
+  await assert.rejects(client({ url: 'http://127.0.0.1:9', secret: SECRET }).make('c3'), { code: 'workspace-unavailable' });
+  await assert.rejects(client({ url: openwaBase, secret: SECRET }).list(), { code: 'workspace-unavailable' });
+  assert.equal((await ask.stop('c1')).state, 'stopped');
+  // from the environment: null where the platform makes no sub-sites; else the address and the secret are needed
+  const secretFile = path.join(tmp, 'client-secret'), env = { WA_SCRM_PROVISIONER_URL: base, WA_SCRM_PROVISIONER_SECRET_FILE: secretFile };
+  fs.writeFileSync(secretFile, SECRET + '\n');
+  assert.equal(clientFromEnv({ WA_SCRM_PROVISIONER_SECRET_FILE: secretFile }), null);
+  assert.deepEqual((await clientFromEnv(env).list()).room.max, 2);
+  assert.throws(() => clientFromEnv({ ...env, WA_SCRM_PROVISIONER_URL: base + '/sites' }), /WA_SCRM_PROVISIONER_URL/);
+  assert.throws(() => clientFromEnv({ WA_SCRM_PROVISIONER_URL: base }), /WA_SCRM_PROVISIONER_SECRET_FILE/);
+  fs.writeFileSync(secretFile, 'too short');
+  assert.throws(() => clientFromEnv(env), /at least 32/);
 });
 
 test('the settings from the environment: what is needed is asked for, the secret is long enough, the rest has its defaults', () => {
@@ -246,6 +326,10 @@ test('the settings from the environment: what is needed is asked for, the secret
   const env = { WA_SCRM_PROVISIONER_SECRET_FILE: secretFile, WA_SCRM_SERVER_IMAGE: 'server:1', WA_SCRM_OPENWA_IMAGE: 'openwa:1', WA_SCRM_HOST_DATA_DIR: '/host/data', WA_SCRM_DATA_DIR: '/data' };
   assert.deepEqual(configFromEnv(env), { secret: SECRET, runAs: '1000:1000', serverImage: 'server:1', openwaImage: 'openwa:1', hostDataDir: '/host/data', dataDir: '/data', hostAiEnv: '', network: 'wa-scrm', maxSites: 4, minFreeMb: 1400, openwaMemoryMb: 1536, serverMemoryMb: 256 });
   assert.deepEqual(configFromEnv({ ...env, WA_SCRM_MAX_SITES: '3', WA_SCRM_MIN_FREE_MB: '900', WA_SCRM_RUN_AS: '1001:1002', WA_SCRM_NETWORK: 'other', WA_SCRM_HOST_AI_ENV: '/host/ai.env' }).maxSites, 3);
+  // a number: a 0 is one and is meant; what is no whole number is refused
+  const zero = configFromEnv({ ...env, WA_SCRM_MAX_SITES: '0', WA_SCRM_MIN_FREE_MB: '0', WA_SCRM_OPENWA_MEMORY_MB: '2048' });
+  assert.deepEqual([zero.maxSites, zero.minFreeMb, zero.openwaMemoryMb, zero.serverMemoryMb], [0, 0, 2048, 256]);
+  for (const value of ['four', '-1', '1.5', '2 ']) assert.throws(() => configFromEnv({ ...env, WA_SCRM_MAX_SITES: value }), /WA_SCRM_MAX_SITES must be a whole number/, value);
   for (const name of Object.keys(env)) assert.throws(() => configFromEnv({ ...env, [name]: '' }), new RegExp(name), name);
   fs.writeFileSync(secretFile, 'too short');
   assert.throws(() => configFromEnv(env), /at least 32/);

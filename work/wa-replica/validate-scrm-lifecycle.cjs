@@ -292,7 +292,7 @@ assert.deepEqual([...new Set(masterSource.match(/'\/api\/[^']*'/g))].sort(), ["'
 assert.deepEqual(masterSource.match(/method: '[A-Z]+'/g), ["method: 'POST'"], 'the supervisor page must send its changes through one helper');
 assert.deepEqual([...new Set(masterSource.match(/\bpost\([^,]+,/g))].sort(), ["post('/api/auth/logout',", "post('/api/auth/users',", "post('/api/auth/users/reset',", "post(on ? '/api/auth/users/enable' : '/api/auth/users/disable',"], 'the supervisor page must change accounts only, and sign out');
 assert(masterSource.includes("const at = (site, path) => '/site/' + encodeURIComponent(site) + path;") && !/fetch\(at\(/.test(masterSource), 'the supervisor page must ask each sub-site under its own name, and only ask');
-for (const required of ["'GET /api/auth/users': req => {", "'POST /api/auth/users': async req => {", "if (body.role !== 'supervisor') throw problem('invalid-role');", "if (target.username === actor.username) throw problem('own-account');", "if (target.role === 'admin' && actor.role !== 'admin') throw problem('forbidden');", 'console.log(`site account created by=${actor.username} user=${user.username} role=${user.role}`);']) {
+for (const required of ["'GET /api/auth/users': req => {", "'POST /api/auth/users': async req => {", "if (body.role !== 'supervisor' && !(body.role === 'agent' && workspaces)) throw problem('invalid-role');", "if (target.username === actor.username) throw problem('own-account');", "if (target.role === 'admin' && actor.role !== 'admin') throw problem('forbidden');", 'console.log(`site account created by=${actor.username} user=${user.username} role=${user.role}`);']) {
   assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
 }
 assert(siteSources['site-auth.cjs'].includes('async function createUser({ username, name, role, site = null, password, mustChange = true }) {'), 'an account made with a given password must be able to keep it');
@@ -312,6 +312,34 @@ assert.deepEqual([compose.split('/var/run/docker.sock:/var/run/docker.sock').len
 for (const required of ['resolver 127.0.0.11 valid=5s ipv6=off;', 'location ~ ^/site/(?<scrm_named>[a-z0-9][a-z0-9-]*)/api/(data$|wa/) {', 'if ($scrm_cookie_site != "") { set $scrm_upstream "wa-scrm-site-$scrm_cookie_site"; }', 'proxy_connect_timeout 3s;']) {
   assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
 }
+// What the review of these files found, held: the provisioner asks for the secret before it reads the address,
+// is busy with a sub-site while it stops it, and leaves no volume behind for a container it could not make; the
+// server refuses an address that it and a gateway read differently; the gateway keeps nothing in memory that is
+// sent up, logs no query string, passes no delivery of OpenWA from outside; the upgrade script knows a sub-site
+// by its OpenWA and touches none while the provisioner is not there; a machine can set what it must.
+assert(provisionerSource.indexOf("throw problem('not-allowed')") < provisionerSource.indexOf("new URL(req.url, 'http://localhost')"), 'the provisioner must check the shared secret before it reads the address');
+assert(provisionerSource.includes("work.set(id, 'stopping');") && provisionerSource.includes("if (volume.status !== 200) await docker('DELETE', `/volumes/${n.volume}`).catch(() => {});") && !/Number\(env\.WA_SCRM_[A-Z_]+\) \|\|/.test(provisionerSource), 'the provisioner must be busy while it stops a sub-site, take away a volume it made for nothing, and take a 0 among its settings as meant');
+assert(read(path.join(__dirname, 'serve.cjs')).includes("if (req.url.split('?')[0].includes('\\\\')) return sendJson(res, 400, { error: 'invalid-request' });"), 'the server must refuse an address with a backslash in its path');
+for (const required of ['proxy_request_buffering off;', 'proxy_max_temp_file_size 0;', 'if ($request_uri ~ "^[^?]*\\x5c") { return 400; }', 'location = /api/wa/hook { return 404; }', 'location ~ ^/site/[a-z0-9][a-z0-9-]*/api/wa/hook$ { return 404; }', 'access_log /dev/stdout plain;', 'client_max_body_size 16k;']) {
+  assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
+}
+assert(!/log_format[^;]*\$(request|request_uri|args|query_string)\b/.test(deploy('gateway.conf')), 'the gateway must not write a query string into its log');
+assert(deploy('upgrade.sh').includes("docker ps -a --filter label=wa-scrm.part=openwa --format") && deploy('upgrade.sh').includes('healthy || { echo "the provisioner is not healthy: the sub-sites are left as they are" >&2; exit 1; }') && deploy('upgrade.sh').indexOf('healthy || {') < deploy('upgrade.sh').indexOf('docker rm -f "wa-scrm-site-$SITE"'), 'the upgrade script must know a sub-site by its OpenWA and touch none while the provisioner is not healthy');
+assert(compose.includes('      - WA_SCRM_OPENWA_MEMORY_MB=${WA_SCRM_OPENWA_MEMORY_MB:-1536}') && compose.includes('      - WA_SCRM_SERVER_MEMORY_MB=${WA_SCRM_SERVER_MEMORY_MB:-512}') && compose.includes('    mem_limit: ${WA_SCRM_SERVER_MEMORY_MB:-512}m') && compose.includes('      - WA_SCRM_COOKIE_SECURE=${WA_SCRM_COOKIE_SECURE:-0}'), 'a machine must be able to set the memory of a server and of a sub-site\'s OpenWA, and that its address is HTTPS');
+// An employee is made from the supervisor page where the platform makes sub-sites: the first server asks the
+// provisioner through its client — for the sub-site before the account, because the sub-site is the part that
+// can be refused. Switched off, the account is off before its sub-site is stopped; switched on, the sub-site
+// is started before the account is on. The page offers an employee only where the server says so.
+const apiSource = siteSources['site-api.cjs'];
+for (const required of ["function create({ dir, siteId = 'default', now, workspaces = null }) {", 'const EMPLOYEE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;', "if (!EMPLOYEE.test(id) || RESERVED.includes(id)) throw problem('invalid-username');", "if (error.code !== 'workspace-exists' || auth.listUsers().some(user => user.site === id)) throw error;", "if (!workspaces || target.role !== 'agent' || auth.listUsers().some(user => user.site === target.site && !user.disabled)) return {};", '...(workspaces ? { provisioned: true } : {})']) {
+  assert(apiSource.includes(required), `site-api.cjs is missing ${required}`);
+}
+const asksFirst = apiSource.indexOf("const site = body.role === 'agent' ? await newWorkspace(actor, body, given) : null;");
+assert(asksFirst > 0 && asksFirst < apiSource.indexOf('const { user, password } = await auth.createUser({ username: body.username, name: body.name, role: body.role, site,'), 'the sub-site of a new employee must be asked for before the account is made');
+assert(apiSource.indexOf('auth.setDisabled(target.username, true);') < apiSource.indexOf('...(await workspaceOff(actor, target))') && apiSource.indexOf('const workspace = await workspaceOn(actor, target);') > 0 && apiSource.indexOf('const workspace = await workspaceOn(actor, target);') < apiSource.indexOf('auth.setDisabled(target.username, false);'), 'an account must be off before its sub-site is stopped, and a sub-site started before its account is on');
+assert(read(path.join(__dirname, 'serve.cjs')).includes("workspaces: require('./site-provisioner.cjs').clientFromEnv() })"), 'the server must take its client of the provisioner from the environment');
+assert(provisionerSource.includes("throw problem(['exists', 'full', 'low-memory', 'busy', 'unknown-site'].includes(answer?.error) ? 'workspace-' + answer.error : 'workspace-unavailable');") && provisionerSource.includes('const named = (id, action) => `/sites/${encodeURIComponent(id)}/${action}`;'), 'the first server\'s client must name a refusal by its reason, and an id must not reach into the address');
+assert(masterSource.includes('const kind = state.provisioned') && masterSource.includes('state.provisioned = !state.failed && list.body.provisioned === true;') && masterSource.includes("const answer = await post('/api/auth/users', values);"), 'the supervisor page must offer an employee only where the server says that sub-sites are made');
 assert(!/演示|原型|评审|本机|示例|体验/.test(masterSource) && !/WA_SITE|localStorage|sessionStorage/.test(masterSource), 'the supervisor page must not speak of a demonstration, nor touch the app or the browser\'s storage');
 // Under a sub-site's name the server gives its data and its WhatsApp link only; the supervisor page takes what a
 // sub-site saved where it has the expected shape; a name every object has touches nothing but the document.
@@ -320,7 +348,7 @@ assert(siteSources['site-data.cjs'].includes('const own = (target, name, value) 
 for (const required of ["const named = site ? '/site/' + site.siteId : null;", "if (named && (pathname === named + '/api/data' || pathname.startsWith(named + '/api/wa/'))) pathname = pathname.slice(named.length);"]) {
   assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
 }
-for (const required of ["'GET /api/auth/sites': req => {", "if (signedIn(req).role === 'agent') throw problem('forbidden');", "if (user.role !== 'agent') console.log(`site data read user=${user.username} role=${user.role} site=${siteId} fields=${fields ? fields.join(',') : 'all'}`);", 'return { body: data.read(fields) };']) {
+for (const required of ["'GET /api/auth/sites': async req => {", "if (signedIn(req).role === 'agent') throw problem('forbidden');", "if (user.role !== 'agent') console.log(`site data read user=${user.username} role=${user.role} site=${siteId} fields=${fields ? fields.join(',') : 'all'}`);", 'return { body: data.read(fields) };']) {
   assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
 }
 assert(siteSources['site-api.cjs'].includes('process.umask(0o077);') && siteSources['site-admin.cjs'].includes('process.umask(0o077);'), 'the files of the data folder must be created private');

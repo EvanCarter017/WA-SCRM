@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const net = require('node:net');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -430,6 +431,147 @@ test('accounts from the supervisor page: the list; a new supervisor with a tempo
   for (const secret of [made.json.password, reset.json.password, 'quin-own-password']) assert(!logged.join('\n').includes(secret), 'a password in the log');
 });
 
+test('employees from the supervisor page, where the platform makes sub-sites: the sub-site is asked for first and bears the sign-in name; what is refused makes neither; off, the sub-site stops unless another employee of it can sign in; on, it starts first; the list tells each sub-site\'s state', async () => {
+  // a stand-in for the first server's client of the provisioner: what it was asked, and how it answers
+  const asked = [], states = new Map([['s1', 'ready'], ['s2', 'ready'], ['depot', 'ready'], ['orphan', 'stopped']]);
+  const refuse = {};
+  let reachable = true;
+  const no = code => Object.assign(new Error(code), { code });
+  const answer = (what, id, to) => {
+    asked.push(`${what} ${id}`);
+    if (!reachable) throw no('workspace-unavailable');
+    if (refuse[what]) throw no(refuse[what]);
+    if (what === 'make' ? states.has(id) : !states.has(id)) throw no(what === 'make' ? 'workspace-exists' : 'workspace-unknown-site');
+    states.set(id, to);
+    return { id, state: to };
+  };
+  const workspaces = {
+    list: async () => { if (!reachable) throw no('workspace-unavailable'); return { sites: [...states].map(([id, state]) => ({ id, state })), room: { max: 4, running: 2, freeMb: 3000, minFreeMb: 1400, canStart: true } }; },
+    make: async id => answer('make', id, 'starting'), start: async id => answer('start', id, 'starting'), stop: async id => answer('stop', id, 'stopped'),
+  };
+  const first = siteApi.create({ dir: path.join(tmp, 'main'), siteId: 'hq', now: () => clock, workspaces });
+  const firstServer = http.createServer((req, res) => first.handle(req, res, new URL(req.url, 'http://localhost').pathname));
+  await new Promise(resolve => firstServer.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${firstServer.address().port}`;
+  try {
+    const signIn = async (username, password = PASSWORD) => call('/api/auth/login', { method: 'POST', body: { username, password } });
+    const [gus, ivo, joy] = [cookieOf(await signIn('gus')), cookieOf(await signIn('ivo')), cookieOf(await signIn('joy'))];
+    const send = (pathname, cookie, body) => call(pathname, { method: 'POST', cookie, body, base });
+    const sites = async (cookie = ivo) => (await call('/api/auth/sites', { cookie, base })).json;
+    const account = async username => (await call('/api/auth/users', { cookie: ivo, base })).json.users.find(user => user.username === username);
+    const count = async () => (await call('/api/auth/users', { cookie: ivo, base })).json.users.length;
+    await site.auth.createUser({ username: 'otto', role: 'agent', name: 'Otto', site: 'depot' });
+    await site.auth.createUser({ username: 'zed', role: 'agent', name: 'Zed', site: 'nowhere' });
+    // the list: the platform makes sub-sites, and each one has its state — one the provisioner does not know is missing
+    const list = await sites();
+    assert.deepEqual([list.provisioned, list.sites.find(entry => entry.site === 's1').state, list.sites.find(entry => entry.site === 'depot').state, list.sites.find(entry => entry.site === 'nowhere').state], [true, 'ready', 'ready', 'missing']);
+    assert.deepEqual(list.sites.find(entry => entry.site === 'depot'), { site: 'depot', employees: [{ username: 'otto', name: 'Otto', disabled: false }], state: 'ready' });
+    // a server that is not the first server of such a platform says nothing of it, and makes no employee
+    const plain = (await call('/api/auth/sites', { cookie: ivo })).json;
+    assert.deepEqual([plain.provisioned, plain.sites.some(entry => 'state' in entry), (await call('/api/auth/users', { method: 'POST', cookie: ivo, body: { username: 'lena', name: 'Lena', role: 'agent' } })).json], [undefined, false, { error: 'invalid-role' }]);
+    // a new employee: the sub-site is asked for, then the account is made — in its sub-site, with a temporary password
+    asked.length = 0;
+    const made = await send('/api/auth/users', ivo, { username: ' Lena ', name: ' Lena L ', role: 'agent' });
+    assert.deepEqual([made.status, made.json.user, made.json.password.length, asked], [200, { username: 'lena', name: 'Lena L', role: 'agent' }, 16, ['make lena']]);
+    assert.deepEqual(await account('lena'), { username: 'lena', name: 'Lena L', role: 'agent', site: 'lena', mustChangePassword: true, disabled: false });
+    const lena = await call('/api/auth/login', { method: 'POST', base, body: { username: 'lena', password: made.json.password } });
+    assert.deepEqual([lena.status, lena.cookies[1]], [200, 'scrm_site=lena; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000']);
+    assert.deepEqual((await sites()).sites.find(entry => entry.site === 'lena'), { site: 'lena', employees: [{ username: 'lena', name: 'Lena L', disabled: false }], state: 'starting' });
+    states.set('lena', 'ready');
+    assert.equal((await sites(joy)).sites.find(entry => entry.site === 'lena').state, 'ready');
+    // with a password of their own: it does not come back, and need not be changed
+    const own = await send('/api/auth/users', joy, { username: 'mia-2', name: 'Mia', role: 'agent', password: 'mia-own-password' });
+    assert.deepEqual([own.status, own.json, (await account('mia-2')).mustChangePassword, (await account('mia-2')).site], [200, { user: { username: 'mia-2', name: 'Mia', role: 'agent' } }, false, 'mia-2']);
+    // a supervisor is made as before, and the provisioner is not asked
+    asked.length = 0;
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'sven', name: 'Sven', role: 'supervisor' })).status, asked, (await account('sven')).site], [200, [], null]);
+    // what would stop the account is found before anything is asked of the provisioner
+    const before = await count();
+    for (const [body, error, status] of [
+      [{ username: 'ab', name: 'Short' }, 'invalid-username', 400],
+      [{ username: 'le.na', name: 'Dot' }, 'invalid-username', 400],
+      [{ username: 'le_na', name: 'Underscore' }, 'invalid-username', 400],
+      [{ username: 'lena-', name: 'Ends with a hyphen' }, 'invalid-username', 400],
+      [{ username: '-lena', name: 'Begins with a hyphen' }, 'invalid-username', 400],
+      [{ username: 'x'.repeat(33), name: 'Long' }, 'invalid-username', 400],
+      [{ username: 'master', name: 'The platform\'s own' }, 'invalid-username', 400],
+      [{ username: 'gateway', name: 'The platform\'s own' }, 'invalid-username', 400],
+      [{ username: 'provisioner', name: 'The platform\'s own' }, 'invalid-username', 400],
+      [{ username: 'rita', name: '  ' }, 'invalid-name', 400],
+      [{ username: 'rita', name: 'x'.repeat(61) }, 'invalid-name', 400],
+      [{ username: 'rita', name: 'Rita', password: 'short' }, 'invalid-password', 400],
+      [{ username: 'rita', name: 'Rita', password: 12345678 }, 'invalid-password', 400],
+      [{ username: 'lena', name: 'Again' }, 'username-taken', 409],
+      [{ username: 'ivo', name: 'A supervisor\'s name' }, 'username-taken', 409],
+      [{ username: 'rita', name: 'Rita', role: 'admin' }, 'invalid-role', 400],
+    ]) {
+      const refused = await send('/api/auth/users', ivo, { role: 'agent', ...body });
+      assert.deepEqual([refused.status, refused.json], [status, { error }], JSON.stringify(body));
+    }
+    assert.deepEqual([asked, await count()], [[], before], 'nothing was asked, nothing was made');
+    assert.deepEqual([(await send('/api/auth/users', gus, { username: 'rita', name: 'Rita', role: 'agent' })).json, (await call('/api/auth/users', { method: 'POST', base, body: { username: 'rita', name: 'Rita', role: 'agent' } })).status, (await call('/api/auth/users', { method: 'POST', base, cookie: ivo, body: { username: 'rita', name: 'Rita', role: 'agent' }, headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, asked], [{ error: 'forbidden' }, 401, 403, []]);
+    // what the provisioner refuses makes no account: no room, too little memory, busy, no answer, a sub-site that is somebody's
+    for (const [reason, status] of [['workspace-full', 409], ['workspace-low-memory', 409], ['workspace-busy', 409], ['workspace-unavailable', 503]]) {
+      refuse.make = reason;
+      const refused = await send('/api/auth/users', ivo, { username: 'rita', name: 'Rita', role: 'agent' });
+      assert.deepEqual([refused.status, refused.json], [status, { error: reason }]);
+    }
+    delete refuse.make;
+    asked.length = 0;
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'depot', name: 'Depot', role: 'agent' })).json, asked, await count()], [{ error: 'workspace-exists' }, ['make depot'], before], 'the sub-site of another account is not taken');
+    // a sub-site that is there and is nobody's — its account was not made the last time — is taken and started
+    asked.length = 0;
+    const taken = await send('/api/auth/users', ivo, { username: 'orphan', name: 'Orphan', role: 'agent' });
+    assert.deepEqual([taken.status, asked, (await account('orphan')).site, states.get('orphan')], [200, ['make orphan', 'start orphan'], 'orphan', 'starting']);
+    refuse.start = 'workspace-full';
+    states.set('second', 'stopped');
+    assert.deepEqual([(await send('/api/auth/users', ivo, { username: 'second', name: 'Second', role: 'agent' })).json, await account('second')], [{ error: 'workspace-full' }, undefined], 'not when it cannot be started');
+    delete refuse.start;
+    // off: the session ends, and the sub-site stops — its place is free
+    asked.length = 0;
+    const off = await send('/api/auth/users/disable', ivo, { username: 'lena' });
+    assert.deepEqual([off.json, asked, (await call('/api/auth/me', { cookie: cookieOf(lena), base })).status, (await sites()).sites.find(entry => entry.site === 'lena')], [{ ok: true, workspace: 'stopped' }, ['stop lena'], 401, { site: 'lena', employees: [{ username: 'lena', name: 'Lena L', disabled: true }], state: 'stopped' }]);
+    // on: the sub-site is started first — when there is no room for it, the account stays off
+    asked.length = 0;
+    refuse.start = 'workspace-full';
+    assert.deepEqual([(await send('/api/auth/users/enable', ivo, { username: 'lena' })).json, asked, (await account('lena')).disabled], [{ error: 'workspace-full' }, ['start lena'], true]);
+    refuse.start = 'workspace-low-memory';
+    assert.deepEqual([(await send('/api/auth/users/enable', ivo, { username: 'lena' })).status, (await account('lena')).disabled], [409, true]);
+    delete refuse.start;
+    assert.deepEqual([(await send('/api/auth/users/enable', joy, { username: 'lena' })).json, (await account('lena')).disabled, states.get('lena')], [{ ok: true, workspace: 'starting' }, false, 'starting']);
+    // a sub-site with several employees stops only when the last of them who could sign in is switched off
+    const several = (await sites()).sites.find(entry => entry.site === 's2').employees.map(employee => employee.username);
+    assert(several.length > 2 && several.includes('max'));
+    asked.length = 0;
+    for (const username of several.slice(1)) assert.deepEqual((await send('/api/auth/users/disable', ivo, { username })).json, { ok: true }, username);
+    assert.deepEqual(asked, [], 'the first of them can still sign in');
+    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: several[0] })).json, asked, states.get('s2')], [{ ok: true, workspace: 'stopped' }, ['stop s2'], 'stopped']);
+    for (const username of several) assert.deepEqual((await send('/api/auth/users/enable', ivo, { username })).json, { ok: true, workspace: 'starting' }, username);
+    states.set('s2', 'ready');
+    // a sub-site that cannot be stopped: the account is off all the same, and the answer says that it still runs
+    refuse.stop = 'workspace-unavailable';
+    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'otto' })).json, (await account('otto')).disabled], [{ ok: true, workspace: 'running' }, true]);
+    delete refuse.stop;
+    // an employee whose sub-site the platform did not make, and a supervisor: the account only
+    asked.length = 0;
+    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'zed' })).json, (await send('/api/auth/users/enable', ivo, { username: 'zed' })).json, (await account('zed')).disabled, asked], [{ ok: true }, { ok: true }, false, ['stop nowhere', 'start nowhere']]);
+    asked.length = 0;
+    assert.deepEqual([(await send('/api/auth/users/disable', ivo, { username: 'sven' })).json, (await send('/api/auth/users/enable', ivo, { username: 'sven' })).json, asked], [{ ok: true }, { ok: true }, []]);
+    // the provisioner does not answer: the list is there without the states, and no employee is made
+    reachable = false;
+    const blind = await sites();
+    assert.deepEqual([blind.provisioned, blind.sites.some(entry => 'state' in entry), blind.sites.find(entry => entry.site === 'lena').employees.length, (await send('/api/auth/users', ivo, { username: 'rita', name: 'Rita', role: 'agent' })).status, await account('rita')], [true, false, 1, 503, undefined]);
+    reachable = true;
+    // each thing asked of the provisioner is in the log with who asked; no password is
+    const lines = logged.filter(line => line.startsWith('site workspace '));
+    for (const line of ['site workspace make ok by=ivo site=lena', 'site workspace make ok by=joy site=mia-2', 'site workspace make failed by=ivo site=rita error=workspace-full', 'site workspace make failed by=ivo site=depot error=workspace-exists', 'site workspace make ok by=ivo site=orphan', 'site workspace stop ok by=ivo site=lena', 'site workspace start failed by=ivo site=lena error=workspace-full', 'site workspace start ok by=joy site=lena', 'site workspace stop failed by=ivo site=depot error=workspace-unavailable']) assert(lines.includes(line), line + '\n' + lines.join('\n'));
+    assert(logged.includes('site account created by=ivo user=lena role=agent'));
+    for (const secret of [made.json.password, 'mia-own-password']) assert(!logged.join('\n').includes(secret), 'a password in the log');
+  } finally {
+    firstServer.closeAllConnections(); firstServer.close(); first.close();
+  }
+});
+
 test('the log names users and outcomes, never a password, a token or data', () => {
   const lines = logged.filter(line => line.startsWith('site '));
   assert(lines.some(line => line === 'site login ok user=ana') && lines.some(line => line === 'site login failed error=invalid-credentials') && lines.some(line => line === 'site password changed user=ben'), lines.slice(0, 8).join('\n'));
@@ -521,6 +663,16 @@ test('the preview server: without a data folder the routes are off; with one, th
     assert.deepEqual([await named('/site/other/api/data'), await named('/site/default/index.html'), await named('/site/default')], [404, 404, 404]);
     for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
     assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
+    // an address with a backslash — a slash to this server, none to a gateway in front of it — is refused
+    // (asked over a bare connection: a client of Node's own would not send such an address)
+    const plainly = (method, pathname) => new Promise((resolve, reject) => {
+      const socket = net.connect(Number(new URL(on.base).port), '127.0.0.1', () => socket.write(`${method} ${pathname} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n${method === 'POST' ? 'Content-Type: application/json\r\nContent-Length: 2\r\n\r\n{}' : '\r\n'}`));
+      let answer = '';
+      socket.on('data', chunk => { answer += chunk; });
+      socket.on('end', () => resolve(Number(answer.split(' ')[1])));
+      socket.on('error', reject);
+    });
+    assert.deepEqual([await plainly('POST', '/api/wa/\\..\\..\\auth/login'), await plainly('GET', '/api/site\\status'), await plainly('GET', '/api/site/status'), await plainly('GET', '/api/site/status?note=a\\b')], [400, 400, 200, 200]);
     // the server is for this machine only, unless it is told to listen elsewhere — as it is in a container
     const outside = Object.values(os.networkInterfaces()).flat().find(address => address.family === 'IPv4' && !address.internal)?.address;
     if (outside) {

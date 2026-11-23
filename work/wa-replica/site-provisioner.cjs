@@ -19,6 +19,7 @@
 //   WA_SCRM_MAX_SITES (4)  WA_SCRM_MIN_FREE_MB (1400)  WA_SCRM_OPENWA_MEMORY_MB (1536)  WA_SCRM_SERVER_MEMORY_MB (256)
 //   WA_SCRM_RUN_AS (1000:1000)        the user the sub-sites' servers run as; owner of the files in the data folder
 // A log line carries the action, the sub-site and the outcome; never a key or a secret.
+// The first server's side is here as well (client, clientFromEnv): what it asks, and how it reads the answers.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -46,6 +47,9 @@ function engine(socketPath) {
         try { parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {}
         resolve({ status: res.statusCode, body: parsed });
       });
+      // An answer that breaks off must not leave its caller waiting for good.
+      res.on('error', reject);
+      res.on('close', () => { if (!res.complete) reject(new Error('the Docker Engine ended its answer early')); });
     });
     req.setTimeout(ENGINE_TIMEOUT_MS, () => req.destroy(new Error('the Docker Engine did not answer in time')));
     req.on('error', reject);
@@ -61,8 +65,12 @@ const openwaAddress = id => `http://wa-scrm-openwa-${id}:2785`;
 function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = sleep, healthWaitMs = HEALTH_WAIT_MS }) {
   const names = id => ({ server: `wa-scrm-site-${id}`, openwa: `wa-scrm-openwa-${id}`, volume: `wa-scrm-openwa-${id}`, settings: `openwa-${id}.env` });
   const labels = (id, part) => ({ 'wa-scrm.site': id, 'wa-scrm.part': part });
-  // What is being made right now, and what went wrong last time: id → 'working' | the reason it failed.
+  // What is being made or started right now ('working'), what is being stopped ('stopping'), and what went
+  // wrong the last time (the reason it failed), by id.
   const work = new Map();
+  const busy = id => work.get(id) === 'working' || work.get(id) === 'stopping';
+  // Does this part take memory: it runs, or Docker is starting it again this moment.
+  const up = part => part?.state === 'running' || part?.state === 'restarting';
 
   const ok = (answer, ...fine) => { if (!fine.includes(answer.status)) throw Object.assign(problem('engine'), { detail: `${answer.status} ${answer.body?.message || ''}`.trim() }); return answer; };
 
@@ -77,24 +85,26 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     }
     return sites;
   }
-  // ready: both run and OpenWA answers. starting: on the way there. stopped: both are there and do not run.
-  // failed: the last attempt to make or start it went wrong, or a part is missing.
+  // ready: both run and OpenWA answers. starting: on the way there. stopping: on the way down. stopped: its
+  // OpenWA is there and does not run, and no server runs (the server may be gone: an upgrade takes it away, and
+  // the next start makes it anew). failed: the last attempt to make or start it went wrong, or a part is missing.
   function stateOf(id, parts) {
     if (work.get(id) === 'working') return 'starting';
+    if (work.get(id) === 'stopping') return 'stopping';
     const { server, openwa } = parts || {};
     if (server?.state === 'running' && openwa?.state === 'running') return openwa.health === 'healthy' ? 'ready' : openwa.health === 'unhealthy' ? 'failed' : 'starting';
     if (work.has(id)) return 'failed';
-    if (server && openwa && server.state !== 'running' && openwa.state !== 'running') return 'stopped';
+    if (openwa && !up(openwa) && !up(server)) return 'stopped';
     return 'failed';
   }
   // How many sub-sites take a place: those whose OpenWA runs, and those that are being made or started.
-  const taken = (sites, but) => [...new Set([...[...sites].filter(([, parts]) => parts.openwa?.state === 'running').map(([id]) => id), ...[...work].filter(([, state]) => state === 'working').map(([id]) => id)])].filter(id => id !== but).length;
+  const taken = (sites, but) => [...new Set([...[...sites].filter(([, parts]) => up(parts.openwa)).map(([id]) => id), ...[...work].filter(([, state]) => state === 'working').map(([id]) => id)])].filter(id => id !== but).length;
   async function list() {
     const sites = await containers();
     for (const id of work.keys()) if (!sites.has(id)) sites.set(id, {});
     const running = taken(sites), free = Math.floor(freeMb());
     return {
-      sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, parts]) => ({ id, state: stateOf(id, parts), ...(work.has(id) && work.get(id) !== 'working' ? { reason: work.get(id) } : {}) })),
+      sites: [...sites].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, parts]) => ({ id, state: stateOf(id, parts), ...(work.has(id) && !busy(id) ? { reason: work.get(id) } : {}) })),
       room: { max: config.maxSites, running, freeMb: free, minFreeMb: config.minFreeMb, canStart: running < config.maxSites && free >= config.minFreeMb },
     };
   }
@@ -154,7 +164,7 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
   // The settings file of a sub-site's WhatsApp link: where its OpenWA is, a key restricted to operating it, and
   // the secret its deliveries are signed with. Private to the user the servers run as.
   async function settings(id, masterKey) {
-    const made = await fetch(openwaUrl(id) + '/api/auth/api-keys', { method: 'POST', headers: { 'X-API-Key': masterKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `wa-scrm-${id}`, role: 'operator' }), signal: AbortSignal.timeout(20000) });
+    const made = await fetch(openwaUrl(id) + '/api/auth/api-keys', { method: 'POST', headers: { 'X-API-Key': masterKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `wa-scrm-${id}-${Date.now().toString(36)}`, role: 'operator' }), signal: AbortSignal.timeout(20000) });
     const key = made.status === 201 ? (await made.json()).apiKey : '';
     if (!key) throw problem('openwa-key');
     const file = path.join(config.dataDir, names(id).settings), [uid, gid] = config.runAs.split(':').map(Number);
@@ -174,7 +184,14 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
       if (volume.status !== 200 && kept) throw problem('data-missing');
       const masterKey = kept ? '' : crypto.randomBytes(36).toString('base64url');
       if (volume.status !== 200) ok(await docker('POST', '/volumes/create', { Name: n.volume, Labels: labels(id, 'openwa') }), 201);
-      ok(await docker('POST', `/containers/create?name=${n.openwa}`, openwaSpec(id, masterKey)), 201);
+      try {
+        ok(await docker('POST', `/containers/create?name=${n.openwa}`, openwaSpec(id, masterKey)), 201);
+      } catch (error) {
+        // A volume made a moment ago for a container that then cannot be made — the image is not there — holds
+        // nothing. Left behind it would pass for data whose settings are missing, and the id could never be used.
+        if (volume.status !== 200) await docker('DELETE', `/volumes/${n.volume}`).catch(() => {});
+        throw error;
+      }
       ok(await docker('POST', `/containers/${n.openwa}/start`), 204, 304);
       await healthy(id);
       if (!kept) await settings(id, masterKey);
@@ -203,7 +220,7 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     'GET /sites': async () => list(),
     'POST /sites': async body => {
       const id = known(body.id);
-      if (work.get(id) === 'working') throw problem('busy');
+      if (busy(id)) throw problem('busy');
       await claim(id, async () => {
         if ((await containers()).has(id) || fs.existsSync(path.join(config.dataDir, names(id).settings))) throw problem('exists');
         await room(id);
@@ -213,24 +230,34 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     },
     'POST /sites/start': async (body, id) => {
       known(id);
-      if (work.get(id) === 'working') throw problem('busy');
+      if (busy(id)) throw problem('busy');
       await claim(id, async () => {
         const parts = (await containers()).get(id);
         if (!parts && !fs.existsSync(path.join(config.dataDir, names(id).settings))) throw problem('unknown-site');
-        if (parts?.openwa?.state !== 'running') await room(id);
+        if (!up(parts?.openwa)) await room(id);
       });
       begin(id, 'start');
       return { status: 202, body: { id, state: 'starting' } };
     },
     'POST /sites/stop': async (body, id) => {
       known(id);
-      if (work.get(id) === 'working') throw problem('busy');
-      const parts = (await containers()).get(id);
-      if (!parts) throw problem('unknown-site');
-      // The server first, so that nothing is sent to an OpenWA that is going; OpenWA gets the time it needs to
-      // put its session away.
-      if (parts.server) ok(await docker('POST', `/containers/${names(id).server}/stop?t=10`), 204, 304);
-      if (parts.openwa) ok(await docker('POST', `/containers/${names(id).openwa}/stop?t=75`), 204, 304);
+      if (busy(id)) throw problem('busy');
+      // While it is being stopped — which takes its time — a sub-site is busy like one that is being made:
+      // nothing else is begun with it.
+      const before = work.get(id);
+      work.set(id, 'stopping');
+      try {
+        const parts = (await containers()).get(id);
+        if (!parts) throw problem('unknown-site');
+        // The server first, so that nothing is sent to an OpenWA that is going; OpenWA gets the time it needs to
+        // put its session away.
+        if (parts.server) ok(await docker('POST', `/containers/${names(id).server}/stop?t=10`), 204, 304);
+        if (parts.openwa) ok(await docker('POST', `/containers/${names(id).openwa}/stop?t=75`), 204, 304);
+      } catch (error) {
+        if (before === undefined) work.delete(id);
+        else work.set(id, before);
+        throw error;
+      }
       work.delete(id);
       console.log(`provisioner stop ok site=${id}`);
       return { status: 200, body: { id, state: 'stopped' } };
@@ -240,10 +267,13 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
   async function handle(req, res) {
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
     try {
-      const pathname = new URL(req.url, 'http://localhost').pathname, named = pathname.match(/^\/sites\/([^/]+)\/(start|stop)$/);
-      if (req.method === 'GET' && pathname === '/health') return send(200, { ok: true });
+      if (req.method === 'GET' && req.url === '/health') return send(200, { ok: true });
       const given = Buffer.from(String(req.headers.authorization || '').replace(/^Bearer /, '')), secret = Buffer.from(config.secret);
       if (given.length !== secret.length || !crypto.timingSafeEqual(given, secret)) throw problem('not-allowed');
+      // The address is looked at only now; what is no address is nothing the provisioner knows.
+      let pathname;
+      try { pathname = new URL(req.url, 'http://localhost').pathname; } catch { throw problem('not-found'); }
+      const named = pathname.match(/^\/sites\/([^/]+)\/(start|stop)$/);
       const route = routes[`${req.method} ${named ? '/sites/' + named[2] : pathname}`];
       if (!route) throw problem(pathname === '/sites' || named ? 'method-not-allowed' : 'not-found');
       let body = {};
@@ -265,16 +295,62 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
   return { handle, list };
 }
 
+// The first server's side: asks the provisioner, with the shared secret. An answer that is no success is thrown
+// as a problem named after the reason — workspace-exists, -full, -low-memory, -busy, -unknown-site — and
+// everything else (no answer, a secret that does not fit, an answer nobody expects) as workspace-unavailable.
+function client({ url, secret, timeoutMs = 20000, listTimeoutMs = 5000, stopTimeoutMs = 110000 }) {
+  async function ask(method, pathname, sent, patience = timeoutMs) {
+    let status = 0, answer = null;
+    try {
+      const response = await fetch(url + pathname, { method, headers: { Authorization: 'Bearer ' + secret, ...(sent ? { 'Content-Type': 'application/json' } : {}) }, body: sent ? JSON.stringify(sent) : undefined, signal: AbortSignal.timeout(patience) });
+      status = response.status;
+      answer = await response.json();
+    } catch {}
+    if ((status === 200 || status === 202) && answer && typeof answer === 'object') return answer;
+    throw problem(['exists', 'full', 'low-memory', 'busy', 'unknown-site'].includes(answer?.error) ? 'workspace-' + answer.error : 'workspace-unavailable');
+  }
+  const named = (id, action) => `/sites/${encodeURIComponent(id)}/${action}`;
+  return {
+    // Every sub-site with its state, and the room that is left. Asked for a page that waits: not for long.
+    list: async () => {
+      const answer = await ask('GET', '/sites', undefined, listTimeoutMs);
+      if (!Array.isArray(answer.sites) || !answer.room) throw problem('workspace-unavailable');
+      return answer;
+    },
+    make: id => ask('POST', '/sites', { id }),
+    start: id => ask('POST', named(id, 'start')),
+    // Stopping takes as long as OpenWA needs to put its session away.
+    stop: id => ask('POST', named(id, 'stop'), undefined, stopTimeoutMs),
+  };
+}
+// The first server's client from its environment — or null where the platform makes no sub-sites:
+//   WA_SCRM_PROVISIONER_URL           where the provisioner is reached, e.g. http://wa-scrm-provisioner:8090
+//   WA_SCRM_PROVISIONER_SECRET_FILE   the file with the shared secret
+function clientFromEnv(env = process.env) {
+  if (!env.WA_SCRM_PROVISIONER_URL) return null;
+  if (!/^https?:\/\/[^/\s]+$/.test(env.WA_SCRM_PROVISIONER_URL)) throw new Error('WA_SCRM_PROVISIONER_URL must be an address like http://host:port');
+  if (!env.WA_SCRM_PROVISIONER_SECRET_FILE) throw new Error('WA_SCRM_PROVISIONER_SECRET_FILE is not set');
+  const secret = fs.readFileSync(env.WA_SCRM_PROVISIONER_SECRET_FILE, 'utf8').trim();
+  if (secret.length < 32) throw new Error('the shared secret must be at least 32 characters long');
+  return client({ url: env.WA_SCRM_PROVISIONER_URL, secret });
+}
+
 function configFromEnv(env = process.env) {
   const need = name => { if (!env[name]) throw new Error(name + ' is not set'); return env[name]; };
   const secret = fs.readFileSync(need('WA_SCRM_PROVISIONER_SECRET_FILE'), 'utf8').trim();
   if (secret.length < 32) throw new Error('the shared secret must be at least 32 characters long');
   const runAs = env.WA_SCRM_RUN_AS || '1000:1000';
   if (!/^\d+:\d+$/.test(runAs)) throw new Error('WA_SCRM_RUN_AS must be <uid>:<gid>');
+  // A number among the settings: its default when it is not set, else a whole number — 0 is one, and is meant.
+  const number = (name, standard) => {
+    if (env[name] === undefined || env[name] === '') return standard;
+    if (!/^\d+$/.test(env[name])) throw new Error(name + ' must be a whole number');
+    return Number(env[name]);
+  };
   return {
     secret, runAs, serverImage: need('WA_SCRM_SERVER_IMAGE'), openwaImage: need('WA_SCRM_OPENWA_IMAGE'), hostDataDir: need('WA_SCRM_HOST_DATA_DIR'), dataDir: need('WA_SCRM_DATA_DIR'),
     hostAiEnv: env.WA_SCRM_HOST_AI_ENV || '', network: env.WA_SCRM_NETWORK || 'wa-scrm',
-    maxSites: Number(env.WA_SCRM_MAX_SITES) || 4, minFreeMb: Number(env.WA_SCRM_MIN_FREE_MB) || 1400, openwaMemoryMb: Number(env.WA_SCRM_OPENWA_MEMORY_MB) || 1536, serverMemoryMb: Number(env.WA_SCRM_SERVER_MEMORY_MB) || 256,
+    maxSites: number('WA_SCRM_MAX_SITES', 4), minFreeMb: number('WA_SCRM_MIN_FREE_MB', 1400), openwaMemoryMb: number('WA_SCRM_OPENWA_MEMORY_MB', 1536), serverMemoryMb: number('WA_SCRM_SERVER_MEMORY_MB', 256),
   };
 }
 // The host's free memory in MB, as the kernel reckons what can be had without swapping.
@@ -288,4 +364,4 @@ if (require.main === module) {
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));
 }
 
-module.exports = { create, engine, configFromEnv, openwaAddress, SITE_ID, RESERVED };
+module.exports = { create, engine, configFromEnv, client, clientFromEnv, openwaAddress, SITE_ID, RESERVED };
