@@ -521,6 +521,17 @@ test('the preview server: without a data folder the routes are off; with one, th
     assert.deepEqual([await named('/site/other/api/data'), await named('/site/default/index.html'), await named('/site/default')], [404, 404, 404]);
     for (const name of fs.readdirSync(dir).filter(name => name.startsWith('site-default.db'))) assert.equal(fs.statSync(path.join(dir, name)).mode & 0o077, 0, name + ' is private');
     assert.equal((await fetch(on.base + '/')).status, 200, 'the page itself needs no sign-in');
+    // the server is for this machine only, unless it is told to listen elsewhere — as it is in a container
+    const outside = Object.values(os.networkInterfaces()).flat().find(address => address.family === 'IPv4' && !address.internal)?.address;
+    if (outside) {
+      await assert.rejects(fetch(`http://${outside}:${new URL(on.base).port}/api/site/status`), 'not by another address of the machine');
+      const open = await start({ WA_SCRM_DATA_DIR: dir, WA_SCRM_SITE_ID: '', WA_SCRM_AI_ENV: '', WA_SCRM_LISTEN: '0.0.0.0' });
+      try {
+        assert.deepEqual(await (await fetch(`http://${outside}:${new URL(open.base).port}/api/site/status`)).json(), { enabled: true, site: 'default' });
+      } finally {
+        open.child.kill();
+      }
+    }
   } finally {
     on.child.kill();
   }

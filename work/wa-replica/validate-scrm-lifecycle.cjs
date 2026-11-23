@@ -296,6 +296,22 @@ for (const required of ["'GET /api/auth/users': req => {", "'POST /api/auth/user
   assert(siteSources['site-api.cjs'].includes(required), `site-api.cjs is missing ${required}`);
 }
 assert(siteSources['site-auth.cjs'].includes('async function createUser({ username, name, role, site = null, password, mustChange = true }) {'), 'an account made with a given password must be able to keep it');
+// The platform in containers. The server listens where it is told to. The provisioner is the one part that talks
+// to Docker: it checks the shared secret before anything else, takes nothing but the id of a sub-site from a
+// request, and makes containers after its own fixed recipe. The images are pinned; only the gateway is published,
+// and only the provisioner has the Docker socket.
+const provisionerSource = read(path.join(__dirname, 'site-provisioner.cjs')), deploy = name => read(path.join(__dirname, '../../deploy', name));
+assert(read(path.join(__dirname, 'serve.cjs')).includes("server.listen(port, process.env.WA_SCRM_LISTEN || '127.0.0.1', () => {"), 'the server must listen on this machine only unless it is told otherwise');
+assert(provisionerSource.includes("if (given.length !== secret.length || !crypto.timingSafeEqual(given, secret)) throw problem('not-allowed');") && provisionerSource.indexOf("throw problem('not-allowed')") < provisionerSource.indexOf('const route = routes['), 'the provisioner must check the shared secret before it looks at what is asked');
+assert.deepEqual([...new Set(provisionerSource.match(/(?<![.\w])body\.[A-Za-z]+/g))], ['body.id'], 'the provisioner must take nothing but the id of a sub-site from a request');
+assert(provisionerSource.includes("const SITE_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;") && provisionerSource.includes("const RESERVED = ['master', 'gateway', 'provisioner'];") && provisionerSource.includes("const known = id => { if (typeof id !== 'string' || !SITE_ID.test(id) || RESERVED.includes(id)) throw problem('invalid-request'); return id; };"), 'the provisioner must accept only the id of a sub-site');
+assert(!/child_process|execSync|spawn\(/.test(provisionerSource), 'the provisioner must talk to the Docker Engine only, and run no command itself');
+assert(/^FROM node:24-slim@sha256:[0-9a-f]{64}$/m.test(deploy('Dockerfile')) && deploy('Dockerfile').includes('USER 1000:1000'), 'the image of the servers must be built on a pinned base and run as an ordinary user');
+const compose = deploy('compose.yml');
+assert.deepEqual([compose.split('/var/run/docker.sock:/var/run/docker.sock').length - 1, compose.split('\n    ports:').length - 1, compose.includes("      - '${WA_SCRM_PORT:-8141}:8141'"), /image: nginx:[0-9.]+-alpine@sha256:[0-9a-f]{64}\n/.test(compose)], [1, 1, true, true], 'only the provisioner may have the Docker socket, only the gateway a published port, and the gateway image must be pinned');
+for (const required of ['resolver 127.0.0.11 valid=5s ipv6=off;', 'location ~ ^/site/(?<scrm_named>[a-z0-9][a-z0-9-]*)/api/(data$|wa/) {', 'if ($scrm_cookie_site != "") { set $scrm_upstream "wa-scrm-site-$scrm_cookie_site"; }', 'proxy_connect_timeout 3s;']) {
+  assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
+}
 assert(!/演示|原型|评审|本机|示例|体验/.test(masterSource) && !/WA_SITE|localStorage|sessionStorage/.test(masterSource), 'the supervisor page must not speak of a demonstration, nor touch the app or the browser\'s storage');
 // Under a sub-site's name the server gives its data and its WhatsApp link only; the supervisor page takes what a
 // sub-site saved where it has the expected shape; a name every object has touches nothing but the document.

@@ -1,0 +1,110 @@
+# The part of the platform that is always there: the gateway, the first server ("master") and the provisioner.
+# The two containers of each sub-site are made by the provisioner on the same network.
+# Start from the repository root, with the settings of the machine in a file (see platform.env.template):
+#   docker compose -f deploy/compose.yml --env-file <the settings file> up -d
+name: wa-scrm
+services:
+  gateway:
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    container_name: wa-scrm-gateway
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - 'no-new-privileges:true'
+    mem_limit: 128m
+    ports:
+      - '${WA_SCRM_PORT:-8141}:8141'
+    volumes:
+      - ./gateway.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - platform
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  # The first server: the page, signing in, the accounts and the model relay. It is no employee's sub-site.
+  master:
+    image: ${WA_SCRM_SERVER_IMAGE:-wa-scrm-server:current}
+    container_name: wa-scrm-master
+    restart: unless-stopped
+    init: true
+    user: '${WA_SCRM_RUN_AS:-1000:1000}'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - 'no-new-privileges:true'
+    mem_limit: 256m
+    environment:
+      - WA_SCRM_DATA_DIR=/data
+      - WA_SCRM_SITE_ID=master
+      - WA_SCRM_LISTEN=0.0.0.0
+      - WA_SCRM_AI_ENV=/run/wa-scrm/ai.env
+      - WA_SCRM_PROVISIONER_URL=http://wa-scrm-provisioner:8090
+      - WA_SCRM_PROVISIONER_SECRET_FILE=/run/wa-scrm/provisioner.secret
+    volumes:
+      - ${WA_SCRM_HOST_DATA_DIR:?}:/data
+      - ${WA_SCRM_HOST_AI_ENV:?}:/run/wa-scrm/ai.env:ro
+      - ${WA_SCRM_HOST_SECRET:?}:/run/wa-scrm/provisioner.secret:ro
+    networks:
+      - platform
+    logging: *logging
+
+  # The provisioner: the only container that has the Docker socket. Nothing of it is published; the first server
+  # reaches it on the platform's network and proves itself with the shared secret.
+  provisioner:
+    image: ${WA_SCRM_SERVER_IMAGE:-wa-scrm-server:current}
+    container_name: wa-scrm-provisioner
+    restart: unless-stopped
+    init: true
+    command: ['node', 'work/wa-replica/site-provisioner.cjs']
+    user: '${WA_SCRM_RUN_AS:-1000:1000}'
+    group_add:
+      - '${WA_SCRM_DOCKER_GID:?}'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - 'no-new-privileges:true'
+    mem_limit: 128m
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8090/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    environment:
+      - WA_SCRM_PROVISIONER_SECRET_FILE=/run/wa-scrm/provisioner.secret
+      - WA_SCRM_SERVER_IMAGE=${WA_SCRM_SERVER_IMAGE:-wa-scrm-server:current}
+      - WA_SCRM_OPENWA_IMAGE=${WA_SCRM_OPENWA_IMAGE:-ghcr.io/rmyndharis/openwa:0.31.0@sha256:cfa076443c09d5cb7add0b8b446dc4aee857374e8af8168d376fdacc926d599d}
+      - WA_SCRM_HOST_DATA_DIR=${WA_SCRM_HOST_DATA_DIR:?}
+      - WA_SCRM_DATA_DIR=/data
+      - WA_SCRM_HOST_AI_ENV=${WA_SCRM_HOST_AI_ENV:?}
+      - WA_SCRM_NETWORK=wa-scrm
+      - WA_SCRM_RUN_AS=${WA_SCRM_RUN_AS:-1000:1000}
+      - WA_SCRM_MAX_SITES=${WA_SCRM_MAX_SITES:-4}
+      - WA_SCRM_MIN_FREE_MB=${WA_SCRM_MIN_FREE_MB:-1400}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${WA_SCRM_HOST_DATA_DIR:?}:/data
+      - ${WA_SCRM_HOST_SECRET:?}:/run/wa-scrm/provisioner.secret:ro
+    networks:
+      - platform
+    logging: *logging
+
+networks:
+  platform:
+    name: wa-scrm

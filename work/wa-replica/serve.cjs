@@ -80,7 +80,9 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '127.0.0.1', () => {
+// The address the server listens on: this machine only, unless WA_SCRM_LISTEN names another one. In a container
+// that is 0.0.0.0, and the container's network decides who reaches it.
+server.listen(port, process.env.WA_SCRM_LISTEN || '127.0.0.1', () => {
   console.log('PREVIEW_URL=http://127.0.0.1:' + server.address().port);
 });
 process.on('SIGINT', () => server.close(() => process.exit(0)));

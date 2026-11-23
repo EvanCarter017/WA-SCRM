@@ -41,6 +41,24 @@ server {
 
 如果在服务前面放置反向代理（nginx、OpenResty 等），代理允许的请求体大小必须不低于 8 MB（例如 nginx 的 `client_max_body_size 10m;`）：页面把较大的修改拆成多次请求保存，但单个数据项最大 2 MB，服务本身一次请求最多接收 8 MB。上限过低时页面会提示「修改未能保存：内容超过服务器允许的大小」。
 
+#### 用容器运行整套平台
+
+`deploy/` 目录提供把整套平台放进 Docker 的文件。平台由三部分常驻容器和每个子站各两个容器组成，全部在同一个 Docker 网络 `wa-scrm` 里，只有网关对外开放端口：
+
+- **网关**（`wa-scrm-gateway`，nginx，配置见 `deploy/gateway.conf`）：所有人访问的唯一地址。它通过 Docker 自带的名称解析按容器名找到其他容器，新建、启动或停止子站时不需要改任何配置。
+- **主服务**（`wa-scrm-master`）：页面、登录、账号管理和 AI 中转；它不是任何员工的子站。
+- **调度服务**（`wa-scrm-provisioner`，`work/wa-replica/site-provisioner.cjs`）：唯一能操作 Docker 的部分。它按固定的方式创建、启动、停止一个子站的两个容器（子站服务 `wa-scrm-site-<编号>` 和它专属的 OpenWA `wa-scrm-openwa-<编号>`），调用方只能给出子站编号；它只接受主服务凭共享密钥发来的请求，不对外开放。创建子站时它为 OpenWA 生成密钥、写好该子站的连接设置文件；超过子站数量上限（默认 4）或服务器剩余内存不足（默认 1400 MB）时拒绝创建和启动。
+
+首次部署（在服务器上，以能使用 Docker 的用户执行）：
+
+```bash
+docker build -f deploy/Dockerfile -t wa-scrm-server:current .          # 构建服务镜像
+cp deploy/platform.env.template /私有目录/platform.env                   # 填写数据目录、AI 设置文件、共享密钥文件等路径
+docker compose -f deploy/compose.yml --env-file /私有目录/platform.env up -d
+```
+
+之后每次更新代码，执行 `bash deploy/upgrade.sh /私有目录/platform.env`：重新构建镜像，更新三个常驻容器，并让每个子站的服务换用新镜像；子站的 OpenWA 不会被重启，WhatsApp 连接不中断。数据目录、AI 设置文件和共享密钥文件都放在仓库之外。
+
 #### 接入 AI 翻译（可选）
 服务带有 AI 中转接口（`/api/ai/*`，只对已登录用户开放）：页面只调用本站服务器，由服务器携带密钥调用模型服务，密钥不进入浏览器。把 `work/wa-replica/ai.env.example` 复制到私有位置并填写，再用环境变量 `WA_SCRM_AI_ENV` 指向它启动服务。未设置或文件不完整时没有翻译（「AI 能力」页显示「未连接」）。填好的文件不要提交到仓库。
 
@@ -114,6 +132,7 @@ flowchart LR
 ├── PRODUCT.md                                         # 产品定位、跟进闭环业务边界与范围说明
 ├── DESIGN.md                                          # 桌面/窄屏布局规范与跟进闭环交互架构
 ├── 重新构建原型.cmd                                    # Windows 一键重编译与自动化校验脚本
+├── deploy/                                            # 容器部署：服务镜像、网关配置、常驻三个容器的编排文件、升级脚本
 ├── outputs/
 │   ├── wa-replica-prototype/                          # 模块化原型运行目录（由 serve.cjs 托管）
 │   │   ├── index.html / app.js / app.css              # 编译后的前端入口、逻辑与令牌样式
@@ -142,6 +161,7 @@ flowchart LR
 │       ├── site-auth.cjs / site-data.cjs              # 账号与登录会话；子站数据文档（内置 SQLite）
 │       ├── site-api.cjs / site-api.test.cjs           # 登录与数据接口及其测试
 │       ├── site-admin.cjs                             # 账号与数据管理工具（在服务器上运行）
+│       ├── site-provisioner.cjs / .test.cjs           # 子站容器的创建与启停（唯一与 Docker 打交道的部分）及其测试
 │       ├── fidelity-ui.js / fidelity-customer-pages.js# 列表、标签、标签统计与聊天记录归档视图
 │       ├── fidelity-operations.js / fidelity-subsite.js# 素材管理与聊手子站登录态控制
 │       ├── build-fidelity.cjs                         # 零外部依赖构建打包器
