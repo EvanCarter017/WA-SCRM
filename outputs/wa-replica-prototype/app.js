@@ -4106,10 +4106,17 @@ window.WA_START = () => {
     if (d.translated) return '发送译文';
     return aiGuardActive(c) && text && !aiGuardNeutral(text) ? '待翻译' : '发送原文';
   }
-  // The line under the message box that explains the Enter key, and the translation shortcut where it works.
+  // The line under the message box that explains the Enter key, and the translation shortcut where it works. A
+  // shortcut that is Enter or Shift + Enter takes that key's place: then the send button sends, or no key makes a
+  // new line.
   function aiEnterHint(c) {
-    const keys = aiGuardActive(c) ? 'Enter 先翻译，再按一次发送；Shift + Enter 换行' : 'Enter 发送，Shift + Enter 换行';
-    return aiShortcutReady(c) ? `${keys}；${esc(aiShortcutLabel(aiShortcut()))} 翻译` : keys;
+    const enter = aiGuardActive(c) ? 'Enter 先翻译，再按一次发送' : 'Enter 发送';
+    const keys = aiGuardActive(c) ? `${enter}；Shift + Enter 换行` : `${enter}，Shift + Enter 换行`;
+    if (!aiShortcutReady(c)) return keys;
+    const shortcut = aiShortcut(), named = `${esc(aiShortcutLabel(shortcut))} 翻译`;
+    if (shortcut === 'Enter') return `${named}，点击「发送」发出；Shift + Enter 换行`;
+    if (shortcut === 'Shift+Enter') return `${enter}；${named}`;
+    return `${keys}；${named}`;
   }
   // The switch of the send guard, beside the message box. Shown only while the relay is in use.
   function aiGuardHTML(c) {
@@ -4197,40 +4204,54 @@ window.WA_START = () => {
     aiTranslateDraft(c, text);
   };
 
-  // ---- the translation shortcut (plan 060) ----
-  // A key combination, set under the gear beside the customer's language. Pressed in the message box it
-  // translates what was typed into the customer's language and shows the translation above the box, whether or
-  // not the send guard is on; Enter then sends the translation, and what was typed stays in the box. It is kept
-  // in the AI settings as e.g. "Ctrl+Enter" or "Alt+Shift+T": Ctrl or Alt (on a Mac ⌘ counts as Ctrl), maybe
-  // Shift, and a letter or Enter. Combinations that typing, sending or the browser need are refused.
+  // ---- the translation shortcut (plans 060 and 062) ----
+  // A key, or a combination of keys, set under the gear beside the customer's language. Pressed in the message
+  // box it translates what was typed into the customer's language and shows the translation above the box,
+  // whether or not the send guard is on; Enter (or the send button) then sends the translation, and what was typed
+  // stays in the box. Any key can be the shortcut, with or without modifier keys, and so can modifier keys pressed
+  // on their own (plan 062: the owner asked for any key). It is kept in the AI settings as e.g. "Ctrl+Enter", "F2",
+  // "Backquote", "Alt+Shift+T" or "Ctrl": the modifier keys in the order Ctrl, Alt, Shift, Meta (on a Mac ⌘ counts
+  // as Ctrl), then the key by its place on the keyboard (event.code; letters and digits as they are).
   const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';
-  const AI_SHORTCUT_FORM = /^(Ctrl\+(Alt\+)?|Alt\+)(Shift\+)?([A-Z]|Enter)$/;
-  const AI_SHORTCUT_TAKEN = [
-    [/^Ctrl\+Alt\+/, '同时按 Ctrl 和 Alt 在部分键盘上用于输入字符（AltGr）'],
-    [/^Ctrl\+(Shift\+)?[ACVXYZ]$/, '它用于编辑文字（全选、复制、粘贴、剪切、撤销、重做）'],
-    [/^Ctrl\+(Shift\+)?[HMNQTW]$/, '它由浏览器或系统占用（新窗口、新标签页、关闭标签页、退出、隐藏或最小化窗口），网页无法使用'],
-    [/^Ctrl\+Shift\+[IJ]$/, '它会打开浏览器的开发者工具'],
-    [/^Alt\+[DEF]$/, '它会打开浏览器的地址栏或菜单'],
-  ];
+  const AI_SHORTCUT_FORM = /^((Ctrl|Alt|Shift|Meta)\+){0,4}[A-Za-z0-9]{1,24}$/;
   const aiOnMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
-  const aiShortcutLabel = combo => combo.split('+').join(' + ');
-  // Why a combination cannot be the shortcut, or '' when it can.
-  function aiShortcutProblem(combo) {
-    if (!AI_SHORTCUT_FORM.test(combo || '')) return '快捷键要包含 Ctrl 或 Alt（可再加 Shift），再加一个字母或 Enter；单独的 Enter 用于发送，Shift + Enter 用于换行。';
-    const taken = AI_SHORTCUT_TAKEN.find(([pattern]) => pattern.test(combo));
-    return taken ? `不能使用 ${aiShortcutLabel(combo)}：${taken[1]}。请换一个组合。` : '';
-  }
+  const AI_MODIFIERS = { Control: 'Ctrl', Alt: 'Alt', AltGraph: 'Alt', Shift: 'Shift', Meta: aiOnMac ? 'Ctrl' : 'Meta', OS: 'Meta' };
+  const AI_MODIFIER_ORDER = ['Ctrl', 'Alt', 'Shift', 'Meta'];
+  const AI_KEY_SIGNS = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', IntlBackslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', Space: '空格', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', NumpadAdd: '小键盘 +', NumpadSubtract: '小键盘 -', NumpadMultiply: '小键盘 *', NumpadDivide: '小键盘 /', NumpadDecimal: '小键盘 .', Meta: 'Win' };
+  // How a shortcut is shown: "Ctrl + Enter", "F2", "`", "小键盘 5".
+  const aiShortcutLabel = combo => combo.split('+').map(part => AI_KEY_SIGNS[part] || part.replace(/^Numpad(\d)$/, '小键盘 $1')).join(' + ');
+  // Why a stored value cannot be the shortcut (it names no key), or '' when it can.
+  const aiShortcutProblem = combo => (AI_SHORTCUT_FORM.test(combo || '') ? '' : '没有读到按键：请点击上面的框，再按一次想用的键。');
   // The shortcut in use: the one set under the gear, read without creating the settings, or the default.
   const aiShortcut = () => (aiShortcutProblem(data.ai?.translateKey) ? AI_SHORTCUT_DEFAULT : data.ai.translateKey);
-  // The combination a key press makes, e.g. "Ctrl+Shift+K"; '' while only modifier keys are down. The key is
-  // told by its place on the keyboard (event.code), so that Alt on a Mac, which changes the character, still
-  // gives the letter.
+  // The combination a key press makes, e.g. "Ctrl+Shift+K" or "F2"; '' for a modifier key, which counts only when
+  // it is pressed on its own (below). The key is told by its place on the keyboard (event.code), so that Alt on a
+  // Mac, which changes the character, still gives the letter.
   function aiShortcutOf(event) {
-    if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph', 'CapsLock'].includes(event.key)) return '';
+    if (AI_MODIFIERS[event.key]) return '';
     const code = event.code || '';
-    const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : code === 'Enter' || code === 'NumpadEnter' ? 'Enter' : code || event.key || '?';
-    return `${event.ctrlKey || (aiOnMac && event.metaKey) ? 'Ctrl+' : ''}${event.altKey ? 'Alt+' : ''}${event.shiftKey ? 'Shift+' : ''}${key}`;
+    const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5) : code === 'NumpadEnter' ? 'Enter' : /^[A-Za-z0-9]{1,24}$/.test(code) ? code : String(event.key || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+    if (!key) return '';
+    const held = [event.ctrlKey || (aiOnMac && event.metaKey) ? 'Ctrl' : '', event.altKey ? 'Alt' : '', event.shiftKey ? 'Shift' : '', !aiOnMac && event.metaKey ? 'Meta' : ''];
+    return [...held.filter(Boolean), key].join('+');
   }
+  // Modifier keys pressed on their own (e.g. Ctrl pressed and let go): the ones held since every key was up, and
+  // whether another key came in between, which makes them part of an ordinary combination instead.
+  const aiLone = { held: new Set(), spoiled: false };
+  const aiLoneReset = () => { aiLone.held.clear(); aiLone.spoiled = false; };
+  function aiLoneDown(event) {
+    if (AI_MODIFIERS[event.key]) aiLone.held.add(AI_MODIFIERS[event.key]);
+    else aiLone.spoiled = true;
+  }
+  // At a key's release: once every modifier key is up, the ones pressed on their own ("Ctrl", "Ctrl+Shift"), or ''.
+  function aiLoneUp(event) {
+    if (event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return '';
+    const combo = aiLone.spoiled ? '' : AI_MODIFIER_ORDER.filter(name => aiLone.held.has(name)).join('+');
+    aiLoneReset();
+    return combo;
+  }
+  // Whether Enter itself is the shortcut: then the send button sends the translation.
+  const aiEnterTaken = () => aiShortcut() === 'Enter';
   // Whether the shortcut can translate for this customer: the relay is in use, translating replies is switched
   // on, and the customer has a language.
   const aiShortcutReady = c => aiRuntime.provider === 'server' && data.ai?.enabled?.['translate.outbound'] !== false && Boolean(aiCustomerLanguage(c));
@@ -4239,18 +4260,29 @@ window.WA_START = () => {
     if (aiRuntime.provider !== 'server') return '';
     return `<button type="button" class="icon-button ai-shortcut-gear" data-ai-shortcut aria-label="翻译快捷键设置" title="翻译快捷键：${esc(aiShortcutLabel(aiShortcut()))}">${icon('Settings')}</button>`;
   }
-  // The panel under the gear: the shortcut is set by pressing it in the field.
+  // The panel under the gear. Its field records the next key press once it is clicked (or Enter or Space is pressed
+  // on it): any key, with or without modifier keys, or modifier keys on their own. Until then Tab and Escape keep
+  // their use there, so that the panel can be left with the keyboard.
+  let aiRecording = false;
   function aiShortcutOpen() {
     const combo = aiShortcut();
-    fidForm('翻译快捷键', 'ai-shortcut', `<p class="fid-field-help ai-shortcut-about">在消息框中按下快捷键，输入的内容会译为客户语言，显示在消息框上方；再按 Enter 发送译文。</p>
-      ${fidFormRow('快捷键', `<input class="fid-input ai-shortcut-key" id="ai-shortcut-key" value="${esc(aiShortcutLabel(combo))}" readonly aria-describedby="ai-shortcut-help"><input type="hidden" name="combo" value="${esc(combo)}"><span class="fid-field-help" id="ai-shortcut-help">点击上面的框，按下新的组合键：Ctrl 或 Alt（可再加 Shift），再加一个字母或 Enter。Mac 上 ⌘ 等同于 Ctrl。</span>${fidButton(`恢复默认（${aiShortcutLabel(AI_SHORTCUT_DEFAULT)}）`, '', '', 'slim', 'data-ai-shortcut-default')}`, 'ai-shortcut-key')}`, '保 存');
+    aiRecording = false;
+    fidForm('翻译快捷键', 'ai-shortcut', `<p class="fid-field-help ai-shortcut-about">在消息框中按下快捷键，输入的内容会译为客户语言，显示在消息框上方；再按 Enter 或点击「发送」发送译文。</p>
+      ${fidFormRow('快捷键', `<input class="fid-input ai-shortcut-key" id="ai-shortcut-key" value="${esc(aiShortcutLabel(combo))}" readonly aria-describedby="ai-shortcut-help"><input type="hidden" name="combo" value="${esc(combo)}"><span class="fid-field-help" id="ai-shortcut-help">点击上面的框，再按下想用的键：任意一个键或组合键都可以，例如 F2、\`、Tab 或 Ctrl + Enter，也可以单独按 Ctrl、Alt 等键。设为单独的字母、数字、空格、Enter 或 Shift 等键后，在消息框里按它就会翻译，不再输入、发送或换行。浏览器自己的快捷键（如 Ctrl + W）网页收不到。Mac 上 ⌘ 等同于 Ctrl。</span>${fidButton(`恢复默认（${aiShortcutLabel(AI_SHORTCUT_DEFAULT)}）`, '', '', 'slim', 'data-ai-shortcut-default')}`, 'ai-shortcut-key')}`, '保 存');
   }
-  // Puts a combination into the panel's field, and takes away a refusal shown before.
+  // Starts or stops recording in the panel's field; stopped, the field shows the shortcut kept in the form.
+  function aiShortcutRecord(on) {
+    const field = $('#ai-shortcut-key'), kept = $('#dialog [name="combo"]');
+    aiRecording = Boolean(on && field && kept);
+    aiLoneReset();
+    if (field && kept) field.value = aiRecording ? '请按下新的快捷键…' : aiShortcutLabel(kept.value);
+  }
+  // Puts a combination into the panel's field and stops recording; a message shown before goes away.
   function aiShortcutShow(combo) {
     const field = $('#ai-shortcut-key'), kept = $('#dialog [name="combo"]');
     if (!field || !kept) return;
-    field.value = aiShortcutLabel(combo);
     kept.value = combo;
+    aiShortcutRecord(false);
     $('#form-error').textContent = '';
     $('#dialog .field-error')?.remove();
     field.removeAttribute('aria-invalid');
@@ -4274,7 +4306,7 @@ window.WA_START = () => {
     if (!aiCustomerLanguage(c)) return toast('请先在上方选择客户语言。');
     if (aiDraftPending.has(c.id)) return toast('正在翻译，请稍候。');
     const d = draft(c);
-    if (d.translated && d.source === text) return toast('译文已在消息框上方，按 Enter 发送。');
+    if (d.translated && d.source === text) return toast(aiEnterTaken() ? '译文已在消息框上方，点击「发送」即可发出。' : '译文已在消息框上方，按 Enter 发送。');
     const request = {};
     aiDraftPending.set(c.id, request);
     aiRefreshDraftPreview(c);
@@ -4285,36 +4317,55 @@ window.WA_START = () => {
       if (!result.ok) {
         if (!result.skipped) toast('未能取得译文，请稍后再试。');
       } else if (unchanged && aiSameText(result.text, text)) {
-        toast(`这段内容已是${c.language}，按 Enter 直接发送。`);
+        toast(`这段内容已是${c.language}，${aiEnterTaken() ? '点击「发送」直接发出' : '按 Enter 直接发送'}。`);
       } else if (unchanged) {
         current.translated = result.text;
         current.source = text;
         persist();
-        toast(`已译为${c.language}，按 Enter 发送译文。`);
+        toast(`已译为${c.language}，${aiEnterTaken() ? '点击「发送」发出译文' : '按 Enter 发送译文'}。`);
       }
       aiRefreshDraftPreview(c);
     });
   }
-  // Key presses: in the message box the shortcut translates — this listener comes before the page's own one,
-  // which sends on Enter, so a shortcut with Enter does not send. In the panel's field a press is the new
-  // shortcut; Tab and Escape keep their use there.
+  // Key presses. In the message box the shortcut translates — these listeners come before the page's own one,
+  // which sends on Enter, so a shortcut with Enter does not send; nothing counts while an input method composes.
+  // In the panel's field, while it records, any press is the new shortcut; otherwise Enter or Space starts
+  // recording there.
   document.addEventListener('keydown', event => {
-    if (event.target.id === 'composer-text') {
-      if (event.isComposing || event.keyCode === 229 || aiShortcutOf(event) !== aiShortcut()) return;
+    const id = event.target.id;
+    if (id === 'composer-text') {
+      if (event.isComposing || event.keyCode === 229) return void (aiLone.spoiled = true);
+      aiLoneDown(event);
+      if (aiShortcutOf(event) !== aiShortcut()) return;
       event.preventDefault();
       event.stopPropagation();
       return aiTranslateByShortcut();
     }
-    if (event.target.id !== 'ai-shortcut-key') return;
-    if ((event.key === 'Tab' || event.key === 'Escape') && !event.ctrlKey && !event.altKey && !event.metaKey) return;
+    if (id !== 'ai-shortcut-key') return;
+    if (!aiRecording) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      return aiShortcutRecord(true);
+    }
     event.preventDefault();
     event.stopPropagation();
+    if (event.isComposing || event.keyCode === 229) return;
+    aiLoneDown(event);
     const combo = aiShortcutOf(event);
-    if (!combo) return;
-    const problem = aiShortcutProblem(combo);
-    if (problem) return error(problem);
-    aiShortcutShow(combo);
+    if (combo) aiShortcutShow(combo);
   }, true);
+  // Modifier keys pressed on their own count when the last of them is let go.
+  document.addEventListener('keyup', event => {
+    const id = event.target.id;
+    if (id !== 'composer-text' && id !== 'ai-shortcut-key') return aiLoneReset();
+    const lone = aiLoneUp(event);
+    if (lone && id === 'composer-text' && lone === aiShortcut()) aiTranslateByShortcut();
+    else if (lone && id === 'ai-shortcut-key' && aiRecording) aiShortcutShow(lone);
+  }, true);
+  // Leaving the field stops recording; the shortcut kept so far stays.
+  document.addEventListener('focusout', event => {
+    if (event.target.id === 'ai-shortcut-key' && aiRecording) aiShortcutRecord(false);
+  });
 
   function renderAiPage() {
     const settings = aiSettings();
@@ -4481,6 +4532,7 @@ window.WA_START = () => {
     if (event.target.closest?.('[data-ai-guard]')) aiSetGuard(!aiGuardOn());
     if (event.target.closest?.('[data-ai-shortcut]')) aiShortcutOpen();
     if (event.target.closest?.('[data-ai-shortcut-default]')) aiShortcutShow(AI_SHORTCUT_DEFAULT);
+    if (event.target.id === 'ai-shortcut-key') aiShortcutRecord(true);
     const ask = event.target.closest?.('[data-ai-transcribe]');
     if (ask) aiTranscribe(ask.dataset.aiTranscribe);
   });

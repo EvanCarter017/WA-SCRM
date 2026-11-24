@@ -516,14 +516,16 @@ for (const required of ['<select class="fid-select" id="price-currency">', "cons
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
 assert.equal(pricePage.match(/priceMoney\(/g).length, 2, 'a price must be shown and quoted only through priceShown');
-// The translation shortcut (plan 060): set under a gear beside the customer's language by pressing it; in the
-// message box it translates what was typed and shows it above the box. It is caught before the page's own
-// handling of Enter, so that a shortcut with Enter translates instead of sending.
-for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'if (event.isComposing || event.keyCode === 229 || aiShortcutOf(event) !== aiShortcut()) return;', "fidForms['ai-shortcut-form'] = (f, v) => {", 'aiSettings().translateKey = combo;', "</select></label>${aiShortcutGear()}`;", "if (event.target.closest?.('[data-ai-shortcut]')) aiShortcutOpen();", 'return aiShortcutReady(c) ? `${keys}；${esc(aiShortcutLabel(aiShortcut()))} 翻译` : keys;', "aiRun('translate.outbound', aiOutboundInput(c, text), { customerId: c.id }).then(result => {"]) {
+// The translation shortcut (plans 060 and 062): set under a gear beside the customer's language by pressing it —
+// any key, any combination, or modifier keys on their own; in the message box it translates what was typed and
+// shows it above the box. It is caught before the page's own handling of Enter, so that a shortcut with Enter
+// translates instead of sending, and not while an input method composes.
+for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'const AI_SHORTCUT_FORM = /^((Ctrl|Alt|Shift|Meta)\\+){0,4}[A-Za-z0-9]{1,24}$/;', 'if (event.isComposing || event.keyCode === 229) return void (aiLone.spoiled = true);', 'if (aiShortcutOf(event) !== aiShortcut()) return;', "if (lone && id === 'composer-text' && lone === aiShortcut()) aiTranslateByShortcut();", "else if (lone && id === 'ai-shortcut-key' && aiRecording) aiShortcutShow(lone);", "if (event.target.id === 'ai-shortcut-key') aiShortcutRecord(true);", "fidForms['ai-shortcut-form'] = (f, v) => {", 'aiSettings().translateKey = combo;', "</select></label>${aiShortcutGear()}`;", "if (event.target.closest?.('[data-ai-shortcut]')) aiShortcutOpen();", 'const shortcut = aiShortcut(), named = `${esc(aiShortcutLabel(shortcut))} 翻译`;', "aiRun('translate.outbound', aiOutboundInput(c, text), { customerId: c.id }).then(result => {"]) {
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
-assert(aiSource.includes('    aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
+assert(aiSource.includes('    if (combo) aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
+assert(!aiSource.includes('AI_SHORTCUT_TAKEN'), 'any key can be the shortcut: no combination is refused (plan 062)');
 assert(read(path.join(out, 'icons.js')).includes('"Settings":[["path"'), 'the gear must be in the icon pool');
 // Pinning chats (plan 061): a right-click on a chat in the list opens a menu with 置顶 or 取消置顶; pinned chats come
 // first in every filter and search, marked with a pin; the pin is kept with the customer and survives the merging
@@ -566,7 +568,7 @@ const summary = {
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
   pinnedChats: 'a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged',
-  translateShortcut: 'a key combination set under the gear beside the customer\'s language (Ctrl + Enter at first; Ctrl or Alt, maybe Shift, and a letter or Enter; combinations that typing, sending or the browser need are refused) translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter then sends the translation; the line under the box names it',
+  translateShortcut: 'a key, a combination or modifier keys on their own, recorded under the gear beside the customer\'s language once its field is clicked (Ctrl + Enter at first; any key, plan 062), translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter (or the send button, when Enter is the shortcut) then sends the translation; the line under the box names it',
   priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',
   externalNetworkCalls: false,
 };
