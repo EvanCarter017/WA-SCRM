@@ -526,6 +526,14 @@ for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'const AI_S
 }
 assert(aiSource.includes('    if (combo) aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
 assert(!aiSource.includes('AI_SHORTCUT_TAKEN'), 'any key can be the shortcut: no combination is refused (plan 062)');
+// The words a seller typed are kept as the translation of the sent reply back into their reading language (plan
+// 063): the page names its reading language in a reply request, and the relay keeps the typed words when they are
+// written in it, so that another workspace of this server receiving the reply shows them.
+for (const required of ['return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context, from: settings.readLanguage };', 'body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context, from: input.from }),']) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert(read(path.join(__dirname, 'ai-relay.cjs')).includes('if (from && translated !== text && writtenIn(from, text)) translationStore()?.put(translationKey(from, translated), text);'), 'the relay must keep the typed words of a reply as its translation back');
 assert(read(path.join(out, 'icons.js')).includes('"Settings":[["path"'), 'the gear must be in the icon pool');
 // Pinning chats (plan 061): a right-click on a chat in the list opens a menu with 置顶 or 取消置顶; pinned chats come
 // first in every filter and search, marked with a pin; the pin is kept with the customer and survives the merging
@@ -567,6 +575,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  replyWordsKeptBack: 'the words a seller typed are kept by the relay as the translation of the sent reply back into the seller\'s reading language (when written in it), so that another workspace of this server receiving the reply shows the seller\'s own words',
   pinnedChats: 'a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged',
   translateShortcut: 'a key, a combination or modifier keys on their own, recorded under the gear beside the customer\'s language once its field is clicked (Ctrl + Enter at first; any key, plan 062), translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter (or the send button, when Enter is the shortcut) then sends the translation; the line under the box names it',
   priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',

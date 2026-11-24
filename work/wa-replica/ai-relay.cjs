@@ -36,6 +36,16 @@ const MAX_VOICE_BYTES = 24 * 1024 * 1024;
 const VOICE_TIMEOUT_MS = Number(process.env.WA_SCRM_AI_VOICE_TIMEOUT_MS) || 60000;
 // A language name: letters of any script, spaces and a few separators.
 const LANGUAGE = /^[\p{L}\p{M} ()·-]{1,40}$/u;
+// The reading languages that have a script of their own; the others offered by the page are written in Latin letters.
+const READING_SCRIPTS = { '中文': /\p{Script=Han}/u, '日本語': /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u, '한국어': /\p{Script=Hangul}/u, 'Русский': /\p{Script=Cyrillic}/u, 'العربية': /\p{Script=Arabic}/u };
+// Whether a text is written in a reading language: at least half of its letters in that language's own script, or,
+// for a language written in Latin letters, Latin letters only.
+function writtenIn(language, text) {
+  const letters = text.match(/\p{L}/gu) || [];
+  if (!letters.length) return false;
+  const own = READING_SCRIPTS[language];
+  return own ? letters.filter(letter => own.test(letter)).length * 2 >= letters.length : letters.every(letter => /\p{Script=Latin}/u.test(letter));
+}
 // How a reply should sound. The keys are what the page sends.
 const TONES = {
   casual: 'Tone: casual and relaxed, like texting someone you know. Contractions and everyday words are fine.',
@@ -255,19 +265,27 @@ async function translate(input, config) {
   return { text: translated, inputChars: text.length };
 }
 
-// A reply the seller typed, put into the customer's language. tone, business and context are optional.
+// A reply the seller typed, put into the customer's language. tone, business, context and from (the seller's
+// reading language) are optional.
 async function reply(input, config) {
   const text = typeof input.text === 'string' ? input.text.trim() : '';
   const to = typeof input.to === 'string' ? input.to.trim() : '';
   const tone = input.tone === undefined ? 'casual' : input.tone;
   const business = input.business === undefined ? '' : input.business;
   const context = input.context === undefined ? [] : input.context;
+  const from = input.from === undefined ? '' : input.from;
   if (!text || !LANGUAGE.test(to) || typeof tone !== 'string' || !Object.hasOwn(TONES, tone) || typeof business !== 'string' || !Array.isArray(context)) throw failure(400, 'invalid-request');
+  if (typeof from !== 'string' || (from && !LANGUAGE.test(from))) throw failure(400, 'invalid-request');
   if (context.some(message => !message || typeof message.text !== 'string' || !['me', 'customer'].includes(message.from))) throw failure(400, 'invalid-request');
   if (text.length > MAX_TEXT || business.length > MAX_BUSINESS) throw failure(413, 'too-long');
   const oneLine = value => value.replace(/\s+/g, ' ').trim();
   const recent = context.slice(-MAX_CONTEXT_MESSAGES).map(message => ({ from: message.from, text: oneLine(message.text).slice(0, MAX_CONTEXT_TEXT) })).filter(message => message.text);
-  return { text: await askModel(config, replyPrompt({ to, tone, business: oneLine(business) }), replyTurn(text, recent)), inputChars: text.length };
+  const translated = await askModel(config, replyPrompt({ to, tone, business: oneLine(business) }), replyTurn(text, recent));
+  // What the seller typed is what this reply says in their reading language (plan 063): it is kept as the reply's
+  // translation into that language, so that another workspace of this server that receives the reply shows the
+  // seller's own words instead of translating it anew. Only when the words are written in that language.
+  if (from && translated !== text && writtenIn(from, text)) translationStore()?.put(translationKey(from, translated), text);
+  return { text: translated, inputChars: text.length };
 }
 
 const ACTIONS = { '/api/ai/translate': ['translate', translate], '/api/ai/reply': ['reply', reply] };
