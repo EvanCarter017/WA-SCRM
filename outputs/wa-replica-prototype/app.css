@@ -2877,6 +2877,12 @@ dialog>#toast,dialog>#toast.show{transform:none}
   justify-content: center;
   font-weight: 800;
 }
+.conversation-pin { display: inline-flex; color: var(--fid-quiet); }
+.conversation-pin .icon { width: var(--fid-px-14); height: var(--fid-px-14); }
+.chat-menu { position: fixed; z-index: 20; min-width: var(--fid-px-120); padding: var(--fid-px-4); border: var(--fid-px-1) solid var(--fid-frame); border-radius: var(--fid-px-8); background: var(--color-surface); box-shadow: 0 var(--fid-px-2) var(--fid-px-8) var(--fid-shadow); }
+.chat-menu-item { display: flex; align-items: center; gap: var(--fid-px-8); width: 100%; padding: var(--fid-px-8) var(--fid-px-12); border: 0; border-radius: var(--fid-px-6); background: none; color: var(--color-text); font-size: var(--fid-px-14); text-align: left; cursor: pointer; }
+.chat-menu-item:hover, .chat-menu-item:focus-visible { background: var(--color-accent-soft); color: var(--color-accent); outline: none; }
+.chat-menu-item .icon { width: var(--fid-px-16); height: var(--fid-px-16); }
 .conversation-line .lc-tier {
   min-height: var(--fid-px-16);
   padding: 0 var(--fid-px-5);

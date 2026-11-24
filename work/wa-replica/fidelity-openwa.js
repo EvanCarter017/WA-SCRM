@@ -630,7 +630,7 @@
     }
     list.sort((x, y) => (x.at || 0) - (y.at || 0));
     const last = list.at(-1);
-    Object.assign(keep, { waChat: drop.waChat, unread: Math.max(Number(keep.unread) || 0, Number(drop.unread) || 0), star: keep.star || drop.star,
+    Object.assign(keep, { waChat: drop.waChat, unread: Math.max(Number(keep.unread) || 0, Number(drop.unread) || 0), star: keep.star || drop.star, pinned: keep.pinned || drop.pinned,
       tags: [...new Set([...keep.tags, ...drop.tags])], notes: keep.notes || drop.notes, ...(last?.at ? { preview: last.text, translation: '', last: last.time, lastAt: last.at } : {}) });
     for (const t of data.tasks) if (t.customer === drop.id) t.customer = keep.id;
     for (const record of data.chatArchives || []) if (record.customerId === drop.id) record.customerId = keep.id;

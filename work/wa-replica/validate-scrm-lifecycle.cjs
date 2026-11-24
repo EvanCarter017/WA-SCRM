@@ -525,6 +525,15 @@ for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'if (event.
 }
 assert(aiSource.includes('    aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
 assert(read(path.join(out, 'icons.js')).includes('"Settings":[["path"'), 'the gear must be in the icon pool');
+// Pinning chats (plan 061): a right-click on a chat in the list opens a menu with 置顶 or 取消置顶; pinned chats come
+// first in every filter and search, marked with a pin; the pin is kept with the customer and survives the merging
+// of a duplicate chat.
+for (const required of ['return [...list.filter(c => c.pinned), ...list.filter(c => !c.pinned)];', "document.addEventListener('contextmenu', event => {", "const row = event.target.closest?.('#conversation-list .conversation[data-id]'), c = row && customer(row.dataset.id);", "${c.pinned ? '取消置顶' : '置顶'}</button>", 'if (c.pinned) delete c.pinned;', "<time>${esc(c.last)}</time>${c.pinned ? `<span class=\"conversation-pin\" title=\"已置顶\">${icon('Pin')}</span>` : ''}</span>"]) {
+  assert(moduleSource.includes(required), `fidelity-lifecycle.js is missing ${required}`);
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert(openwaSource.includes('star: keep.star || drop.star, pinned: keep.pinned || drop.pinned,'), 'merging a duplicate chat must keep its pin');
+for (const name of ['"Pin":[["path"', '"PinOff":[["path"']) assert(read(path.join(out, 'icons.js')).includes(name), `the icon pool must hold ${name}`);
 
 const summary = {
   version: req.version,
@@ -556,6 +565,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  pinnedChats: 'a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged',
   translateShortcut: 'a key combination set under the gear beside the customer\'s language (Ctrl + Enter at first; Ctrl or Alt, maybe Shift, and a letter or Enter; combinations that typing, sending or the browser need are refused) translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter then sends the translation; the line under the box names it',
   priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',
   externalNetworkCalls: false,

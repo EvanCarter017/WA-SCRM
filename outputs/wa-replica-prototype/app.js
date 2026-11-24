@@ -2008,7 +2008,7 @@ window.WA_START = () => {
     }
     list.sort((x, y) => (x.at || 0) - (y.at || 0));
     const last = list.at(-1);
-    Object.assign(keep, { waChat: drop.waChat, unread: Math.max(Number(keep.unread) || 0, Number(drop.unread) || 0), star: keep.star || drop.star,
+    Object.assign(keep, { waChat: drop.waChat, unread: Math.max(Number(keep.unread) || 0, Number(drop.unread) || 0), star: keep.star || drop.star, pinned: keep.pinned || drop.pinned,
       tags: [...new Set([...keep.tags, ...drop.tags])], notes: keep.notes || drop.notes, ...(last?.at ? { preview: last.text, translation: '', last: last.time, lastAt: last.at } : {}) });
     for (const t of data.tasks) if (t.customer === drop.id) t.customer = keep.id;
     for (const record of data.chatArchives || []) if (record.customerId === drop.id) record.customerId = keep.id;
@@ -3285,10 +3285,10 @@ window.WA_START = () => {
     return filteredConversations().map(c => {
       const a = account(c.account);
       const selected = fid.chatOpen && c.id === ui.customer ? 'selected' : '';
-      return `<button type="button" class="conversation ${selected}" aria-label="打开${esc(c.name)}的会话" data-action="openConversation" data-id="${esc(c.id)}">
+      return `<button type="button" class="conversation ${selected}" aria-label="打开${esc(c.name)}的会话${c.pinned ? '（已置顶）' : ''}" data-action="openConversation" data-id="${esc(c.id)}">
         ${avatar(c)}
         <span class="conversation-main">
-          <span class="conversation-line"><strong>${esc(c.name)}${lcTier(c) ? ' ' + lcTierBadge(c) : ''}</strong><time>${esc(c.last)}</time></span>
+          <span class="conversation-line"><strong>${esc(c.name)}${lcTier(c) ? ' ' + lcTierBadge(c) : ''}</strong><time>${esc(c.last)}</time>${c.pinned ? `<span class="conversation-pin" title="已置顶">${icon('Pin')}</span>` : ''}</span>
           <span class="conversation-preview"><span>${esc(c.preview)}</span>${c.unread ? `<span class="unread">${c.unread}</span>` : ''}</span>
           <span class="conversation-account">
             <span>${lcNumberDot(a)}${esc(ui.account === 'all' ? a?.name : aiLanguageLabel(c))}</span>
@@ -3298,6 +3298,68 @@ window.WA_START = () => {
       </button>`;
     }).join('') || empty('没有匹配会话', '切换筛选，或清空搜索后再试。');
   };
+
+  // ---- pinning chats (plan 061) ----
+  // A right-click on a chat in the list (or the menu key while the chat has the focus) opens a small menu with
+  // 置顶 or 取消置顶. A pinned chat stays at the top of the list, whatever the filter or the search, and is
+  // marked with a pin; pinned chats keep the order of their last message among themselves. The pin is kept with
+  // the customer (pinned: true) in this workspace only: WhatsApp on the phone is not changed.
+  const lcFilteredConversations = filteredConversations;
+  filteredConversations = function() {
+    const list = lcFilteredConversations();
+    return [...list.filter(c => c.pinned), ...list.filter(c => !c.pinned)];
+  };
+  const lcChatMenuClose = () => document.querySelector('.chat-menu')?.remove();
+  // The menu at a place on the screen (kept inside it), with the focus on its item.
+  function lcChatMenuOpen(c, x, y) {
+    lcChatMenuClose();
+    const menu = document.createElement('div');
+    menu.className = 'chat-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', `${c.name}的会话`);
+    menu.innerHTML = `<button type="button" class="chat-menu-item" role="menuitem" data-pin-chat="${esc(c.id)}">${icon(c.pinned ? 'PinOff' : 'Pin')}${c.pinned ? '取消置顶' : '置顶'}</button>`;
+    document.body.append(menu);
+    paintIcons(menu);
+    const box = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(x, innerWidth - box.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(y, innerHeight - box.height - 8))}px`;
+    menu.querySelector('button').focus();
+  }
+  function lcPinChat(id) {
+    const c = customer(id);
+    lcChatMenuClose();
+    if (!c) return;
+    if (c.pinned) delete c.pinned;
+    else c.pinned = true;
+    persist();
+    render();
+    toast(c.pinned ? `已置顶「${c.name}」。` : `已取消置顶「${c.name}」。`);
+  }
+  document.addEventListener('contextmenu', event => {
+    const row = event.target.closest?.('#conversation-list .conversation[data-id]'), c = row && customer(row.dataset.id);
+    if (!c) return;
+    event.preventDefault();
+    // A right-click opens the menu where it happened; the menu key opens it beside the chat.
+    const place = row.getBoundingClientRect();
+    lcChatMenuOpen(c, event.clientX || event.clientY ? event.clientX : place.left + 24, event.clientX || event.clientY ? event.clientY : place.top + place.height / 2);
+  });
+  document.addEventListener('click', event => {
+    const item = event.target.closest?.('[data-pin-chat]');
+    if (item) return lcPinChat(item.dataset.pinChat);
+    if (!event.target.closest?.('.chat-menu')) lcChatMenuClose();
+  });
+  // Escape closes the menu and gives the focus back to the chat; scrolling, resizing or leaving the page closes it.
+  document.addEventListener('keydown', event => {
+    const menu = document.querySelector('.chat-menu');
+    if (!menu || event.key !== 'Escape') return;
+    event.preventDefault();
+    const id = menu.querySelector('[data-pin-chat]').dataset.pinChat;
+    lcChatMenuClose();
+    [...document.querySelectorAll('#conversation-list .conversation[data-id]')].find(row => row.dataset.id === id)?.focus();
+  });
+  addEventListener('scroll', lcChatMenuClose, true);
+  addEventListener('resize', lcChatMenuClose);
+  addEventListener('blur', lcChatMenuClose);
 
   const lcPrevChatHTML = chatHTML;
   chatHTML = function(c) {
