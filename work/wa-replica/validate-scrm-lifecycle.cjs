@@ -508,6 +508,14 @@ for (const gone of ['<span>本地演示</span>', '演示消息', '模拟扫码',
 for (const required of ['const day=openwaDayLabel(m),separator=', "(m.side==='out'?openwaMessageMark(m):'')", 'return openwaOrder(list)}', '  function send() {}\n']) {
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
+// One currency for the whole price list, chosen in the confirm dialog of an upload (plan 059). It starts on the
+// currency the headers name; every price the page shows or quotes carries it, and a list saved before the choice
+// existed keeps the currencies of its headers.
+for (const required of ['<select class="fid-select" id="price-currency">', "const start = list.columns.prices.map(priceHeaderCurrency).find(Boolean) || '';", 'if (list.currency === undefined) return priceMoney(list.columns.prices[at], value);', 'return list.currency && !/[$€£¥]/.test(value) ? `${list.currency} ${value}` : value;', "const chosen = $('#price-currency')?.value || '', currency = PRICE_CURRENCIES.some(([code]) => code === chosen) ? chosen : '';", 'data.priceList = { file: pending.file, at: new Date().toISOString(), by: ui.persona, currency, columns: pending.columns, rows: pending.rows };', '${esc(priceShown(list, at, value))}</button>', ': ${priceShown(list, at, entry.prices[at])}']) {
+  assert(pricePage.includes(required), `fidelity-pricelist.js is missing ${required}`);
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert.equal(pricePage.match(/priceMoney\(/g).length, 2, 'a price must be shown and quoted only through priceShown');
 
 const summary = {
   version: req.version,
@@ -539,6 +547,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',
   externalNetworkCalls: false,
 };
 fs.writeFileSync(path.join(out, 'validation.json'), JSON.stringify(summary, null, 2) + '\n');

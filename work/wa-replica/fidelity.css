@@ -567,6 +567,8 @@
 .price-table th,.price-table td { text-align:left; }
 .price-table col:first-child { width:64px; }
 .price-preview p { margin:0 0 10px; font-size:13px; }
+.price-preview .fid-form-row { margin:4px 0 12px; }
+.price-preview #price-currency { min-width:240px; }
 .price-quote-button { display:inline-flex; align-items:center; gap:4px; margin-left:6px; padding:2px 8px; border:1px solid var(--fid-frame); border-radius:999px; background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:12px; line-height:18px; white-space:nowrap; cursor:pointer; }
 .price-quote-button:hover { border-color:var(--color-accent); color:var(--color-accent); }
 .price-quote-button:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }

@@ -1008,6 +1008,8 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .price-table th,.price-table td { text-align:left; }
 .price-table col:first-child { width:var(--fid-px-64); }
 .price-preview p { margin:0 0 var(--fid-px-10); font-size:var(--fid-px-13); }
+.price-preview .fid-form-row { margin:var(--fid-px-4) 0 var(--fid-px-12); }
+.price-preview #price-currency { min-width:var(--fid-px-240); }
 .price-quote-button { display:inline-flex; align-items:center; gap:var(--fid-px-4); margin-left:var(--fid-px-6); padding:var(--fid-px-2) var(--fid-px-8); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-999); background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:var(--fid-px-12); line-height:var(--fid-px-18); white-space:nowrap; cursor:pointer; }
 .price-quote-button:hover { border-color:var(--color-accent); color:var(--color-accent); }
 .price-quote-button:focus-visible { outline:var(--fid-px-2) solid var(--color-accent); outline-offset:var(--fid-px-1); }

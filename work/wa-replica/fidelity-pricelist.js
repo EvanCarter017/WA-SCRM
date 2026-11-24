@@ -2,7 +2,8 @@
   // The price list (plan 037). A person uploads an Excel or CSV file on the page "价格表"; the file is read in the
   // browser (pricefile.js) and its products replace the list. In a conversation the button "报价" beside the
   // message box finds a product and puts its price into the message box. Nothing here sends a message, suggests
-  // a product by itself or calls a server; a price is shown exactly as the file gives it.
+  // a product by itself or calls a server; a price is shown as the file gives it, in the currency chosen for the
+  // list when it was uploaded (plan 059).
   // ============================================================================
   const PRICE_MESSAGES = {
     'too-large': '文件超过 5 MB，无法作为价格表。',
@@ -47,14 +48,35 @@
   }
   // What a price column is called once the currency is taken out of its header: "100+ ($)" is "100+".
   const priceColumnName = label => String(label || '').replace(PRICE_CURRENCY, '').replace(/[（(]\s*[）)]/g, '').replace(/\s+/g, ' ').trim();
-  const priceHeads = list => [list.columns.code || '简称', ...(list.columns.name ? [list.columns.name] : []), ...(list.columns.spec ? [list.columns.spec] : []), ...list.columns.prices.map((label, i) => label || `价格 ${i + 1}`)];
+  // The currency of the whole list, chosen in the confirm dialog of an upload (plan 059): one of these codes, or ''
+  // for none. The choice starts on the currency the price columns' headers name. A list saved before the choice
+  // existed has no currency and shows every price in the currency its own column's header names, as before.
+  const PRICE_CURRENCIES = [['USD', '美元'], ['EUR', '欧元'], ['CNY', '人民币'], ['GBP', '英镑'], ['HKD', '港币'], ['JPY', '日元'], ['AUD', '澳元'], ['CAD', '加元'], ['SGD', '新加坡元'], ['MXN', '墨西哥比索'], ['BRL', '巴西雷亚尔'], ['INR', '印度卢比'], ['AED', '阿联酋迪拉姆'], ['SAR', '沙特里亚尔'], ['RUB', '俄罗斯卢布'], ['KRW', '韩元'], ['VND', '越南盾'], ['THB', '泰铢']];
+  const PRICE_SIGN_CODES = { 'US$': 'USD', 'HK$': 'HKD', $: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'CNY', '₹': 'INR', '₽': 'RUB', '₩': 'KRW', '₫': 'VND', '฿': 'THB', RMB: 'CNY' };
+  // The currency a header names, as a code: "Price ($)" gives USD, "售价（人民币）" gives CNY, "售价" gives ''.
+  function priceHeaderCurrency(label) {
+    const sign = PRICE_CURRENCY.exec(label || '')?.[0]?.toUpperCase();
+    const word = PRICE_CURRENCY_WORDS.find(([pattern]) => pattern.test(label || ''))?.[1];
+    return sign ? PRICE_SIGN_CODES[sign] || sign : PRICE_SIGN_CODES[word] || '';
+  }
+  const priceCurrencyLabel = code => `${code} ${PRICE_CURRENCIES.find(([known]) => known === code)?.[1] || ''}`.trim();
+  // A price as the page shows and quotes it: in the list's currency ("USD 40"), or with none when none was chosen.
+  // A price that carries its own sign in the file ("$40") stays as it is.
+  function priceShown(list, at, value) {
+    if (list.currency === undefined) return priceMoney(list.columns.prices[at], value);
+    return list.currency && !/[$€£¥]/.test(value) ? `${list.currency} ${value}` : value;
+  }
+  // A price column's head: as the file names it; once a currency was chosen for the list, without the header's own
+  // currency and with the chosen one: "Price ($)" with EUR chosen is "Price（EUR）".
+  const priceHead = (list, label, i) => (list.currency === undefined ? label || `价格 ${i + 1}` : `${priceColumnName(label) || `价格 ${i + 1}`}${list.currency ? `（${list.currency}）` : ''}`);
+  const priceHeads = list => [list.columns.code || '简称', ...(list.columns.name ? [list.columns.name] : []), ...(list.columns.spec ? [list.columns.spec] : []), ...list.columns.prices.map((label, i) => priceHead(list, label, i))];
   const priceCells = (list, entry) => [entry.code, ...(list.columns.name ? [entry.name] : []), ...(list.columns.spec ? [entry.spec] : []), ...list.columns.prices.map((label, i) => entry.prices[i] || '')];
   // The line that goes into the message box, e.g. "Product Alpha PRDA01 (100*10 Units): $40". With several price
   // columns the line says which one: "... : $10.5 (100+)".
   function priceLine(list, entry, at) {
     const label = list.columns.prices[at] || '';
     const column = list.columns.prices.length > 1 ? priceColumnName(label) : '';
-    return `${[entry.name, entry.code].filter(Boolean).join(' ')}${entry.spec ? ` (${entry.spec})` : ''}: ${priceMoney(label, entry.prices[at])}${column ? ` (${column})` : ''}`;
+    return `${[entry.name, entry.code].filter(Boolean).join(' ')}${entry.spec ? ` (${entry.spec})` : ''}: ${priceShown(list, at, entry.prices[at])}${column ? ` (${column})` : ''}`;
   }
 
   // ---- page: #prices (价格表) ----
@@ -68,7 +90,7 @@
   function renderPriceList() {
     const list = priceList();
     const about = list
-      ? `当前价格表：${list.file || '未命名文件'}，共 ${list.rows.length} 个产品，${fidDate(list.at)} 由 ${member(list.by)?.name || list.by || '—'} 上传`
+      ? `当前价格表：${list.file || '未命名文件'}，共 ${list.rows.length} 个产品${list.currency === undefined ? '' : list.currency ? `，售价币种 ${priceCurrencyLabel(list.currency)}` : '，售价不显示币种'}，${fidDate(list.at)} 由 ${member(list.by)?.name || list.by || '—'} 上传`
       : '尚未上传价格表';
     return `<section class="fid-page"><div class="fid-panel price-panel">
       ${fidHead('价格表', '上传一份 Excel（.xlsx）或 CSV 文件作为价格表。在聊天界面点击消息框旁的「报价」，即可查找产品并把价格放入消息框；消息仍由你确认后发送。')}
@@ -103,9 +125,11 @@
     priceView.pending = { file: String(file.name || '').slice(0, 120), columns: list.columns, rows: list.rows };
     const heads = priceHeads(list).map(esc), first = list.rows.slice(0, 5);
     const names = [['简称', list.columns.code], ['名称', list.columns.name], ['规格', list.columns.spec], ['价格', list.columns.prices.join('、')]].filter(([, label]) => label);
+    const start = list.columns.prices.map(priceHeaderCurrency).find(Boolean) || '';
     fidDialog('确认价格表', `<div class="modal-body price-preview">
       <p>文件：<strong>${esc(priceView.pending.file)}</strong></p>
       <p>读取到 <strong>${list.rows.length}</strong> 个产品${list.skipped ? `，另有 ${list.skipped} 行没有价格，已略过` : ''}。各列按表头识别为：${names.map(([name, label]) => `${name} = ${esc(label)}`).join('；')}。</p>
+      ${fidFormRow('售价币种', `<select class="fid-select" id="price-currency">${option('', '不显示币种', start)}${PRICE_CURRENCIES.map(([code]) => option(code, priceCurrencyLabel(code), start)).join('')}</select><span class="fid-field-help">报价时每个价格都带上这个币种，例如「USD 40」。${start ? '已按表头选好，可以更改。' : ''}</span>`, 'price-currency')}
       <div class="fid-table-scroll"><table class="fid-table price-table"><thead><tr>${heads.map(head => `<th scope="col">${head}</th>`).join('')}</tr></thead><tbody>${first.map(entry => `<tr>${priceCells(list, entry).map(cell => `<td>${esc(cell || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="price-note">${list.rows.length > first.length ? `以上为前 ${first.length} 个产品。` : ''}确认后将${priceList() ? '替换当前价格表' : '作为价格表使用'}。</p>
     </div>`, fidButton('确认使用', 'priceUse', '', 'blue') + fidButton('取 消', 'close'), true);
@@ -124,7 +148,7 @@
     const several = list.columns.prices.length > 1;
     const rows = found.slice(0, PRICE_QUOTE_ROWS).map(entry => {
       const prices = entry.prices.map((value, at) => (value
-        ? `<button type="button" class="fid-btn slim tint" data-action="priceInsert" data-id="${list.rows.indexOf(entry)}:${at}" title="${esc(priceLine(list, entry, at))}">${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceMoney(list.columns.prices[at], value))}</button>`
+        ? `<button type="button" class="fid-btn slim tint" data-action="priceInsert" data-id="${list.rows.indexOf(entry)}:${at}" title="${esc(priceLine(list, entry, at))}">${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceShown(list, at, value))}</button>`
         : '')).join('');
       return `<li class="price-quote-row"><span class="price-quote-product"><strong>${esc(entry.code)}</strong>${entry.name ? ` <span>${esc(entry.name)}</span>` : ''}${entry.spec ? ` <small>${esc(entry.spec)}</small>` : ''}</span><span class="price-quote-prices">${prices}</span></li>`;
     }).join('');
@@ -147,13 +171,14 @@
     priceUse: () => {
       const pending = priceView.pending;
       if (!pending) return;
-      data.priceList = { file: pending.file, at: new Date().toISOString(), by: ui.persona, columns: pending.columns, rows: pending.rows };
+      const chosen = $('#price-currency')?.value || '', currency = PRICE_CURRENCIES.some(([code]) => code === chosen) ? chosen : '';
+      data.priceList = { file: pending.file, at: new Date().toISOString(), by: ui.persona, currency, columns: pending.columns, rows: pending.rows };
       Object.assign(priceView, { pending: null, query: '' });
       ui.pages.prices = 0;
       persist();
       close();
       render();
-      toast(`价格表已更新，共 ${pending.rows.length} 个产品。`);
+      toast(`价格表已更新，共 ${pending.rows.length} 个产品${currency ? `，售价币种 ${currency}` : ''}。`);
     },
     priceClear: () => { if (priceList()) fidConfirm('彻底删除价格表', '价格表会从系统中彻底删除：页面上、服务器保存的数据和保存记录里都不再留下它，无法恢复。删除后，聊天界面的「报价」将没有可选的产品；已经放进消息或草稿里的报价不受影响。确认彻底删除？', 'priceClearDo'); },
     // The server takes the list out with every trace of it (WA_SITE.purge); only then is it gone from the page.
