@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-24T19:04:12.956Z",
+  "checkedAt": "2026-11-24T19:13:43.186Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -53,6 +53,7 @@
   "messageTranslation": "once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again",
   "fileSending": "up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "customerPictures": "the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp's own servers or the gateway, kept for a day; the initials stay when there is none",
+  "reasoningEffort": "AI_REASONING_EFFORT in the server's settings (none, minimal, low, medium or high) is sent to the model service as reasoning_effort and named by the status; a value outside these leaves the service not configured (bad-reasoning-effort); without it nothing is sent",
   "voiceWithGemini": "voice notes into text can use Google Gemini (VOICE_PROVIDER=gemini, model gemini-3.5-transcribe): the sound goes inline into a generateContent request with the key in its own header, 14 MB at most; the answer's words without the model's thoughts",
   "replyWordsKeptBack": "the words a seller typed are kept by the relay as the translation of the sent reply back into the seller's reading language (when written in it), so that another workspace of this server receiving the reply shows the seller's own words",
   "pinnedChats": "a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged",

@@ -22,6 +22,10 @@ const MAX_BUSINESS = 600;
 const MAX_CONTEXT_MESSAGES = 6;
 const MAX_CONTEXT_TEXT = 300;
 const MAX_OUTPUT_TOKENS = 4096;
+// How much a model that reasons before it answers may reason (plan 065): the values AI_REASONING_EFFORT may take,
+// sent to the service as reasoning_effort. Without the setting nothing is sent and the model reasons as it does by
+// default.
+const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'];
 const TIMEOUT_MS = Number(process.env.WA_SCRM_AI_TIMEOUT_MS) || 30000;
 // Services with an OpenAI-compatible /audio/transcriptions endpoint, and the model each one is asked for when
 // the settings name none.
@@ -123,7 +127,9 @@ function loadConfig() {
   if (!/^https?:\/\/\S+$/.test(baseUrl)) return { configured: false, reason: 'missing-address' };
   if (!values.AI_API_KEY) return { configured: false, reason: 'missing-key' };
   if (!values.AI_MODEL) return { configured: false, reason: 'missing-model' };
-  return { configured: true, name: preset.name, baseUrl, model: values.AI_MODEL, key: values.AI_API_KEY, limitField: preset.limitField };
+  const reasoning = (values.AI_REASONING_EFFORT || '').toLowerCase();
+  if (reasoning && !REASONING_EFFORTS.includes(reasoning)) return { configured: false, reason: 'bad-reasoning-effort' };
+  return { configured: true, name: preset.name, baseUrl, model: values.AI_MODEL, key: values.AI_API_KEY, limitField: preset.limitField, ...(reasoning ? { reasoning } : {}) };
 }
 
 // The speech service of the same settings file.
@@ -260,6 +266,7 @@ async function askModel(config, system, user) {
         model: config.model,
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         [config.limitField]: MAX_OUTPUT_TOKENS,
+        ...(config.reasoning ? { reasoning_effort: config.reasoning } : {}),
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -325,7 +332,7 @@ async function handle(req, res, pathname) {
     const config = loadConfig(), voice = loadVoiceConfig();
     // voice says whether speech can be turned into text, whatever the state of the model service.
     return sendJson(res, 200, {
-      ...(config.configured ? { configured: true, provider: config.name, model: config.model } : { configured: false, reason: config.reason }),
+      ...(config.configured ? { configured: true, provider: config.name, model: config.model, ...(config.reasoning ? { reasoning: config.reasoning } : {}) } : { configured: false, reason: config.reason }),
       voice: voice.configured ? { configured: true, provider: voice.name, model: voice.model } : { configured: false, reason: voice.reason },
     });
   }

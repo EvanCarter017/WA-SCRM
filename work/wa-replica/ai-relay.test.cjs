@@ -87,6 +87,7 @@ test('not configured: every reason is reported and no translation is attempted',
   const reasonFor = async lines => { writeEnv(lines); const { voice, ...model } = (await call('/api/ai/status', { method: 'GET' })).json; return model; };
   assert.deepEqual(await reasonFor(['AI_PROVIDER=anthropic', 'AI_API_KEY=x', 'AI_MODEL=m']), { configured: false, reason: 'unsupported-provider' });
   assert.deepEqual(await reasonFor(['AI_PROVIDER=other', 'AI_API_KEY=x', 'AI_MODEL=m']), { configured: false, reason: 'missing-address' });
+  assert.deepEqual(await reasonFor(['AI_PROVIDER=openai', 'AI_API_KEY=x', 'AI_MODEL=m', 'AI_REASONING_EFFORT=extreme']), { configured: false, reason: 'bad-reasoning-effort' });
   assert.deepEqual(await reasonFor(['AI_PROVIDER=openai', 'AI_MODEL=m']), { configured: false, reason: 'missing-key' });
   assert.deepEqual(await reasonFor(['AI_PROVIDER=openai', 'AI_API_KEY=x']), { configured: false, reason: 'missing-model' });
   const calls = upstream.calls.length;
@@ -124,6 +125,21 @@ test('translate: sends the key, the model and the message to the service and ret
   assert.equal(sent.body.messages[1].content, SECRET_TEXT);
   assert(sent.body.messages[0].content.includes("Translate the user's message into 中文.") && sent.body.messages[0].content.includes('Output only the translation.'));
   assert(!result.raw.includes(KEY));
+});
+
+test('translate and reply: the reasoning effort of the settings is sent as reasoning_effort and named by the status; without it none is sent', async () => {
+  configure(['AI_REASONING_EFFORT=Low']);
+  upstream.mode = 'ok'; upstream.calls.length = 0;
+  assert.equal((await call('/api/ai/translate', { body: { text: 'Reasoning low, please.', to: '中文' } })).status, 200);
+  assert.equal((await call('/api/ai/reply', { body: { text: '请问需要几箱？', to: 'English' } })).status, 200);
+  assert.deepEqual(upstream.calls.map(c => c.body.reasoning_effort), ['low', 'low']);
+  const status = (await call('/api/ai/status', { method: 'GET' })).json;
+  assert.deepEqual([status.configured, status.model, status.reasoning], [true, 'test-model', 'low']);
+  configure();
+  upstream.calls.length = 0;
+  assert.equal((await call('/api/ai/translate', { body: { text: 'No reasoning setting.', to: '中文' } })).status, 200);
+  assert.equal('reasoning_effort' in upstream.calls[0].body, false);
+  assert.equal('reasoning' in (await call('/api/ai/status', { method: 'GET' })).json, false);
 });
 
 test('translate: the OpenAI preset uses its own address and max_completion_tokens', async () => {
