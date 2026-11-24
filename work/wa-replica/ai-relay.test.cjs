@@ -36,6 +36,15 @@ const upstreamServer = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(upstream.voice === 'odd' ? { usage: {} } : { text: upstream.voice === 'silent' ? '' : '  Hola, quiero dos cajas.  ', usage: { type: 'tokens' } }));
     }
+    // Gemini: the sound inline in an ordinary request, the key in a header of its own (plan 064)
+    if (req.url.endsWith(':generateContent')) {
+      const parts = JSON.parse(raw || '{}').contents?.[0]?.parts || [];
+      const sound = parts.find(part => part.inline_data)?.inline_data;
+      upstream.calls.push({ url: req.url, key: req.headers['x-goog-api-key'], auth: req.headers.authorization, mime: sound?.mime_type, bytes: sound ? Buffer.from(sound.data, 'base64').length : -1, prompt: parts.some(part => typeof part.text === 'string' && part.text.length > 20) });
+      if (upstream.voice === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(upstream.voice === 'odd' ? { usage: {} } : { candidates: [{ content: { parts: upstream.voice === 'silent' ? [] : [{ text: 'Listening first…', thought: true }, { text: '  Hola, quiero dos cajas.  ' }] }, finishReason: 'STOP' }] }));
+    }
     upstream.calls.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(raw || '{}') });
     if (upstream.mode === 'hang') return;
     if (upstream.mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
@@ -289,6 +298,35 @@ test('speech to text: the voice settings, what is sent to the service, and its a
   assert.equal(upstream.calls.length, calls, 'refused before the service is called');
   configure(['VOICE_PROVIDER=other', 'VOICE_API_KEY=v', 'VOICE_BASE_URL=http://127.0.0.1:9/v1', 'VOICE_MODEL=m']);
   await refused(relay.transcribeAudio(wav, 'audio/wav'), 'provider-unreachable', 502);
+});
+
+test('speech to text with Gemini: the preset; the sound inline in an ordinary request with the key in a header of its own; the words of the answer without thoughts; MP3 under its documented name; no speech; failures; a sound too large for Gemini', async () => {
+  const wav = Buffer.concat([Buffer.from('RIFF\0\0\0\0WAVEfmt '), Buffer.alloc(40, 3)]);
+  const refused = (promise, code, status) => assert.rejects(promise, error => error.message === code && error.status === status);
+  configure(['VOICE_PROVIDER=Gemini', 'VOICE_API_KEY=v']);
+  assert.deepEqual(relay.loadVoiceConfig(), { configured: true, name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.5-transcribe', key: 'v', native: 'gemini' });
+  configure(['VOICE_PROVIDER=gemini', `VOICE_API_KEY=${VOICE_KEY}`, `VOICE_BASE_URL=http://127.0.0.1:${upstreamPort}/v1beta/`]);
+  const status = await call('/api/ai/status', { method: 'GET' });
+  assert.deepEqual(status.json.voice, { configured: true, provider: 'Google Gemini', model: 'gemini-3.5-transcribe' });
+  assert(!status.raw.includes(VOICE_KEY));
+  upstream.voice = 'ok';
+  upstream.calls.length = 0;
+  assert.equal(await relay.transcribeAudio(wav, 'audio/ogg'), 'Hola, quiero dos cajas.');
+  assert.deepEqual(upstream.calls, [{ url: '/v1beta/models/gemini-3.5-transcribe:generateContent', key: VOICE_KEY, auth: undefined, mime: 'audio/ogg', bytes: wav.length, prompt: true }]);
+  await relay.transcribeAudio(wav, 'audio/mpeg');
+  assert.equal(upstream.calls[1].mime, 'audio/mp3');
+  upstream.voice = 'silent';
+  assert.equal(await relay.transcribeAudio(wav, 'audio/wav'), '');
+  upstream.voice = 'error';
+  await assert.rejects(relay.transcribeAudio(wav, 'audio/wav'), error => error.message === 'provider-error' && error.status === 502 && error.upstream === 500);
+  upstream.voice = 'odd';
+  await refused(relay.transcribeAudio(wav, 'audio/wav'), 'empty-result', 502);
+  upstream.voice = 'ok';
+  const calls = upstream.calls.length;
+  await refused(relay.transcribeAudio(Buffer.alloc(14 * 1024 * 1024 + 1), 'audio/ogg'), 'too-long', 413);
+  await refused(relay.transcribeAudio(wav, 'video/mp4'), 'unsupported-audio', 415);
+  assert.equal(upstream.calls.length, calls, 'refused before the service is called');
+  assert(!logged.some(line => line.includes(VOICE_KEY)), 'the key is never logged');
 });
 
 test('translate: a translation made once is kept and given again without asking the service; another language or text asks again; a failure is not kept; replies are never kept; without a data folder nothing is kept', async () => {

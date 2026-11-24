@@ -28,8 +28,16 @@ const TIMEOUT_MS = Number(process.env.WA_SCRM_AI_TIMEOUT_MS) || 30000;
 const VOICE_PROVIDERS = {
   openai: { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini-transcribe' },
   groq: { name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'whisper-large-v3-turbo' },
+  // Gemini has no /audio/transcriptions address: the sound goes inline into an ordinary request to the model
+  // (plan 064). Its model for this is the one made for transcribing.
+  gemini: { name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.5-transcribe', native: 'gemini' },
   other: { name: '自定义服务', baseUrl: '', model: '' },
 };
+// What Gemini is asked with the sound. Its request may be 20 MB at most, and the sound goes into it as base64 (a
+// third larger); MP3 goes under the name Gemini documents for it.
+const GEMINI_VOICE_PROMPT = 'Transcribe the speech in this audio exactly as spoken, in the language it is spoken in. Reply with the transcript only, without comments, labels or translation. If there is no speech, reply with nothing.';
+const GEMINI_VOICE_MAX = 14 * 1024 * 1024;
+const GEMINI_TYPES = { 'audio/mpeg': 'audio/mp3' };
 // The kinds of sound the speech services take, and the file name each is sent under.
 const VOICE_FILES = { 'audio/ogg': 'voice.ogg', 'audio/mpeg': 'voice.mp3', 'audio/mp4': 'voice.m4a', 'audio/wav': 'voice.wav', 'audio/webm': 'voice.webm' };
 const MAX_VOICE_BYTES = 24 * 1024 * 1024;
@@ -138,7 +146,16 @@ function loadVoiceConfig() {
   if (!values.VOICE_API_KEY) return { configured: false, reason: 'missing-key' };
   const model = values.VOICE_MODEL || preset.model;
   if (!model) return { configured: false, reason: 'missing-model' };
-  return { configured: true, name: preset.name, baseUrl, model, key: values.VOICE_API_KEY };
+  return { configured: true, name: preset.name, baseUrl, model, key: values.VOICE_API_KEY, ...(preset.native ? { native: preset.native } : {}) };
+}
+
+// The words of a Gemini answer: the text of its first candidate without the model's thoughts; '' when it heard no
+// speech; null when the answer holds no candidate at all.
+function geminiWords(body) {
+  const candidate = Array.isArray(body?.candidates) ? body.candidates[0] : undefined;
+  if (!candidate) return null;
+  const parts = Array.isArray(candidate.content?.parts) ? candidate.content.parts : [];
+  return parts.filter(part => typeof part?.text === 'string' && !part.thought).map(part => part.text).join('');
 }
 
 // Speech to text for one sound file. kind is what the file is by its first bytes (audio/ogg, …). Returns the
@@ -147,25 +164,32 @@ async function transcribeAudio(bytes, kind) {
   const config = loadVoiceConfig();
   if (!config.configured) throw failure(503, 'not-configured', { reason: config.reason });
   if (!Object.hasOwn(VOICE_FILES, kind)) throw failure(415, 'unsupported-audio');
-  if (bytes.length > MAX_VOICE_BYTES) throw failure(413, 'too-long');
-  const form = new FormData();
-  form.append('file', new Blob([bytes], { type: kind }), VOICE_FILES[kind]);
-  form.append('model', config.model);
-  form.append('response_format', 'json');
+  const gemini = config.native === 'gemini';
+  if (bytes.length > (gemini ? GEMINI_VOICE_MAX : MAX_VOICE_BYTES)) throw failure(413, 'too-long');
   const started = Date.now();
   let response;
   try {
-    response = await fetch(config.baseUrl + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + config.key }, body: form, signal: AbortSignal.timeout(VOICE_TIMEOUT_MS) });
+    if (gemini) {
+      const parts = [{ inline_data: { mime_type: GEMINI_TYPES[kind] || kind, data: bytes.toString('base64') } }, { text: GEMINI_VOICE_PROMPT }];
+      response = await fetch(`${config.baseUrl}/models/${encodeURIComponent(config.model)}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.key }, body: JSON.stringify({ contents: [{ role: 'user', parts }] }), signal: AbortSignal.timeout(VOICE_TIMEOUT_MS) });
+    } else {
+      const form = new FormData();
+      form.append('file', new Blob([bytes], { type: kind }), VOICE_FILES[kind]);
+      form.append('model', config.model);
+      form.append('response_format', 'json');
+      response = await fetch(config.baseUrl + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + config.key }, body: form, signal: AbortSignal.timeout(VOICE_TIMEOUT_MS) });
+    }
   } catch (error) {
     console.error(`ai transcribe failed error=${error.name === 'TimeoutError' ? 'timeout' : 'provider-unreachable'} ms=${Date.now() - started}`);
     throw error.name === 'TimeoutError' ? failure(504, 'timeout') : failure(502, 'provider-unreachable');
   }
   const body = response.ok ? await response.json().catch(() => null) : null;
-  if (typeof body?.text !== 'string') {
+  const heard = gemini ? geminiWords(body) : body?.text;
+  if (typeof heard !== 'string') {
     console.error(`ai transcribe failed error=${response.ok ? 'empty-result' : 'provider-error upstream=' + response.status} ms=${Date.now() - started}`);
     throw response.ok ? failure(502, 'empty-result') : failure(502, 'provider-error', { upstream: response.status });
   }
-  const words = body.text.trim();
+  const words = heard.trim();
   console.log(`ai transcribe ok bytes=${bytes.length} chars=${words.length} ms=${Date.now() - started}`);
   return words;
 }
