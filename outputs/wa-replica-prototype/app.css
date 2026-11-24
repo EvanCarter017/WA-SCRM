@@ -997,6 +997,11 @@ dialog>#toast,dialog>#toast.show{transform:none}
 /* The choice of a customer's language, at the right of the strip above a conversation (plan 038). Where the
    conversation is narrow, the list box of the choice narrows before anything sticks out of the strip. */
 .source-strip .ai-language-pick { margin-left:auto; display:inline-flex; align-items:center; gap:var(--fid-px-6); min-width:0; color:var(--color-text-muted); font-size:var(--fid-px-12); white-space:nowrap; }
+.source-strip .ai-shortcut-gear { width:var(--fid-px-28); height:var(--fid-px-28); margin-left:var(--fid-px-2); color:var(--color-text-muted); }
+.source-strip .ai-shortcut-gear .icon { width:var(--fid-px-16); height:var(--fid-px-16); }
+.ai-shortcut-about { margin:0 0 var(--fid-px-14); }
+.ai-shortcut-key { width:100%; cursor:pointer; caret-color:transparent; font-weight:600; }
+#ai-shortcut-form .fid-btn.slim { margin-top:var(--fid-px-8); }
 .ai-language-pick svg { width:var(--fid-px-14); height:var(--fid-px-14); flex:none; }
 .ai-language-pick span { flex:none; }
 .ai-language-pick .fid-select { height:var(--fid-px-28); min-width:0; flex:0 1 auto; padding:0 var(--fid-px-8); font-size:var(--fid-px-12); }

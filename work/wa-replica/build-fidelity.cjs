@@ -402,6 +402,12 @@ if (!lucideIcons && fs.existsSync(path.join(output, 'icons.js'))) {
   lucideIcons = vm.runInNewContext(read(output, 'icons.js') + ';window.WA_ICONS', { window: {} });
 }
 assert(lucideIcons, 'Unable to load icon definitions');
+// Icons the committed pool does not hold yet, from lucide-static 1.0.0 — the version the pool comes from (ISC
+// licence, see lucide-license.txt) — in lucide's own format. An icon of the same name in the pool comes first.
+const addedIcons = {
+  Settings: [["path",{"d":"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"}],["circle",{"cx":"12","cy":"12","r":"3"}]],
+};
+lucideIcons = { ...addedIcons, ...lucideIcons };
 const names = [...new Set([...(index+js+master).matchAll(/["']([A-Z][A-Za-z0-9]*)["']/g)].map(m=>m[1]))].filter(n=>Array.isArray(lucideIcons[n]));
 const iconJS = 'window.WA_ICONS='+JSON.stringify(Object.fromEntries(names.map(n=>[n,lucideIcons[n]])))+';\n';
 

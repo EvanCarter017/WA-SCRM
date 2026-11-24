@@ -516,6 +516,15 @@ for (const required of ['<select class="fid-select" id="price-currency">', "cons
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
 assert.equal(pricePage.match(/priceMoney\(/g).length, 2, 'a price must be shown and quoted only through priceShown');
+// The translation shortcut (plan 060): set under a gear beside the customer's language by pressing it; in the
+// message box it translates what was typed and shows it above the box. It is caught before the page's own
+// handling of Enter, so that a shortcut with Enter translates instead of sending.
+for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'if (event.isComposing || event.keyCode === 229 || aiShortcutOf(event) !== aiShortcut()) return;', "fidForms['ai-shortcut-form'] = (f, v) => {", 'aiSettings().translateKey = combo;', "</select></label>${aiShortcutGear()}`;", "if (event.target.closest?.('[data-ai-shortcut]')) aiShortcutOpen();", 'return aiShortcutReady(c) ? `${keys}；${esc(aiShortcutLabel(aiShortcut()))} 翻译` : keys;', "aiRun('translate.outbound', aiOutboundInput(c, text), { customerId: c.id }).then(result => {"]) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+  assert(appJs.includes(required), `app.js is missing ${required}`);
+}
+assert(aiSource.includes('    aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
+assert(read(path.join(out, 'icons.js')).includes('"Settings":[["path"'), 'the gear must be in the icon pool');
 
 const summary = {
   version: req.version,
@@ -547,6 +556,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  translateShortcut: 'a key combination set under the gear beside the customer\'s language (Ctrl + Enter at first; Ctrl or Alt, maybe Shift, and a letter or Enter; combinations that typing, sending or the browser need are refused) translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter then sends the translation; the line under the box names it',
   priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',
   externalNetworkCalls: false,
 };
