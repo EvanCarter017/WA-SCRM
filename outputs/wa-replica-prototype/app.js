@@ -2193,16 +2193,34 @@ window.WA_START = () => {
 
   const openwaWait = ms => new Promise(resolve => setTimeout(resolve, ms));
   // Reads the feed for as long as the page is open. Another page that opens the sub-site takes the feed over.
+  // What is asked first — the server's state, then the feed for this page — is asked again, more slowly each time,
+  // until it is answered (plan 074): a server that is restarting, or a moment without network, must not leave the
+  // page without new messages until it is reloaded.
   async function openwaListen() {
-    const status = await openwaCall('GET', 'status');
-    if (status.status !== 200) return;
+    let status;
+    for (let failures = 0; ;) {
+      status = await openwaCall('GET', 'status');
+      if (status.status === 200) break;
+      if (window.WA_SITE.halted()) return;
+      if (status.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');
+      failures += 1;
+      await openwaWait(Math.min(30000, 1000 * 2 ** failures));
+    }
     openwaServer = { configured: Boolean(status.body.configured), reachable: Boolean(status.body.reachable) };
     if (!openwaServer.configured) return render();
     let changed = false;
     // Messages that were on their way when the page was closed: their outcome is open, and sending again is safe.
     for (const list of Object.values(data.messages)) for (const m of list) if (m.status === 'sending') { m.status = 'unknown'; changed = true; }
     if (changed) persist();
-    if ((await openwaCall('POST', 'claim', { client: openwaClient })).status !== 200) return render();
+    for (let failures = 0; ;) {
+      const claim = await openwaCall('POST', 'claim', { client: openwaClient });
+      if (claim.status === 200) break;
+      if (window.WA_SITE.halted()) return;
+      if (claim.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');
+      if (!failures) render();
+      failures += 1;
+      await openwaWait(Math.min(30000, 1000 * 2 ** failures));
+    }
     // First everything that happened while no page was open; then the numbers' states as the server sees them now.
     for (let failures = 0, caughtUp = false; ;) {
       const answer = await openwaCall('GET', `events?after=${Number(data.waCursor) || 0}&client=${openwaClient}&wait=${caughtUp ? 25 : 0}`);
