@@ -433,4 +433,7 @@ const assets = {
   'requirements.json':JSON.stringify(requirement,null,2)+'\n',
 };
 for(const [file,content] of Object.entries(assets))write(output,file,content);
+// The emoji font (plan 068): its parts and its licence are copied as they are.
+fs.mkdirSync(path.join(output,'fonts'),{recursive:true});
+for(const file of fs.readdirSync(path.join(__dirname,'fonts')))fs.copyFileSync(path.join(__dirname,'fonts',file),path.join(output,'fonts',file));
 console.log(JSON.stringify({version:requirement.version,base:'0.4-replica-ui',historicalFilesUnchanged:verifiedBaselineCount,icons:names.length,bytes:Buffer.byteLength(js),externalNetwork:false},null,2));

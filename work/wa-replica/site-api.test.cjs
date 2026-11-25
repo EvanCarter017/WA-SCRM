@@ -752,6 +752,28 @@ test('administration tool: creates an account with a temporary password, lists, 
   assert.equal(spawnSync(process.execPath, [path.join(__dirname, 'site-admin.cjs'), 'user', 'list'], { env: { ...process.env, WA_SCRM_DATA_DIR: '' }, encoding: 'utf8' }).stderr.trim(), 'site-admin: WA_SCRM_DATA_DIR is not set');
 });
 
+test('the preview server: the page\'s files are asked for anew every time; the parts of the emoji font go as fonts and are kept by the browser (plan 068)', async () => {
+  const child = spawn(process.execPath, [path.join(__dirname, 'serve.cjs'), '0'], { env: { ...process.env, WA_SCRM_DATA_DIR: '', WA_SCRM_AI_ENV: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    const base = await new Promise((resolve, reject) => {
+      let out = '';
+      child.stdout.on('data', chunk => { out += chunk; const m = out.match(/PREVIEW_URL=(http:\/\/127\.0\.0\.1:\d+)/); if (m) resolve(m[1]); });
+      child.on('exit', code => reject(new Error('serve.cjs exited early: ' + code)));
+      setTimeout(() => reject(new Error('serve.cjs did not start')), 8000);
+    });
+    const font = await fetch(base + '/fonts/noto-color-emoji-v50-9.woff2');
+    assert.deepEqual([font.status, font.headers.get('content-type'), font.headers.get('cache-control')], [200, 'font/woff2', 'public, max-age=31536000, immutable']);
+    assert.equal(Buffer.from(await font.arrayBuffer()).subarray(0, 4).toString('latin1'), 'wOF2');
+    for (const file of ['/app.js', '/app.css', '/fonts/noto-color-emoji-OFL.txt']) {
+      const answer = await fetch(base + file);
+      assert.deepEqual([answer.status, answer.headers.get('cache-control')], [200, 'no-store'], file);
+      await answer.arrayBuffer();
+    }
+  } finally {
+    child.kill();
+  }
+});
+
 test('the preview server: without a data folder the routes are off; with one, the AI relay answers signed-in users only', async () => {
   const start = env => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(__dirname, 'serve.cjs'), '0'], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });

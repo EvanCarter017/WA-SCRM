@@ -26,6 +26,7 @@ const mime = {
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.woff2': 'font/woff2',
 };
 
 function sendJson(res, status, body) {
@@ -50,7 +51,9 @@ async function serveFile(req, res, pathname) {
   const body = await fs.readFile(file);
   res.writeHead(200, {
     'Content-Type': mime[path.extname(file)] || 'text/plain; charset=utf-8',
-    'Cache-Control': 'no-store',
+    // The parts of the emoji font never change under their name (plan 068): the browser keeps them. Everything else
+    // is asked for anew every time.
+    'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-store',
   });
   res.end(req.method === 'HEAD' ? undefined : body);
 }

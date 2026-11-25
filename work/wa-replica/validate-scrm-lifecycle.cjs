@@ -279,6 +279,24 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// Every emoji drawn the same way on every computer (plan 068): the eleven parts of Noto Color Emoji (SIL OFL 1.1) and
+// its licence are shipped as they are and copied by the build; the page's style sheet names each part with its
+// characters and the colour format it needs, after the fonts of the text; the server sends the parts as fonts the
+// browser keeps.
+const emojiFontDir = path.join(__dirname, 'fonts');
+const emojiParts = Array.from({ length: 11 }, (_, n) => `noto-color-emoji-v50-${n}.woff2`);
+const emojiFiles = [...emojiParts, 'noto-color-emoji-OFL.txt'].sort();
+assert.deepEqual(fs.readdirSync(emojiFontDir).sort(), emojiFiles, 'work/wa-replica/fonts must hold the eleven parts of the emoji font and its licence');
+assert.deepEqual(fs.readdirSync(path.join(out, 'fonts')).sort(), emojiFiles, 'the built fonts folder must hold the same files');
+for (const file of emojiFiles) assert(fs.readFileSync(path.join(out, 'fonts', file)).equals(fs.readFileSync(path.join(emojiFontDir, file))), `fonts/${file} must be the built copy`);
+assert(read(path.join(emojiFontDir, 'noto-color-emoji-OFL.txt')).includes('SIL Open Font License, Version 1.1'), 'the licence of the emoji font must be shipped');
+const builtCss = read(path.join(out, 'app.css'));
+for (const file of emojiParts) assert(builtCss.includes(`src:url("fonts/${file}") format("woff2") tech(color-COLRv1); unicode-range:U+`), `app.css must name ${file}`);
+assert.equal((builtCss.match(/font-family:"SCRM Emoji"/g) || []).length, 11, 'app.css must have the eleven parts of the emoji font');
+assert(builtCss.includes('font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the emoji font must come after the fonts of the text');
+for (const required of ["'.woff2': 'font/woff2',", "'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-store',"]) {
+  assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
+}
 // A page whose saving goes wrong keeps trying and says so (plan 067): every save has a time limit, a guard catches
 // whatever goes wrong in the save, a save counts only with the new version in the answer, and the server's log is
 // told once for each kind of trouble — with the first plain words of the error, never data.
@@ -589,6 +607,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  ownEmoji: 'emoji are drawn with Noto Color Emoji (SIL OFL 1.1; work/wa-replica/fonts, copied by the build) in eleven parts named by their characters: a browser loads only the parts of the emoji on screen and keeps them (font/woff2, immutable); digits and signs keep the fonts of the text; a browser that cannot draw the colour format keeps its own emoji',
   saveGuard: 'every save of the page has a time limit of 30 s and a guard around it: whatever goes wrong, the changes stay, the page says they are not saved and tries again, and the server\'s log is told once for each kind of trouble (POST /api/site/report, signed in; who, sub-site, kind, status, the first plain words of the error, never data)',
   reasoningEffort: 'AI_REASONING_EFFORT in the server\'s settings (none, minimal, low, medium or high) is sent to the model service as reasoning_effort and named by the status; a value outside these leaves the service not configured (bad-reasoning-effort); without it nothing is sent',
   voiceWithGemini: 'voice notes into text can use Google Gemini (VOICE_PROVIDER=gemini, model gemini-3.5-transcribe): the sound goes inline into a generateContent request with the key in its own header, 14 MB at most; the answer\'s words without the model\'s thoughts',
