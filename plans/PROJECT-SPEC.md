@@ -2,7 +2,7 @@
 
 > **What this is.** A dense, verified description of the WA-SCRM system for an AI agent that has to understand, change, review or extend it. It states how the system works today, what must stay true, how to build and verify it, and which weak spots a deep audit found.
 >
-> **Stamp.** Written against commit `17da196` on `main`, 2026-11-25, with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents (correctness ×2, security, performance, tests, architecture + dependencies, tooling + docs, direction), then every finding in section 11 re-checked against the code by the advisor. Facts in sections 1–10 come from the advisor's own reading of the code.
+> **Stamp.** Written against commit `17da196` on `main`, 2026-11-25, with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents (correctness ×2, security, performance, tests, architecture + dependencies, tooling + docs, direction), then every ranked finding in section 11 (the table and its details) re-checked against the code by the advisor; the short list in 11.4 is given as the agents reported it. Facts in sections 1–10 come from the advisor's own reading of the code.
 >
 > **How to read it.** Sections 1–3 for orientation; 4–7 before touching code in that area; 8–10 before any change at all; 11 before planning work. Where this document and the code disagree, **the code wins** — record the drift (it is a finding).
 >
@@ -290,7 +290,7 @@ Grounded in the repository; none is approved.
 - Test timing margins (TEST-09) — no flaky run observed in three full runs.
 - Event-feed polling cost — a cheap 25 s long-poll; the costs are downstream (#24).
 
-### 11.4 Also reported, lower priority (not individually expanded here)
+### 11.4 Also reported by the audit agents, lower priority (not individually re-checked)
 Translation store keyed without model/prompt and never expiring (BUG-10); purge reported failed when VACUUM fails afterwards (BUG-07); send-file result recorded after the media copy (BUG-08); first-time linking race (BUG-09); translations of a deleted workspace re-created during removal (BUG-11); stale reply translation applied after a language change (CORR-09); a 200 without `messageId` can delete another message (CORR-10); merges lose the open draft (CORR-11); audit log not durable, report route not rate-limited (SEC-04); media read whole into memory (SEC-07, PERF-10); network separation of OpenWA and the provisioner (SEC-08); no AI budget (SEC-09); the `cached` flag reveals platform-wide translation history (SEC-10); nginx 1.27 branch and no image update routine (DEP-03); duplicated message rendering in `master.js` (DEBT-06); one SQLite helper and one Node line (DEP-04); validator pins exact text rather than behaviour (DEBT-07, TEST-07); unreachable manager-only UI and prototype seeding (DEBT-08); undocumented settings (`AI_REASONING_EFFORT`, `gemini` voice) in `ai.env.example` (DX-04); incomplete container first-run steps (DOCS-03); tests inherit `WA_SCRM_*` from the environment (TEST-03); shared fixtures between tests (TEST-10); missing index for receipt lookups (PERF-06); whole-document reads for `?fields=` (PERF-08).
 
 ### 11.5 Not audited
