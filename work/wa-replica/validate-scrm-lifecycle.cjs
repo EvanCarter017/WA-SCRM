@@ -279,6 +279,9 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A number still linked to WhatsApp is not removed from the account list (plan 073): it goes on receiving, and every
+// message for a number the page no longer knows would be dropped for good. 移除账号 asks to unlink it first.
+assert(read(path.join(__dirname, 'fidelity-ui.js')).includes("if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');fidConfirm('移除账号',") && appJs.includes("if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');fidConfirm('移除账号',") && appJs.includes('fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!a.linked&&!data.customers.some(c=>c.account===a.id));'), 'a number that is still linked must not be removed from the account list');
 // A stopped page stays stopped (plan 072): drawing the app again would hide the notice while every later change is
 // thrown away unsaved, so the drawing asks first whether the page was stopped, and the WhatsApp feed is read no more.
 const subsiteSource = read(path.join(__dirname, 'fidelity-subsite.js'));
@@ -629,6 +632,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  linkedNumberKept: '移除账号 refuses a number that is still linked to WhatsApp (online or offline) and asks to unlink it first in 号码管理 (解除绑定); a removed number that was still linked went on receiving, and every message for it was dropped',
   haltedStays: 'a page stopped with a notice (数据已在别处更新, 登录已失效, 已在其他页面打开) stays stopped: the app is not drawn behind the notice again and nothing more is taken in from the WhatsApp feed; 刷新页面 reloads the page, which reads the feed on from the saved position',
   endAfterTranslation: 'a conversation that shows its end keeps showing it when a translation redraws it, also when a picture takes its height a moment later (the redraw scrolls with the WhatsApp module\'s own noted step)',
   noPermissionsNote: 'the chat\'s tool rail ends with 刷新视图; the shield button 权限说明 and its dialog 会话权限 are gone (the rules of who sees what are unchanged)',
