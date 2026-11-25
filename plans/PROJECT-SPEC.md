@@ -4,6 +4,8 @@
 >
 > **Stamp.** Written against commit `17da196` on `main`, 2026-11-25, with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents (correctness ×2, security, performance, tests, architecture + dependencies, tooling + docs, direction), then every ranked finding in section 11 (the table and its details) re-checked against the code by the advisor; the short list in 11.4 is given as the agents reported it. Facts in sections 1–10 come from the advisor's own reading of the code.
 >
+> **Updated** 2026-11-25 after plans 072–075 (merged and live at commit `2de0a82`; the owner chose findings 1, 3, 4 and 5 of the audit's top five, not 2): findings #1, #3, #4 (its start half) and #5 are fixed and marked so in section 11; sections 4.2, 4.4 and 10 describe the new behaviour.
+>
 > **How to read it.** Sections 1–3 for orientation; 4–7 before touching code in that area; 8–10 before any change at all; 11 before planning work. Where this document and the code disagree, **the code wins** — record the drift (it is a finding).
 >
 > **What it deliberately leaves out.** Live machine addresses, workspace and account names, keys, settings files and any customer data. The repository is public and changes under `plans/` are published automatically; never add such things here.
@@ -99,15 +101,17 @@ Core capabilities, as built:
 - **Save protocol:** every data change calls `persist()` → `WA_SITE.save(data)` → after 400 ms `flush()`. The data is split into **parts**: each top-level field is one part, except `messages` and `activities`, which are split per customer id (`messages/<customerId>`). Parts are compared with what was last saved (`synced`, JSON text) and changed ones are sent with `PUT /api/data { baseVersion, set, remove }`, at most 256 KB per request (a larger single part goes alone), whole fields first, `waCursor` last.
 - Server answer handling: `200` with a numeric `version` → saved; `409` (version conflict) or `401` → `stop()` shows a blocking screen; anything else (incl. timeout after **30 s**, network error, 413) → keep the changes, show a notice, retry with backoff (2, 4, 8, 16, 30 s…), and report once per kind to `POST /api/site/report` (plan 067). A guard (`flush` wrapping `saveNow`) turns any exception in the save code into the same retry path.
 - On `pagehide` the page flushes with `keepalive`.
-- Known weak spots here: section 11 (CORR-01, CORR-03, PERF-01, CORR-12).
+- A page stopped with a notice stays stopped (plan 072): `window.WA_SITE.halted()` tells whether it was stopped; drawing (`renderSignInState`) then leaves the notice in place, and the WhatsApp feed is read no more.
+- Known weak spots here: section 11 (CORR-03, PERF-01, CORR-12).
 
 ### 4.3 Views and their labels
 Top tabs / sidebar: 首页 `#dashboard` · WhatsApp API `#inbox` (号码管理 numbers / 在线聊天 chat) · 客户列表 `#customers` · 跟进闭环 `#followups` · 账号列表 `#accounts` · 聊天记录 `#chat-records` · 标签管理 `#tags` · 标签统计 · AI 能力 `#ai` · 价格表 `#prices`. Hidden: 素材管理 `#materials` (no menu entry). Supervisors and admins get the supervisor page (`master.js`) instead of a workspace.
 
 ### 4.4 WhatsApp client (`fidelity-openwa.js`)
-- `openwaListen()`: `GET /api/wa/status` → `POST /api/wa/claim` (only one page per workspace receives the feed; a later page takes over, the earlier one halts) → loop `GET /api/wa/events?after=<waCursor>&wait=25` (long-poll), apply events (`openwaApply`), save, redraw (`openwaRefresh` → full `render()`).
+- `openwaListen()`: `GET /api/wa/status` → `POST /api/wa/claim` (only one page per workspace receives the feed; a later page takes over, the earlier one halts); both are asked again after 2, 4, 8 … at most 30 s until they are answered, and a 401 stops the page with 登录已失效 (plan 074) → loop `GET /api/wa/events?after=<waCursor>&wait=25` (long-poll), apply events (`openwaApply`), save, redraw (`openwaRefresh` → full `render()`); a stopped page reads no further (plan 072).
 - Events become customers and messages: a new chat creates a customer (`source: '未知来源'`, `engagement: 'open'`); messages carry `wa` (WhatsApp id) and status (`sending → sent → delivered → read`, or `failed`/`unknown`); twins (the same person under a phone chat and a privacy chat id) are merged.
-- Sending: `POST /api/wa/send` / `send-file` with a client request id (idempotent on the server); the page's own message is matched to its echo from the feed.
+- Sending: `POST /api/wa/send` / `send-file` with a client request id (idempotent on the server); the page's own message is matched to its echo from the feed while it is 发送中 or 结果待确认 (`sending` or `unknown`; plan 075) — a 未发送 (`failed`) message never is.
+- Numbers: 移除账号 in 账号列表 refuses a number that is still linked (`a.linked`) and asks to unlink it first in 号码管理 (plan 073).
 - Keeping the conversation at its end: `openwaAtEnd` / `openwaEndTop` note whether the page itself put the conversation at its end; a picture loading in a conversation at its end scrolls it there again (`openwaShowEnd`). Anything that redraws the conversation and scrolls to the end must use `openwaShowEnd()` (plan 071).
 
 ### 4.5 AI client (`fidelity-ai.js`)
@@ -225,6 +229,8 @@ Browser behaviour has **no tests in the repository** (a deliberate zero-dependen
 9. Nothing secret, no data folder, database or settings file is ever inside the repository.
 10. A broken gateway configuration never reaches a running gateway (`upgrade.sh` tests it first); OpenWA containers are not restarted by an upgrade.
 11. The conversation that shows its end keeps showing it when content above or within it changes (`openwaShowEnd` after any redraw).
+12. A page stopped with a notice stays stopped: nothing draws the app behind the notice, and the WhatsApp feed is read no more (plan 072).
+13. A number that is still linked to WhatsApp is never removed from the page's account list (plan 073).
 
 ---
 
@@ -234,11 +240,11 @@ Every row was re-checked against the cited code by the advisor (**V** = confirme
 
 | # | ID | Finding | Category | Impact | Effort | V/P |
 |---|---|---|---|---|---|---|
-| 1 | CORR-01 | A halted page (save conflict, expired login, taken over) comes back on the next redraw and silently discards every later edit | correctness | data loss without any sign | S | V |
+| 1 | CORR-01 | **Fixed by plan 072 (live 2026-11-25).** A halted page (save conflict, expired login, taken over) comes back on the next redraw and silently discards every later edit | correctness | data loss without any sign | S | V |
 | 2 | DX-06 / SEC-11 | `.gitignore` has no rule for `*.env`, `*.secret`, `*.db*`, `.claude/` — and the repo auto-publishes within ~30 s | security | a filled settings file or database dropped in the tree becomes public | S | V |
-| 3 | CORR-02 | Removing a number in 账号列表 while it is still linked drops all its later messages for good | correctness | lost customer messages | S | V |
-| 4 | CORR-06 | The WhatsApp feed never starts if its first status/claim call fails, and stops for good on an exception, with no notice | correctness | no new messages until reload | S | V (start) / P (exception) |
-| 5 | CORR-05 | After a reload, unconfirmed sends become `unknown`, but echoes match only `sending` → the reply shows twice or a phantom customer appears | correctness | duplicates, wrong customers | S | V |
+| 3 | CORR-02 | **Fixed by plan 073 (live 2026-11-25).** Removing a number in 账号列表 while it is still linked drops all its later messages for good | correctness | lost customer messages | S | V |
+| 4 | CORR-06 | **Start fixed by plan 074 (live 2026-11-25); the exception half is open.** The WhatsApp feed never starts if its first status/claim call fails, and stops for good on an exception, with no notice | correctness | no new messages until reload | S | V (start) / P (exception) |
+| 5 | CORR-05 | **Fixed by plan 075 (live 2026-11-25).** After a reload, unconfirmed sends become `unknown`, but echoes match only `sending` → the reply shows twice or a phantom customer appears | correctness | duplicates, wrong customers | S | V |
 | 6 | CORR-07 | A hand-made customer's 初步需求 is shown — and later stored — as an incoming message from the customer | correctness | false history in chats and archives | S | V |
 | 7 | BUG-01 | Catch-up skips a chat whose newest message came through the webhook, so a message the webhook missed earlier is never fetched | correctness | permanently missing messages | M | V |
 | 8 | CORR-03 / BUG-06 | A save whose answer was lost (30 s limit since plan 067, dropped connection, deploy) is retried with the old version → false 409 halt; combined with #1, silent loss | correctness | data loss, wrong message | S–M | V |
@@ -263,13 +269,13 @@ Every row was re-checked against the cited code by the advisor (**V** = confirme
 | 27 | SEC-06 | The `Sec-Fetch-Site` check never fires over plain HTTP (browsers send it only to secure origins); CSRF is in practice stopped by SameSite=Lax + JSON content types; no CSP | security | defence in depth only | S | V |
 | 28 | DOCS-02 | A stale pre-v0.8 README and internal design files are served next to the app (not a disclosure: the repository itself is public) | docs | misleading | S | V |
 
-**Ordering notes.** #1 first: it turns several other faults (#8, a save conflict, a lost session) into silent data loss. #17 (one verification command) and #23 (pure-function tests for the save client and feed) should precede risky refactors of `fidelity-boot.js` / `fidelity-openwa.js`. #9 and #10 share one remedy direction (split `customers`, `chatArchives` and long conversations into smaller parts). #19 removes a step every plan repeats.
+**Ordering notes.** #1 came first (fixed by plan 072): it turned several other faults (#8, a save conflict, a lost session) into silent data loss; #8 now ends on the notice instead. #17 (one verification command) and #23 (pure-function tests for the save client and feed) should precede risky refactors of `fidelity-boot.js` / `fidelity-openwa.js`. #9 and #10 share one remedy direction (split `customers`, `chatArchives` and long conversations into smaller parts). #19 removes a step every plan repeats.
 
 ### 11.1 Details of the top findings
-- **CORR-01.** `fidelity-subsite.js:5-10` `renderSignInState()` always un-hides `#app-shell`; `build-fidelity.cjs:58` makes it the first statement of every `render()`. `fidelity-boot.js:130-131` `stop()` only sets a private `stopped`, and `save()` then returns silently (`:201-202`). The WhatsApp feed loop exits only on its own 409/401 (`fidelity-openwa.js:832-833`), so after a save conflict its events keep calling `render()`. *Fix sketch:* expose `WA_SITE.halted`, make `renderSignInState()` return false while halted, end the feed loop on halt, make `save()` after a halt re-show the stop screen.
+- **CORR-01 (fixed by plan 072).** `fidelity-subsite.js:5-10` `renderSignInState()` always un-hides `#app-shell`; `build-fidelity.cjs:58` makes it the first statement of every `render()`. `fidelity-boot.js:130-131` `stop()` only sets a private `stopped`, and `save()` then returns silently (`:201-202`). The WhatsApp feed loop exits only on its own 409/401 (`fidelity-openwa.js:832-833`), so after a save conflict its events keep calling `render()`. *Fix sketch:* expose `WA_SITE.halted`, make `renderSignInState()` return false while halted, end the feed loop on halt, make `save()` after a halt re-show the stop screen.
 - **DX-06.** `.gitignore` covers only OS and old artefacts (`Thumbs.db`, …). *Fix sketch:* add `*.env` with `!*.env.example`, `*.secret`, `*.db`, `*.db-*`, `platform.env`, `.claude/`, `wa-media-*/`.
-- **CORR-02.** `fidelity-ui.js:420-421` removes accounts with only a "has customers" check; `fidelity-openwa.js:674-687` drops events of unknown accounts. *Fix:* refuse removal while linked (point to 解除绑定) or unlink first.
-- **CORR-05.** `fidelity-openwa.js:826` resets `sending` → `unknown` before catch-up; `:752` matches echoes only in `sending`. *Fix:* accept `sending|unknown|failed` without `wa` as echo candidates; never downgrade a message that already has `wa`.
+- **CORR-02 (fixed by plan 073).** `fidelity-ui.js:420-421` removes accounts with only a "has customers" check; `fidelity-openwa.js:674-687` drops events of unknown accounts. *Fix:* refuse removal while linked (point to 解除绑定) or unlink first.
+- **CORR-05 (fixed by plan 075).** `fidelity-openwa.js:826` resets `sending` → `unknown` before catch-up; `:752` matches echoes only in `sending`. *Fix:* accept `sending|unknown|failed` without `wa` as echo candidates; never downgrade a message that already has `wa`.
 - **CORR-07.** The base `conversationMessages(c)` invents `{side:'in', text:c.preview}` when no messages exist; `fidelity-lifecycle.js:1309` sets `preview` to the 初步需求 text. *Fix:* create `data.messages[id] = []` when a customer is made by hand.
 - **BUG-01.** `openwa-link.cjs:790` raises a chat's `stamp` on every webhook message (`keepChat` uses `MAX`); `:839-840` skips imported chats whose list stamp is not newer. *Fix:* only history imports advance `stamp`; dedupe webhook messages by id.
 - **CORR-03.** `site-data.cjs:96-99` accepts a write only if `baseVersion` equals the current version and cannot recognise a repeat. *Fix:* a client save id stored with the save; a repeat answers 200 with the stored version.
