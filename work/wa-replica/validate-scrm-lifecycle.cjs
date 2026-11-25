@@ -294,7 +294,7 @@ const builtCss = read(path.join(out, 'app.css'));
 for (const file of emojiParts) assert(builtCss.includes(`src:url("fonts/${file}") format("woff2") tech(color-COLRv1); unicode-range:U+`), `app.css must name ${file}`);
 assert.equal((builtCss.match(/font-family:"SCRM Emoji"/g) || []).length, 11, 'app.css must have the eleven parts of the emoji font');
 assert(builtCss.includes('font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the emoji font must come after the fonts of the text');
-for (const required of ["'.woff2': 'font/woff2',", "'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-store',"]) {
+for (const required of ["'.woff2': 'font/woff2',", "'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache',"]) {
   assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
 }
 // A page whose saving goes wrong keeps trying and says so (plan 067): every save has a time limit, a guard catches
@@ -351,6 +351,15 @@ for (const required of ['proxy_request_buffering off;', 'proxy_max_temp_file_siz
   assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
 }
 assert(!/log_format[^;]*\$(request|request_uri|args|query_string)\b/.test(deploy('gateway.conf')), 'the gateway must not write a query string into its log');
+// A lighter page (plan 069): the gateway compresses what goes out as text, also through a proxy or a VPN; the server
+// lets the browser keep the page's files and answers an empty 304, by a tag of their content, when they did not
+// change — a weak tag from a compressing gateway counts the same.
+for (const required of ['gzip on;', 'gzip_proxied any;', 'gzip_vary on;', 'gzip_types text/css application/javascript application/json text/plain;']) {
+  assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
+}
+for (const required of ["const tag = '\"' + crypto.createHash('sha256').update(body).digest('base64url').slice(0, 32) + '\"';", "if (String(req.headers['if-none-match'] || '').split(',').some(asked => asked.trim().replace(/^W\\//, '') === tag)) {", 'res.writeHead(304, kept);']) {
+  assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
+}
 assert(deploy('upgrade.sh').includes("docker ps -a --filter label=wa-scrm.part=openwa --format") && deploy('upgrade.sh').includes('healthy || { echo "the provisioner is not healthy: the sub-sites are left as they are" >&2; exit 1; }') && deploy('upgrade.sh').indexOf('healthy || {') < deploy('upgrade.sh').indexOf('docker rm -f "wa-scrm-site-$SITE"'), 'the upgrade script must know a sub-site by its OpenWA and touch none while the provisioner is not healthy');
 assert(compose.includes('      - WA_SCRM_OPENWA_MEMORY_MB=${WA_SCRM_OPENWA_MEMORY_MB:-1536}') && compose.includes('      - WA_SCRM_SERVER_MEMORY_MB=${WA_SCRM_SERVER_MEMORY_MB:-512}') && compose.includes('    mem_limit: ${WA_SCRM_SERVER_MEMORY_MB:-512}m') && compose.includes('      - WA_SCRM_COOKIE_SECURE=${WA_SCRM_COOKIE_SECURE:-0}'), 'a machine must be able to set the memory of a server and of a sub-site\'s OpenWA, and that its address is HTTPS');
 // An employee is made from the supervisor page where the platform makes sub-sites: the first server asks the
@@ -607,6 +616,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  lighterPage: 'the gateway compresses the page\'s program, style sheets and data (gzip, also through a proxy or a VPN); the browser keeps the page\'s files and asks each time with their tag (ETag), getting an empty 304 when they did not change; the data stays no-store',
   ownEmoji: 'emoji are drawn with Noto Color Emoji (SIL OFL 1.1; work/wa-replica/fonts, copied by the build) in eleven parts named by their characters: a browser loads only the parts of the emoji on screen and keeps them (font/woff2, immutable); digits and signs keep the fonts of the text; a browser that cannot draw the colour format keeps its own emoji',
   saveGuard: 'every save of the page has a time limit of 30 s and a guard around it: whatever goes wrong, the changes stay, the page says they are not saved and tries again, and the server\'s log is told once for each kind of trouble (POST /api/site/report, signed in; who, sub-site, kind, status, the first plain words of the error, never data)',
   reasoningEffort: 'AI_REASONING_EFFORT in the server\'s settings (none, minimal, low, medium or high) is sent to the model service as reasoning_effort and named by the status; a value outside these leaves the service not configured (bad-reasoning-effort); without it nothing is sent',

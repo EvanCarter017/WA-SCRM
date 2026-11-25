@@ -1,6 +1,7 @@
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const aiRelay = require('./ai-relay.cjs');
 
 const workspace = path.resolve(__dirname, '../..');
@@ -49,12 +50,20 @@ async function serveFile(req, res, pathname) {
     return res.end();
   }
   const body = await fs.readFile(file);
-  res.writeHead(200, {
-    'Content-Type': mime[path.extname(file)] || 'text/plain; charset=utf-8',
-    // The parts of the emoji font never change under their name (plan 068): the browser keeps them. Everything else
-    // is asked for anew every time.
-    'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-store',
-  });
+  // The page's own files are kept by the browser, which asks each time whether they changed, by a tag of their
+  // content (plan 069): when they did not, the answer is an empty 304. A gateway that compresses the answer marks the
+  // tag as weak (W/), which counts the same.
+  const tag = '"' + crypto.createHash('sha256').update(body).digest('base64url').slice(0, 32) + '"';
+  const kept = {
+    // The parts of the emoji font never change under their name (plan 068): the browser keeps them without asking.
+    'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache',
+    ETag: tag,
+  };
+  if (String(req.headers['if-none-match'] || '').split(',').some(asked => asked.trim().replace(/^W\//, '') === tag)) {
+    res.writeHead(304, kept);
+    return res.end();
+  }
+  res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'text/plain; charset=utf-8', ...kept });
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
