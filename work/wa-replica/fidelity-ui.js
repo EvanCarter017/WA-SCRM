@@ -333,7 +333,7 @@
 
   toolsRailHTML = function(c) {
     const t=(label,action,glyph,needs=false)=>`<button class="icon-button" data-action="${action}" ${fidActionID(c?.id||'')} aria-label="${label}" ${needs&&!c?'disabled':''}>${icon(glyph)}</button>`;
-    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新视图','refreshUI','RefreshCw')}${t('权限说明','fidChatPermissions','ShieldCheck')}</aside>`;
+    return `<aside class="tool-rail" aria-label="会话工具">${t('会话筛选','fidChatFilters','Bot')}${t('查看客户资料','profile','ContactRound',true)}${t('安排客户跟进','followup','ListOrdered',true)}${t('客户标签','assignTags','Tags',true)}${t('查看客户备注','profileNote','StickyNote',true)}<span class="tool-separator"></span>${t('刷新视图','refreshUI','RefreshCw')}</aside>`;
   };
   const fidOldFillQuick=fillQuick;
   fillQuick = function(id) {
@@ -428,7 +428,6 @@
     fidChatFilters:()=>fidDialog('会话筛选','<div class="modal-body fid-conversation-filters">'+Object.entries(fidConversationFilters).map(([id,label])=>fidButton(label,'fidChatFilter','',ui.conversationFilter===id?'blue':'',`${fidActionID(id)} aria-pressed="${ui.conversationFilter===id}"`)).join('')+'</div>'),
     fidChatFilter:id=>{ui.conversationFilter=id;close();render();},
     fidClearChatFilter:()=>{ui.conversationFilter='all';render();$('#conversation-search')?.focus({preventScroll:true});},
-    fidChatPermissions:()=>fidDialog('会话权限','<div class="modal-body">'+(manager()?'主管可查看团队账号及其会话。':'聊手只查看分配给自己的账号及客户。')+'</div>',fidButton('关闭','close')),
     fidRoleAdd:()=>fidRoleEdit(),fidRoleEdit,
     fidRoleDetails:id=>{if(!manager())return;const g=fidRole(id);if(g)fidDialog('权限详情 · '+g.name,'<div class="modal-body">'+fidPermissionTree(g,true)+'</div>',fidButton('关闭','close'));},
     fidRoleDelete:id=>{if(!manager())return;const g=fidRole(id);if(!g||g.builtIn)return;if(data.members.some(m=>fidMemberRole(m)===id))return toast('请先迁移此权限组下的子账号。');fidConfirm('删除权限组','删除此权限组？','fidDoRoleDelete',id);},

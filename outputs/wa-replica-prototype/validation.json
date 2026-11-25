@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-25T16:51:00.067Z",
+  "checkedAt": "2026-11-25T17:19:36.172Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -53,6 +53,7 @@
   "messageTranslation": "once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again",
   "fileSending": "up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "customerPictures": "the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp's own servers or the gateway, kept for a day; the initials stay when there is none",
+  "noPermissionsNote": "the chat's tool rail ends with 刷新视图; the shield button 权限说明 and its dialog 会话权限 are gone (the rules of who sees what are unchanged)",
   "lighterPage": "the gateway compresses the page's program, style sheets and data (gzip, also through a proxy or a VPN); the browser keeps the page's files and asks each time with their tag (ETag), getting an empty 304 when they did not change; the data stays no-store",
   "ownEmoji": "emoji are drawn with Noto Color Emoji (SIL OFL 1.1; work/wa-replica/fonts, copied by the build) in eleven parts named by their characters: a browser loads only the parts of the emoji on screen and keeps them (font/woff2, immutable); digits and signs keep the fonts of the text; a browser that cannot draw the colour format keeps its own emoji",
   "saveGuard": "every save of the page has a time limit of 30 s and a guard around it: whatever goes wrong, the changes stay, the page says they are not saved and tries again, and the server's log is told once for each kind of trouble (POST /api/site/report, signed in; who, sub-site, kind, status, the first plain words of the error, never data)",

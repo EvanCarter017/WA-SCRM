@@ -253,7 +253,7 @@ Machine-checkable. ALL must hold:
 - [ ] `git checkout d042d07 -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"` and `"icons": 87`
 - [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
 - [ ] `$NODE --test work/wa-replica/ai-relay.test.cjs` → `pass 17`, `fail 0`
-- [ ] `$NODE --test work/wa-replica/site-api.test.cjs` → `pass 19`, `fail 0`
+- [ ] `$NODE --test work/wa-replica/site-api.test.cjs` → `pass 20`, `fail 0` (corrected after the plan ran: the line said 19, a slip of the advisor's text; the smoke script and the review counted 20)
 - [ ] `NODE=$NODE bash /tmp/wa-scrm-plan-070/smoke.sh` ends with `SMOKE PASS`
 - [ ] `sha256sum work/wa-replica/fidelity-lifecycle.js` → `6b140f59b5eb71783f4069be6c0db4e3bc13544b94843e9275474bcead9348df`
 - [ ] `sha256sum work/wa-replica/fidelity-ui.js` → `d30251912a5301d5e739fcb0aed0840df055815b6e8cf5355becff45f5a7b3a3`

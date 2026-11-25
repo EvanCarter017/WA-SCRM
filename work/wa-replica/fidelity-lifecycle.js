@@ -914,7 +914,6 @@
       ${t('客户沟通备注', 'profileNote', 'StickyNote', true)}
       <span class="tool-separator"></span>
       ${t('刷新视图', 'refreshUI', 'RefreshCw')}
-      ${t('权限说明', 'fidChatPermissions', 'ShieldCheck')}
     </aside>`;
   };
 

@@ -279,6 +279,10 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// The chat's tool rail has no permissions note any more (plan 070): neither the shield button "权限说明" nor its
+// dialog "会话权限"; the rail keeps its other buttons.
+assert(!appJs.includes('fidChatPermissions') && !appJs.includes('会话权限') && !appJs.includes('权限说明'), 'the permissions note must be gone from the chat\'s tool rail');
+assert(appJs.includes("${t('刷新视图', 'refreshUI', 'RefreshCw')}\n    </aside>`;"), 'the tool rail must end with the button that refreshes the view');
 // Every emoji drawn the same way on every computer (plan 068): the eleven parts of Noto Color Emoji (SIL OFL 1.1) and
 // its licence are shipped as they are and copied by the build; the page's style sheet names each part with its
 // characters and the colour format it needs, after the fonts of the text; the server sends the parts as fonts the
@@ -616,6 +620,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  noPermissionsNote: 'the chat\'s tool rail ends with 刷新视图; the shield button 权限说明 and its dialog 会话权限 are gone (the rules of who sees what are unchanged)',
   lighterPage: 'the gateway compresses the page\'s program, style sheets and data (gzip, also through a proxy or a VPN); the browser keeps the page\'s files and asks each time with their tag (ETag), getting an empty 304 when they did not change; the data stays no-store',
   ownEmoji: 'emoji are drawn with Noto Color Emoji (SIL OFL 1.1; work/wa-replica/fonts, copied by the build) in eleven parts named by their characters: a browser loads only the parts of the emoji on screen and keeps them (font/woff2, immutable); digits and signs keep the fonts of the text; a browser that cannot draw the colour format keeps its own emoji',
   saveGuard: 'every save of the page has a time limit of 30 s and a guard around it: whatever goes wrong, the changes stay, the page says they are not saved and tries again, and the server\'s log is told once for each kind of trouble (POST /api/site/report, signed in; who, sub-site, kind, status, the first plain words of the error, never data)',
