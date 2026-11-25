@@ -279,6 +279,12 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is
+// matched with its copy from the WhatsApp feed like a reply still on its way, so that it does not show twice (plan 075).
+for (const required of ["(m.wa ? m.wa === e.id : ['sending', 'unknown'].includes(m.status) && m.text === e.text)", "const mine = list.find(m => m.side === 'out' && !m.wa && ['sending', 'unknown'].includes(m.status) && m.text === e.text);"]) {
+  assert(openwaSource.includes(required) && appJs.includes(required), 'a reply whose outcome is open must be matched with its copy from the feed: ' + required.slice(0, 60));
+}
+assert(!openwaSource.includes("m.status === 'sending' && m.text === e.text"), 'no copy from the feed may be matched with replies on their way only');
 // The WhatsApp feed starts also when its first questions fail (plan 074): the server's state and the feed for this page
 // are asked again, more slowly each time, until they are answered; an ended session stops the page, as in the loop.
 for (const required of ["      status = await openwaCall('GET', 'status');\n      if (status.status === 200) break;\n      if (window.WA_SITE.halted()) return;\n      if (status.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');\n      failures += 1;\n      await openwaWait(Math.min(30000, 1000 * 2 ** failures));\n", "      const claim = await openwaCall('POST', 'claim', { client: openwaClient });\n      if (claim.status === 200) break;\n      if (window.WA_SITE.halted()) return;\n      if (claim.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');\n      if (!failures) render();\n      failures += 1;\n      await openwaWait(Math.min(30000, 1000 * 2 ** failures));\n"]) {
@@ -638,6 +644,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  openOutcomeMatched: 'a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy\'s status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)',
   feedStartsAgain: 'the WhatsApp feed starts also when its first questions fail (the server restarting, a moment without network): the server\'s state and the feed for this page are asked again after 2, 4, 8 … at most 30 s until they are answered; an ended session shows 登录已失效, as the feed loop does',
   linkedNumberKept: '移除账号 refuses a number that is still linked to WhatsApp (online or offline) and asks to unlink it first in 号码管理 (解除绑定); a removed number that was still linked went on receiving, and every message for it was dropped',
   haltedStays: 'a page stopped with a notice (数据已在别处更新, 登录已失效, 已在其他页面打开) stays stopped: the app is not drawn behind the notice again and nothing more is taken in from the WhatsApp feed; 刷新页面 reloads the page, which reads the feed on from the saved position',

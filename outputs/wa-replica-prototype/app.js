@@ -2088,9 +2088,10 @@ window.WA_START = () => {
     let c = data.customers.find(c => c.account === a.id && c.waChat === e.chat)
       || (e.phone ? data.customers.find(c => c.account === a.id && !c.waChat && fidPhoneDigits(c.phone) === e.phone) : null);
     // A message this page sent to a customer who was known by phone number only comes back under the chat id
-    // WhatsApp uses for that person: the customer who holds that message is the one of this chat.
+    // WhatsApp uses for that person: the customer who holds that message is the one of this chat. Also when the
+    // message's outcome was open (结果待确认; plan 075), as below.
     if (!c && e.kind === 'message' && e.fromMe) {
-      c = data.customers.find(x => x.account === a.id && !x.waChat && (data.messages[x.id] || []).some(m => m.side === 'out' && (m.wa ? m.wa === e.id : m.status === 'sending' && m.text === e.text)));
+      c = data.customers.find(x => x.account === a.id && !x.waChat && (data.messages[x.id] || []).some(m => m.side === 'out' && (m.wa ? m.wa === e.id : ['sending', 'unknown'].includes(m.status) && m.text === e.text)));
     }
     // The same for a file on its way to such a customer: no message of it exists yet, so the customer is the one
     // this number is sending a file to right now.
@@ -2125,8 +2126,10 @@ window.WA_START = () => {
     }
     const text = e.text || openwaMediaText[e.type] || '[消息]';
     if (e.fromMe) {
-      // What this page sent comes back through the feed: it is the message that is still waiting for its answer.
-      const mine = list.find(m => m.side === 'out' && !m.wa && m.status === 'sending' && m.text === e.text);
+      // What this page sent comes back through the feed: it is the message that is still waiting for its answer, or
+      // the one whose answer never came (结果待确认: the page was closed while it was on its way, or the answer was
+      // lost) — taken for another message, the reply would show twice (plan 075).
+      const mine = list.find(m => m.side === 'out' && !m.wa && ['sending', 'unknown'].includes(m.status) && m.text === e.text);
       if (mine) {
         Object.assign(mine, { wa: e.id, status: e.status || 'sent' });
         return true;
