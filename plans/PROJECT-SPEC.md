@@ -67,7 +67,7 @@ Core capabilities, as built:
 | `work/wa-replica/fidelity-*.js` | Browser modules (sources). | Yes, via plans. |
 | `work/wa-replica/fidelity-base/` | Historical base app (`app.js`, CSS, `index.html`) that the build patches. | Avoid; the build patches it by text. |
 | `work/wa-replica/build-fidelity.cjs` | Zero-dependency build: patches the base, concatenates modules, writes `outputs/wa-replica-prototype/*`. | Yes, carefully. |
-| `work/wa-replica/validate-scrm-lifecycle.cjs` | Validator: ~240 assertions on sources and built files; writes `validation.json`. | Yes, with every change. |
+| `work/wa-replica/validate-scrm-lifecycle.cjs` | Validator: about 200 assertions on sources and built files; writes `validation.json`. | Yes, with every change. |
 | `work/wa-replica/serve.cjs` | The server entry (static files, routing to the APIs). | Yes. |
 | `work/wa-replica/site-api.cjs`, `site-auth.cjs`, `site-data.cjs` | Accounts, sessions, versioned document store. | Yes. |
 | `work/wa-replica/openwa-link.cjs` | WhatsApp bridge link (webhook, event store, feed, sends, media, sync). | Yes. |
@@ -89,7 +89,7 @@ Core capabilities, as built:
 ## 4. Browser application
 
 ### 4.1 Assembly and the override rule
-- `build-fidelity.cjs` takes `fidelity-base/app.js`, applies ~150 ordered text patches (`swap`, `cut`, replaces), then inserts the modules **inside the base app's closure** just before its final `render()`, in this order: `fidelity-ui`, `fidelity-customer-pages`, `fidelity-operations`, `fidelity-openwa`, `fidelity-dashboard`, `fidelity-lifecycle`, `fidelity-ai`, `fidelity-pricelist`, `fidelity-subsite` → `outputs/.../app.js`.
+- `build-fidelity.cjs` takes `fidelity-base/app.js`, applies about 100 ordered text patches (`swap`, `cut`), then inserts the modules **inside the base app's closure** just before its final `render()`, in this order: `fidelity-ui`, `fidelity-customer-pages`, `fidelity-operations`, `fidelity-openwa`, `fidelity-dashboard`, `fidelity-lifecycle`, `fidelity-ai`, `fidelity-pricelist`, `fidelity-subsite` → `outputs/.../app.js`.
 - All modules share one scope. A module **overrides** a base or earlier function by reassignment (`render = function () { … }`, `toolsRailHTML = function (c) { … }`) or wraps it (`const aiDraw = render; render = function () { aiDraw(); … }`). **The last assignment wins**; earlier copies are dead (e.g. `toolsRailHTML` in `fidelity-ui.js` is overridden by `fidelity-lifecycle.js`). Before editing a function, find its live definition: search all modules and take the last one in the order above.
 - Separate scripts: `boot.js` (= `fidelity-boot.js`, loads first, owns sign-in and saving), `master.js` (= `fidelity-master.js`, supervisor page), `pricefile.js` (= `fidelity-pricefile.js`, file parsing), `icons.js` (Lucide SVG pool, 87 icons).
 - Rendering is string templates assigned with `innerHTML`; every value from data must go through `esc()`.
@@ -112,7 +112,7 @@ Top tabs / sidebar: 首页 `#dashboard` · WhatsApp API `#inbox` (号码管理 n
 
 ### 4.5 AI client (`fidelity-ai.js`)
 - Capabilities: `translate.inbound` (会话消息翻译), `translate.outbound` (发送前翻译), `voice.transcribe` (语音转文字). All calls go through `aiRun(capabilityId, input, meta)` → provider `server` → `/api/ai/translate`, `/api/ai/reply`, `/api/wa/transcribe`; a result marked `cached` records no usage.
-- A message is translated **once** into the reading language and keeps `translated` + `translatedTo`; the conversation on screen queues messages without the mark (2 at a time, pause after 3 failures). Messages the page sent **as typed** are marked and never asked for; a reply that was translated before sending is left unmarked so it is **translated back** after sending (plan 066).
+- A message is translated **once** into the reading language and keeps `translated` + `translatedTo`; the conversation on screen queues messages without the mark (2 at a time; after 3 failures in a row, nothing is asked for 60 s). Messages the page sent **as typed** are marked and never asked for; a reply that was translated before sending is left unmarked so it is **translated back** after sending (plan 066).
 - Replies: first Enter (or the shortcut, default Ctrl+Enter, configurable to any key) shows the translation above the box; the next press sends it; the send guard stops an untranslated reply to a customer whose language is set. Customer language is chosen per chat (客户语言), never preset.
 
 ### 4.6 Follow-up model (`fidelity-lifecycle.js`)
