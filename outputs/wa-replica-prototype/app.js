@@ -2206,6 +2206,8 @@ window.WA_START = () => {
     // First everything that happened while no page was open; then the numbers' states as the server sees them now.
     for (let failures = 0, caughtUp = false; ;) {
       const answer = await openwaCall('GET', `events?after=${Number(data.waCursor) || 0}&client=${openwaClient}&wait=${caughtUp ? 25 : 0}`);
+      // A page that was stopped (fidelity-boot.js) reads no further: nothing it took in could be saved (plan 072).
+      if (window.WA_SITE.halted()) return;
       if (answer.status === 409 && answer.body.error === 'taken-over') return window.WA_SITE.halt('已在其他页面打开', '这个子站刚刚在另一个页面或设备上打开，新消息改由那里接收。需要在本页继续时，请刷新页面。');
       if (answer.status === 401) return window.WA_SITE.halt('登录已失效', '请刷新页面后重新登录。');
       if (answer.status !== 200) {
@@ -4784,6 +4786,9 @@ window.WA_START = () => {
   // The earlier layers ask this before they follow the address bar; the app only runs while someone is signed in.
   const subsiteSignedOut = false;
   function renderSignInState() {
+    // A stopped page (the data changed elsewhere, the session ended, another page took over) keeps its notice:
+    // drawing the app again would hide it, and nothing done there could be saved (plan 072).
+    if (window.WA_SITE.halted()) return false;
     $('#app-shell').hidden = false;
     $('#subsite-login').hidden = true;
     $('.skip-link').hidden = false;

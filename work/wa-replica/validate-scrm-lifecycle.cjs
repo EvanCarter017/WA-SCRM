@@ -279,6 +279,11 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A stopped page stays stopped (plan 072): drawing the app again would hide the notice while every later change is
+// thrown away unsaved, so the drawing asks first whether the page was stopped, and the WhatsApp feed is read no more.
+const subsiteSource = read(path.join(__dirname, 'fidelity-subsite.js'));
+assert(subsiteSource.includes("  function renderSignInState() {\n    // A stopped page") && subsiteSource.includes("    if (window.WA_SITE.halted()) return false;\n    $('#app-shell').hidden = false;\n") && appJs.includes("    if (window.WA_SITE.halted()) return false;\n    $('#app-shell').hidden = false;\n"), 'drawing the app must leave the notice of a stopped page in place');
+assert(openwaSource.includes("&wait=${caughtUp ? 25 : 0}`);\n      // A page that was stopped (fidelity-boot.js) reads no further") && openwaSource.includes('      if (window.WA_SITE.halted()) return;\n') && appJs.includes('      if (window.WA_SITE.halted()) return;\n'), 'a stopped page must read no more of the WhatsApp feed');
 // A conversation at its end stays at its end when a translation redraws it (plan 071): the redraw scrolls there with
 // the WhatsApp module's own step, which notes the move, so that a picture taking its height a moment later keeps it
 // there instead of reading as someone scrolling away.
@@ -537,7 +542,7 @@ for (const required of ["fetch('/api/wa/' + path, {", "openwaCall('POST', 'link'
 }
 assert(!/openwaDemoQr|openwaScan|openwaDrop|openwaRestore|openwaAddSampleChat|openwaNextNumber|模拟|演示/.test(openwaSource), 'fidelity-openwa.js must not simulate linking, losing or restoring a connection');
 assert(!/lcSimLeadOpen|lcSimReply|openSimLeadModal|lcSimulateCustomerReply|lc-sim-lead|模拟/.test(moduleSource), 'fidelity-lifecycle.js must not simulate leads or replies');
-assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, purge };'), 'fidelity-boot.js must let the app stop the page with a notice');
+assert(bootSource.includes('window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, halted: () => stopped, purge };'), 'fidelity-boot.js must let the app stop the page with a notice and ask whether it was stopped');
 // A release does not speak of a demonstration, a prototype, a review or of saving on this machine (plan 032),
 // and the materials screen is hidden.
 for (const word of ['演示', '原型', '评审', '本机', '示例', '体验']) {
@@ -624,6 +629,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  haltedStays: 'a page stopped with a notice (数据已在别处更新, 登录已失效, 已在其他页面打开) stays stopped: the app is not drawn behind the notice again and nothing more is taken in from the WhatsApp feed; 刷新页面 reloads the page, which reads the feed on from the saved position',
   endAfterTranslation: 'a conversation that shows its end keeps showing it when a translation redraws it, also when a picture takes its height a moment later (the redraw scrolls with the WhatsApp module\'s own noted step)',
   noPermissionsNote: 'the chat\'s tool rail ends with 刷新视图; the shield button 权限说明 and its dialog 会话权限 are gone (the rules of who sees what are unchanged)',
   lighterPage: 'the gateway compresses the page\'s program, style sheets and data (gzip, also through a proxy or a VPN); the browser keeps the page\'s files and asks each time with their tag (ETag), getting an empty 304 when they did not change; the data stays no-store',

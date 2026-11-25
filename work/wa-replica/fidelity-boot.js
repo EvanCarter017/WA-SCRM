@@ -244,8 +244,10 @@
     }
     addEventListener('pagehide', () => { flush({ keepalive: true }); });
 
-    // halt stops this page with a notice; the app uses it when another page takes over the sub-site.
-    window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, purge };
+    // halt stops this page with a notice; the app uses it when another page takes over the sub-site. halted tells
+    // whether the page was stopped: from then on the app draws nothing behind the notice and reads no more of the
+    // WhatsApp feed, since nothing done on a stopped page could be saved (plan 072).
+    window.WA_SITE = { user, site, data, save, idle, signOut, halt: stop, halted: () => stopped, purge };
     $('#subsite-login').hidden = true;
     $('#app-shell').hidden = false;
     $('.skip-link').hidden = false;
