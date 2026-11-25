@@ -1,0 +1,257 @@
+# Plan 073: A number that is still linked is not removed from the account list
+
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `plans/README.md` — unless a reviewer dispatched you and told you they
+> maintain the index.
+>
+> **Drift check (run first)**: `git diff --stat fb8953c..HEAD -- work/wa-replica replica/build-log.md outputs`
+> If any in-scope file changed since this plan was written, compare the
+> "Current state" facts against the live code before proceeding; on a
+> mismatch, treat it as a STOP condition. (Changes under `plans/` only are expected and fine.)
+
+## Status
+
+- **Priority**: P1
+- **Effort**: S
+- **Risk**: LOW (one more refusal in an existing action, in the style of the refusal next to it; exact text and checksums for every file)
+- **Depends on**: plans/072-stopped-page-stays.md (DONE; it changed the validator and the build log that this plan edits after it)
+- **Category**: bug fix (deep audit of 2026-11-25, finding CORR-02 in `plans/PROJECT-SPEC.md`; chosen by the owner)
+- **Planned at**: commit `fb8953c`, 2026-11-25
+
+## Why this matters
+
+In 账号列表 (the account list, `#accounts`) the button 移除账号 removes the selected numbers from the page's data (`fidAccountDelete` asks, `fidDoAccountDelete` removes; both in `fidelity-ui.js`). It refuses only numbers that still have customers. A number that is still linked to WhatsApp but has no customers yet — a number linked a moment ago, for example — is removed. On the server nothing changes: the number stays linked, OpenWA keeps it connected, and every message for it comes through the WhatsApp feed as before. The page's WhatsApp module (`openwaApply` in `fidelity-openwa.js`) finds no number with that id in `data.accounts` and drops the event, while the feed's position moves on — so every message for that number is lost for good.
+
+A number counts as linked when `a.linked` is true: the WhatsApp module sets it when the number comes online and keeps it while the number is offline but still linked (state `reconnect`, shown as 离线); 解除绑定 (unlink, in 号码管理 under WhatsApp API) clears it after the server has ended the link.
+
+Shown in a browser (the reviewer's harness, 2026-11-25): a linked number without customers was selected and 移除账号 clicked — the removal was confirmed, and a message that then came in for that number never appeared. With this plan's change the page refuses with the notice below, the number stays, and the message appears; after 解除绑定 the number can be removed.
+
+### Decisions already made (do not re-open; do not ask)
+
+- `fidAccountDelete` refuses when any selected number is linked, right after the existing "has customers" refusal, with the toast `选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。` ("the selected number is still linked to WhatsApp; unlink it first in 号码管理").
+- `fidDoAccountDelete` (run by the confirm dialog's button) leaves linked numbers out, the way it already leaves out numbers with customers — the state may change while the dialog is open.
+- The page does not unlink on its own, and nothing else changes: the confirm dialog's text, the "has customers" rule, 号码管理 and the server stay as they are.
+
+## Current state
+
+### What this repository is
+
+A zero-dependency web app for an internal WhatsApp customer workbench: plain HTML/CSS/JS in the browser and a small Node server (Node 22.13 or newer). There is no package.json. Documentation text is Simplified Chinese; code, comments and commit messages are English.
+
+### The files this plan changes
+
+| File | sha256 at the planned commit | sha256 after this plan | Edits |
+|---|---|---|---|
+| `work/wa-replica/fidelity-ui.js` | `d30251912a5301d5e739fcb0aed0840df055815b6e8cf5355becff45f5a7b3a3` | `ed0d4ad802975f4945368e2855ad39192dfda2ead57d2823bfb818e058028347` | 1 |
+| `work/wa-replica/validate-scrm-lifecycle.cjs` | `a8872faea7a217080630a730d2615c3ebc60c06a1ac059bf667b41274c76e7ca` | `81378b6ca32528c8f388273a6ef73aa02ea066e4016b3214092461911baddc8a` | 2 |
+| `replica/build-log.md` | `41f688c519c5e390f1f5c4eeacd171522ec3990e86712a6d877d445da55bfbab` | `fc4a0a461bbc0d45a4ce7075c42282281a4fd08e5494ca549811ae0247b74829` | 1 append |
+
+- `fidelity-ui.js` — the first module of the built page; among others the account list and its actions, written in the compact style of the base app (one action per line, no comments inside the action list). Match that style exactly.
+- `validate-scrm-lifecycle.cjs` — asserts facts about the sources and the built page and writes `validation.json`.
+- `replica/build-log.md` — the project's change log, in Chinese; this plan appends one entry.
+
+### How the build works
+
+`work/wa-replica/build-fidelity.cjs` writes `outputs/wa-replica-prototype/*`. Outputs are committed and must be regenerated by running the build, never edited by hand. The build takes its icons from the committed `outputs/wa-replica-prototype/icons.js`: **restore that file from git before every build** (command below). After this plan's build exactly two output files differ: `app.js` and `validation.json` (written by the validator).
+
+## Commands you will need
+
+Run from the repository root (inside your worktree).
+
+**The tests and the smoke script need Node 22.13 or newer** (the server's accounts and data use `node:sqlite`). Run `node --version`. If it prints an older version, set `NODE` to the full path of a newer binary on the machine (for example `~/.local/node/bin/node`); otherwise set `NODE=node`. If the machine has none, STOP. The build and the validator work with plain `node`.
+
+| Purpose | Command | Expected on success |
+|---|---|---|
+| Restore icon pool (before **every** build) | `git checkout fb8953c -- outputs/wa-replica-prototype/icons.js` | exit 0 |
+| Build | `node work/wa-replica/build-fidelity.cjs` | exit 0; prints JSON with `"version": "0.8-scrm-engagement"` and `"icons": 87` |
+| Validate | `node work/wa-replica/validate-scrm-lifecycle.cjs` | exit 0; prints JSON with `"status": "passed"` |
+| Tests of the link | `$NODE --test work/wa-replica/openwa-link.test.cjs` | `pass 23`, `fail 0` (unchanged) |
+| Sign-in and data tests | `$NODE --test work/wa-replica/site-api.test.cjs` | `pass 20`, `fail 0` (unchanged) |
+| Smoke | `NODE=$NODE bash /tmp/wa-scrm-plan-073/smoke.sh` (script from Step 1; run from inside the repo) | last line `SMOKE PASS` |
+
+## Scope
+
+**In scope** (the only files you may modify):
+
+- `work/wa-replica/fidelity-ui.js` (Step 2)
+- `work/wa-replica/validate-scrm-lifecycle.cjs` (Step 3)
+- `replica/build-log.md` (Step 4)
+- Build outputs, **only by running the build/validator**: `outputs/wa-replica-prototype/app.js`, `validation.json` (every other output file must come out unchanged)
+
+**Out of scope** (do NOT touch): every other file — `fidelity-openwa.js` (`a.linked` and 解除绑定 are used as they are), the base app, the other modules, the style sheets, the servers, `deploy/**`, `plans/**`, earlier entries of `replica/build-log.md`. No file is created by this plan. Do not install anything.
+
+## Git workflow
+
+- Work on the branch your worktree is already on. If (and only if) you find yourself on `main`, create and switch to `advisor/073-linked-number-kept` first.
+- One commit is fine. Conventional commit message, e.g. `fix(scrm): keep a linked number in the account list`.
+- Do NOT push, merge, rebase onto main, or open a PR.
+
+## Steps
+
+How to read the instructions: an **Edit** gives lines to find (together they occur exactly once in the named file at the moment the edit is applied) and the lines that replace them; the first and last lines of both blocks are usually unchanged lines that only show where the change is. An **Append** adds text at the end of a file. The fenced blocks contain the text only — the fence lines are not part of it. A block ends only at a line that equals its opening run of backticks. Copy every block character for character (the blocks contain Chinese text, very long lines, quotes and backslashes; keep them exactly); the most reliable way is a small script (kept outside the repository) that reads this plan file and takes the lines strictly between the opening fence after an instruction and its closing fence. This plan has 3 Edits and 1 Append. Apply the instructions of a file **in the order given** — a later edit of a file may find lines that an earlier one wrote. Before each Edit, confirm that the text to find occurs exactly once. The checksums of the table in "Current state" tell you whether the three files are exactly right.
+
+### Step 1: Create the smoke script (outside the repo) and record the baseline
+
+Save this script at the fixed path `/tmp/wa-scrm-plan-073/smoke.sh` (outside the repository; always call it by this literal path, from inside the repository). If your shell rejects heredocs, write the same content with your file-writing tool and then `chmod +x` it.
+
+```bash
+mkdir -p /tmp/wa-scrm-plan-073 && cat > /tmp/wa-scrm-plan-073/smoke.sh <<'EOF'
+#!/usr/bin/env bash
+# Checks plan 073: 移除账号 refuses a number that is still linked to WhatsApp and asks to unlink it first. NODE must be
+# Node 22.13 or newer.
+set -u
+ROOT=$(git rev-parse --show-toplevel); FAIL=0; NODE=${NODE:-node}; W="$ROOT/work/wa-replica"; O="$ROOT/outputs/wa-replica-prototype"
+same() { [ "$2" = "$3" ] && echo "ok   $1" || { echo "MISS $1 (got: $2)"; FAIL=1; }; }
+has() { grep -qF -- "$3" "$2" 2>/dev/null && echo "ok   $1" || { echo "MISS $1"; FAIL=1; }; }
+"$NODE" -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)" && echo "ok   Node $("$NODE" --version) is new enough" || { echo "MISS Node 22.13 or newer is needed, got $("$NODE" --version)"; FAIL=1; }
+has 'the account list refuses a linked number' "$W/fidelity-ui.js" "if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');"
+has 'the confirmed removal leaves linked numbers out' "$W/fidelity-ui.js" 'filter(a=>!a.linked&&!data.customers.some(c=>c.account===a.id))'
+has 'the page is built with the refusal' "$O/app.js" "if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');"
+has 'the page is built with the confirmed removal' "$O/app.js" 'filter(a=>!a.linked&&!data.customers.some(c=>c.account===a.id))'
+has 'the validator knows it' "$W/validate-scrm-lifecycle.cjs" "  linkedNumberKept: '移除账号 refuses"
+has 'the build log has the entry' "$ROOT/replica/build-log.md" '## 仍在绑定的号码不能直接移除：已修复 · 2026-11-25'
+same 'of the built files only the page and the validation changed' "$(cd "$ROOT" && git status --porcelain -- outputs | grep -vcE '(app\.js|validation\.json)$')" 0
+same 'the built page passes the syntax check' "$(node --check "$O/app.js" 2>/dev/null && echo SYNTAX_OK)" SYNTAX_OK
+same 'the sign-in and data tests pass' "$("$NODE" --test "$W/site-api.test.cjs" 2>&1 | grep -E '^ℹ (pass|fail)' | tr '\n' ' ')" 'ℹ pass 20 ℹ fail 0 '
+same 'the tests of the relay pass' "$("$NODE" --test "$W/ai-relay.test.cjs" 2>&1 | grep -E '^ℹ (pass|fail)' | tr '\n' ' ')" 'ℹ pass 17 ℹ fail 0 '
+same 'the tests of the link pass' "$("$NODE" --test "$W/openwa-link.test.cjs" 2>&1 | grep -E '^ℹ (pass|fail)' | tr '\n' ' ')" 'ℹ pass 23 ℹ fail 0 '
+[ "$FAIL" = 0 ] && echo "SMOKE PASS" || { echo "SMOKE FAIL"; exit 1; }
+EOF
+chmod +x /tmp/wa-scrm-plan-073/smoke.sh && ls -l /tmp/wa-scrm-plan-073/smoke.sh
+```
+
+**Verify**: `sha256sum work/wa-replica/fidelity-ui.js work/wa-replica/validate-scrm-lifecycle.cjs replica/build-log.md` → the "at the planned commit" values of the table in "Current state", in that order; `NODE=$NODE bash /tmp/wa-scrm-plan-073/smoke.sh; git status --porcelain` → exactly these checks are printed with `MISS`, so the run ends with `SMOKE FAIL` (expected at this point): `the account list refuses a linked number`, `the confirmed removal leaves linked numbers out`, `the page is built with the refusal`, `the page is built with the confirmed removal`, `the validator knows it` and `the build log has the entry` (six checks); every other check is printed with `ok`; `git status --porcelain` prints **nothing**. If another check fails, a checksum differs, or `git status` shows changes, STOP.
+
+### Step 2: 移除账号 refuses a number that is still linked
+
+#### `fidelity-ui.js`
+
+**Edit 2.1** — `work/wa-replica/fidelity-ui.js`. Find exactly these lines (they occur once):
+
+```text
+    fidAccountNote:()=>fidForm('批量注释','fid-account-note',fidFormRow('注释',fidCountField('fid-annotation','note','',80,'输入选中账号的注释',true),'fid-annotation',true)),
+    fidAccountDelete:()=>{const selected=fidSelectedAccounts();if(!selected.length)return;if(selected.some(a=>data.customers.some(c=>c.account===a.id)))return toast('选中的账号仍有关联客户，不能移除。');fidConfirm('移除账号','移除选中的无客户账号？','fidDoAccountDelete');},
+    fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!data.customers.some(c=>c.account===a.id));data.accounts=data.accounts.filter(a=>!selected.includes(a));fid.accountChecked.clear();persist();close();render();toast('已移除选中的账号。');},
+    fidAccountZero:()=>fidConfirm('统计清零','将已选账号的未读统计清零？','fidDoAccountZero'),
+```
+
+Replace them with:
+
+```text
+    fidAccountNote:()=>fidForm('批量注释','fid-account-note',fidFormRow('注释',fidCountField('fid-annotation','note','',80,'输入选中账号的注释',true),'fid-annotation',true)),
+    fidAccountDelete:()=>{const selected=fidSelectedAccounts();if(!selected.length)return;if(selected.some(a=>data.customers.some(c=>c.account===a.id)))return toast('选中的账号仍有关联客户，不能移除。');if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');fidConfirm('移除账号','移除选中的无客户账号？','fidDoAccountDelete');},
+    fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!a.linked&&!data.customers.some(c=>c.account===a.id));data.accounts=data.accounts.filter(a=>!selected.includes(a));fid.accountChecked.clear();persist();close();render();toast('已移除选中的账号。');},
+    fidAccountZero:()=>fidConfirm('统计清零','将已选账号的未读统计清零？','fidDoAccountZero'),
+```
+
+What this edit does, so that you can recognise it: in `fidAccountDelete` the refusal `if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');` follows the existing refusal for numbers with customers; in `fidDoAccountDelete` the filter becomes `a=>!a.linked&&!data.customers.some(c=>c.account===a.id)`. The two lines stay one action per line, without comments, like their neighbours.
+
+**Verify**: `sha256sum work/wa-replica/fidelity-ui.js` → `ed0d4ad802975f4945368e2855ad39192dfda2ead57d2823bfb818e058028347`. If the checksum does not match, restore the file (`git checkout -- <file>`) and apply the edit again, once; if it still does not match, STOP.
+
+### Step 3: The validator — and the build
+
+#### `validate-scrm-lifecycle.cjs`
+
+**Edit 3.1** — `work/wa-replica/validate-scrm-lifecycle.cjs`. Find exactly these lines (they occur once):
+
+```text
+assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A stopped page stays stopped (plan 072): drawing the app again would hide the notice while every later change is
+```
+
+Replace them with:
+
+```text
+assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A number still linked to WhatsApp is not removed from the account list (plan 073): it goes on receiving, and every
+// message for a number the page no longer knows would be dropped for good. 移除账号 asks to unlink it first.
+assert(read(path.join(__dirname, 'fidelity-ui.js')).includes("if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');fidConfirm('移除账号',") && appJs.includes("if(selected.some(a=>a.linked))return toast('选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。');fidConfirm('移除账号',") && appJs.includes('fidDoAccountDelete:()=>{const selected=fidSelectedAccounts().filter(a=>!a.linked&&!data.customers.some(c=>c.account===a.id));'), 'a number that is still linked must not be removed from the account list');
+// A stopped page stays stopped (plan 072): drawing the app again would hide the notice while every later change is
+```
+
+**Edit 3.2** — `work/wa-replica/validate-scrm-lifecycle.cjs`. Find exactly these lines (they occur once):
+
+```text
+  customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  haltedStays: 'a page stopped with a notice (数据已在别处更新, 登录已失效, 已在其他页面打开) stays stopped: the app is not drawn behind the notice again and nothing more is taken in from the WhatsApp feed; 刷新页面 reloads the page, which reads the feed on from the saved position',
+```
+
+Replace them with:
+
+```text
+  customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  linkedNumberKept: '移除账号 refuses a number that is still linked to WhatsApp (online or offline) and asks to unlink it first in 号码管理 (解除绑定); a removed number that was still linked went on receiving, and every message for it was dropped',
+  haltedStays: 'a page stopped with a notice (数据已在别处更新, 登录已失效, 已在其他页面打开) stays stopped: the app is not drawn behind the notice again and nothing more is taken in from the WhatsApp feed; 刷新页面 reloads the page, which reads the feed on from the saved position',
+```
+
+**Verify**: `sha256sum work/wa-replica/validate-scrm-lifecycle.cjs` → `81378b6ca32528c8f388273a6ef73aa02ea066e4016b3214092461911baddc8a`; `git checkout fb8953c -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` → exit 0 with `"version": "0.8-scrm-engagement"` and `"icons": 87`, then `git reset -q HEAD -- outputs/wa-replica-prototype/icons.js`; `node work/wa-replica/validate-scrm-lifecycle.cjs` → `"status": "passed"`; `git status --porcelain -- outputs` lists `app.js` and `validation.json` of `outputs/wa-replica-prototype/` only; `sha256sum outputs/wa-replica-prototype/app.js` → `44596e1a5fe180c42c19d1e7bd774869c5615cc7d08b1ffae2c61fc9b680e289`. If a checksum does not match, restore the file and apply its edits again, once; if it still does not match, or another output file changed, STOP.
+
+### Step 4: Build log, final verification
+
+#### `replica/build-log.md`
+
+**Append 4.1** — `replica/build-log.md`. Add at the end of the file, after one empty line:
+
+```text
+## 仍在绑定的号码不能直接移除：已修复 · 2026-11-25
+
+此前，在「账号列表」中可以移除一个仍与 WhatsApp 绑定、但还没有客户的号码。号码被移除后，WhatsApp 仍然继续向它推送消息，而页面已经不认识这个号码，于是之后发给它的所有消息都被丢弃，再也找不回来。
+
+现在，选中的号码只要仍在绑定中（在线或离线），点击「移除账号」时会提示「选中的账号仍绑定着 WhatsApp，请先在号码管理中解除绑定。」，号码不会被移除。先在「号码管理」中点击「解除绑定」，再回到「账号列表」移除即可。仍有关联客户的号码与以前一样不能移除。
+
+验证：构建与校验脚本通过；浏览器测试：选中一个已绑定、没有客户的号码点击「移除账号」，修改前会直接确认移除，之后发给这个号码的新消息不再出现；修改后显示上述提示、号码保留，新消息正常出现；解除绑定之后可以正常移除。
+```
+
+Then verify everything once more (run the restore, the build and the validator one after another):
+
+```bash
+git checkout fb8953c -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs && git reset -q HEAD -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/validate-scrm-lifecycle.cjs && NODE=$NODE bash /tmp/wa-scrm-plan-073/smoke.sh
+```
+
+**Verify**: build exit 0; validator `"status": "passed"`; smoke ends with `SMOKE PASS`; `sha256sum replica/build-log.md` → `fc4a0a461bbc0d45a4ce7075c42282281a4fd08e5494ca549811ae0247b74829`; `git status --porcelain` lists exactly these five as changed and nothing as new: the three files of the table in "Current state" and `outputs/wa-replica-prototype/app.js`, `validation.json`. Commit everything. After the commit `git status --porcelain` must be empty.
+
+## Test plan
+
+- **Validator** — the refusal and the confirmed removal's filter, in the source and the built page.
+- **Smoke** (`/tmp/wa-scrm-plan-073/smoke.sh`) — the same facts, three test files, which built files changed, the syntax of the built page.
+- **Verified by the reviewer, not by you**: in a browser against the reviewer's harness — a linked number without customers selected in 账号列表 and 移除账号 clicked: the notice shows and the number stays, and a message that comes in for it appears (before this plan the removal was confirmed and the message was dropped); after 解除绑定 in 号码管理 the number can be removed. The full site and WhatsApp suites.
+
+## Done criteria
+
+Machine-checkable. ALL must hold:
+
+- [ ] `git checkout fb8953c -- outputs/wa-replica-prototype/icons.js && node work/wa-replica/build-fidelity.cjs` exits 0 and prints `"version": "0.8-scrm-engagement"` and `"icons": 87`
+- [ ] `node work/wa-replica/validate-scrm-lifecycle.cjs` exits 0 and prints `"status": "passed"`
+- [ ] `$NODE --test work/wa-replica/openwa-link.test.cjs` → `pass 23`, `fail 0`
+- [ ] `$NODE --test work/wa-replica/site-api.test.cjs` → `pass 20`, `fail 0`
+- [ ] `NODE=$NODE bash /tmp/wa-scrm-plan-073/smoke.sh` ends with `SMOKE PASS`
+- [ ] `sha256sum work/wa-replica/fidelity-ui.js` → `ed0d4ad802975f4945368e2855ad39192dfda2ead57d2823bfb818e058028347`
+- [ ] `sha256sum work/wa-replica/validate-scrm-lifecycle.cjs` → `81378b6ca32528c8f388273a6ef73aa02ea066e4016b3214092461911baddc8a`
+- [ ] `sha256sum replica/build-log.md` → `fc4a0a461bbc0d45a4ce7075c42282281a4fd08e5494ca549811ae0247b74829`
+- [ ] `sha256sum outputs/wa-replica-prototype/app.js` → `44596e1a5fe180c42c19d1e7bd774869c5615cc7d08b1ffae2c61fc9b680e289`
+- [ ] `git diff --name-only fb8953c..HEAD -- outputs` lists `app.js` and `validation.json` of `outputs/wa-replica-prototype/` and nothing else
+- [ ] `git diff --name-only fb8953c..HEAD -- . ':!plans'` lists exactly five paths: the three of the table in "Current state", `app.js` and `validation.json`
+- [ ] `git status --porcelain` is empty after your final commit
+- [ ] `plans/README.md` status row updated (skip if a reviewer dispatched you and said they maintain the index)
+
+## STOP conditions
+
+Stop and report back (do not improvise) if:
+
+- Step 1's baseline check fails (a failing check other than the named ones, a different checksum).
+- The lines to find do not occur exactly once in their file at the moment the edit is applied.
+- A checksum does not match after you have restored the file and applied its instructions a second time.
+- The build or the validator fails, or a test fails.
+- An output file other than `app.js` and `validation.json` changes.
+- No Node 22.13 or newer exists on the machine.
+- The work appears to require editing an out-of-scope file, creating a file or installing a package.
+
+## Maintenance notes
+
+- **Deployment**: on the platform, `git pull --ff-only && sudo bash deploy/upgrade.sh <the machine's settings file>`; nothing else. An open page keeps the old behaviour until it is opened again.
+- Any new way of removing a number from `data.accounts` must refuse a linked number in the same way: the server and OpenWA keep a linked number connected whatever the page's data says.
+- What a reviewer should scrutinise: that a number that is not linked (待连接) and has no customers can still be removed as before; that the refusal comes after the "has customers" one, so that a number with customers keeps its old notice.
+- `validation.json`: re-run the validator once in the main checkout after merging from a worktree.
