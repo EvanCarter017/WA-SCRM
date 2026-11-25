@@ -279,6 +279,10 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A conversation at its end stays at its end when a translation redraws it (plan 071): the redraw scrolls there with
+// the WhatsApp module's own step, which notes the move, so that a picture taking its height a moment later keeps it
+// there instead of reading as someone scrolling away.
+assert(aiSource.includes('    if (atBottom) openwaShowEnd();\n') && appJs.includes('    if (atBottom) openwaShowEnd();\n') && !aiSource.includes('if (atBottom) scrollMessages();'), 'a redraw by a translation must keep the end in view the way the WhatsApp module does');
 // The chat's tool rail has no permissions note any more (plan 070): neither the shield button "权限说明" nor its
 // dialog "会话权限"; the rail keeps its other buttons.
 assert(!appJs.includes('fidChatPermissions') && !appJs.includes('会话权限') && !appJs.includes('权限说明'), 'the permissions note must be gone from the chat\'s tool rail');
@@ -620,6 +624,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  endAfterTranslation: 'a conversation that shows its end keeps showing it when a translation redraws it, also when a picture takes its height a moment later (the redraw scrolls with the WhatsApp module\'s own noted step)',
   noPermissionsNote: 'the chat\'s tool rail ends with 刷新视图; the shield button 权限说明 and its dialog 会话权限 are gone (the rules of who sees what are unchanged)',
   lighterPage: 'the gateway compresses the page\'s program, style sheets and data (gzip, also through a proxy or a VPN); the browser keeps the page\'s files and asks each time with their tag (ETag), getting an empty 304 when they did not change; the data stays no-store',
   ownEmoji: 'emoji are drawn with Noto Color Emoji (SIL OFL 1.1; work/wa-replica/fonts, copied by the build) in eleven parts named by their characters: a browser loads only the parts of the emoji on screen and keeps them (font/woff2, immutable); digits and signs keep the fonts of the text; a browser that cannot draw the colour format keeps its own emoji',

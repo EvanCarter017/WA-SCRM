@@ -638,9 +638,10 @@
       box.innerHTML = messagesHTML(c);
     });
     paintIcons(box);
-    // At its end the conversation stays at its end; further up, what is being read stays where it is while
-    // translations come in above it.
-    if (atBottom) scrollMessages();
+    // At its end the conversation stays at its end: scrolled there now and noted as the page's own move (plan 071),
+    // so that a picture that takes its height a moment later keeps it there instead of reading as someone scrolling
+    // away. Further up, what is being read stays where it is while translations come in above it.
+    if (atBottom) openwaShowEnd();
     else box.scrollTop = box.scrollHeight - fromEnd;
   }
   // Turns a voice note of the open conversation into text and keeps the text on the message. The words of a
