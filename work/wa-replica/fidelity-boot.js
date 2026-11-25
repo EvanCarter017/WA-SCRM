@@ -10,10 +10,13 @@
   // One save request carries at most this many characters (one value that is larger goes alone); a larger change
   // goes in several requests, one after another. Small enough for a proxy that allows 1 MB a request.
   const SAVE_PART = 256 * 1024;
+  // A save that has had no answer after this long is given up and tried again (plan 067): a request that never
+  // ends must not hold back every later save.
+  const SAVE_TIMEOUT = 30000;
   const screen = { title: $('#subsite-login-title'), notice: $('#site-notice'), signIn: $('#site-sign-in'), password: $('#site-password'), leave: $('#site-leave') };
 
-  const request = (path, { method = 'GET', body, keepalive = false } = {}) =>
-    fetch(path, { method, keepalive, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const request = (path, { method = 'GET', body, keepalive = false, timeout = 0 } = {}) =>
+    fetch(path, { method, keepalive, ...(timeout ? { signal: AbortSignal.timeout(timeout) } : {}), headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
       .then(async response => ({ status: response.status, body: await response.json().catch(() => ({})) }));
 
   function paintIcons(root) {
@@ -113,6 +116,17 @@
       toast.textContent = text;
       toast.classList.toggle('show', Boolean(text));
     };
+    // Tells the server's log, once for each kind of trouble, that this page could not save (plan 067): the kind,
+    // the status of the answer and the name and first words of the error — nothing of the data. Told again only
+    // when the telling itself did not get through.
+    const told = new Set();
+    function tell(kind, status, error) {
+      if (told.has(kind)) return;
+      told.add(kind);
+      const words = error ? `${error.name}: ${String(error.message).split(/["'`]/)[0]}`.slice(0, 160) : '';
+      request('/api/site/report', { method: 'POST', timeout: SAVE_TIMEOUT, body: { kind, status, error: words } })
+        .then(answer => { if (answer.status !== 200) told.delete(kind); }, () => told.delete(kind));
+    }
     function stop(title, notice) {
       stopped = true;
       clearTimeout(timer);
@@ -120,7 +134,7 @@
       screen.leave.textContent = '刷新页面';
       screen.leave.dataset.reload = '1';
     }
-    async function flush({ keepalive = false } = {}) {
+    async function saveNow({ keepalive = false } = {}) {
       clearTimeout(timer);
       timer = 0;
       if (saving || stopped || !pending) return;
@@ -141,12 +155,13 @@
       saving = true;
       let answer;
       try {
-        answer = await request('/api/data', { method: 'PUT', keepalive, body: { baseVersion: version, set, remove } });
-      } catch {
-        answer = { status: 0, body: {} };
+        answer = await request('/api/data', { method: 'PUT', keepalive, timeout: SAVE_TIMEOUT, body: { baseVersion: version, set, remove } });
+      } catch (error) {
+        answer = { status: 0, body: {}, error };
       }
       saving = false;
-      if (answer.status === 200) {
+      // Saved only with the new version in the answer: an answer cut off on its way is tried again.
+      if (answer.status === 200 && typeof answer.body.version === 'number') {
         version = answer.body.version;
         for (const key of Object.keys(set)) synced.set(key, current.get(key));
         for (const key of remove) synced.delete(key);
@@ -164,6 +179,22 @@
         // Refused as too large (by this server or by a proxy in front of it): trying again only helps once an
         // administrator has raised the limit, so the notice says what is wrong.
         note(answer.status === 413 ? '修改未能保存：内容超过服务器允许的大小，请联系管理员。' : '修改暂未保存到服务器，正在重试…');
+        tell(answer.error?.name === 'TimeoutError' ? 'timeout' : answer.status ? 'refused' : 'unreachable', answer.status, answer.error);
+        timer = setTimeout(flush, Math.min(30000, 1000 * 2 ** failures));
+      }
+    }
+    // Whatever goes wrong while saving must not end the saving for good (plan 067): the changes stay, the page says
+    // that they are not saved and tries again, more slowly each time, and the server's log is told once.
+    async function flush(options) {
+      try {
+        await saveNow(options);
+      } catch (error) {
+        saving = false;
+        pending ??= window.WA_SITE.data;
+        failures += 1;
+        note('修改暂未保存：页面出错，正在重试。若一直如此，请刷新页面后重做最近的修改。');
+        tell('error', 0, error);
+        clearTimeout(timer);
         timer = setTimeout(flush, Math.min(30000, 1000 * 2 ** failures));
       }
     }
@@ -185,7 +216,7 @@
       saving = true;
       let answer;
       try {
-        answer = await request('/api/data', { method: 'DELETE', body: { baseVersion: version, field } });
+        answer = await request('/api/data', { method: 'DELETE', timeout: SAVE_TIMEOUT, body: { baseVersion: version, field } });
       } catch {
         answer = { status: 0, body: {} };
       }

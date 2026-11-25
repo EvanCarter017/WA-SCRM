@@ -262,7 +262,7 @@ for (const required of ["new DatabaseSync(path.join(dir, 'ai-translations.db'))"
 }
 assert(appJs.includes('m.translated&&showTranslation?') && !appJs.includes("m.side==='in'&&m.translated"), 'a translation must be shown below a message of either side');
 const bootSource = read(path.join(__dirname, 'fidelity-boot.js'));
-for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/status|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
+for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/(status|report)|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
 assert(!/\bfetch\s*\(\s*['"`]/.test(bootSource), 'fidelity-boot.js must send every request through its request helper');
 
 // 20. The page signs in and keeps its data on the server; no fictional data set is shipped or loaded
@@ -279,6 +279,15 @@ for (const required of ["request('/api/data', { method: 'PUT'", 'window.WA_START
   assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
 }
 assert(read(path.join(__dirname, 'fidelity-subsite.js')).includes('subsiteLogout:()=>window.WA_SITE.signOut()'), 'signing out must end the session on the server');
+// A page whose saving goes wrong keeps trying and says so (plan 067): every save has a time limit, a guard catches
+// whatever goes wrong in the save, a save counts only with the new version in the answer, and the server's log is
+// told once for each kind of trouble — with the first plain words of the error, never data.
+for (const required of ['const SAVE_TIMEOUT = 30000;', '...(timeout ? { signal: AbortSignal.timeout(timeout) } : {})', "request('/api/data', { method: 'PUT', keepalive, timeout: SAVE_TIMEOUT,", "request('/api/data', { method: 'DELETE', timeout: SAVE_TIMEOUT,", "if (answer.status === 200 && typeof answer.body.version === 'number') {", 'async function flush(options) {', "tell('error', 0, error);", "tell(answer.error?.name === 'TimeoutError' ? 'timeout' : answer.status ? 'refused' : 'unreachable', answer.status, answer.error);"]) {
+  assert(bootSource.includes(required), `fidelity-boot.js is missing ${required}`);
+}
+for (const required of ["const REPORT_KINDS = ['timeout', 'unreachable', 'refused', 'error'];", "'POST /api/site/report': async req => {", 'console.error(`site page save failed user=${user.username} site=${user.site || \'-\'} kind=${kind} status=${status ?? \'-\'} error=${words}`);']) {
+  assert(read(path.join(__dirname, 'site-api.cjs')).includes(required), `site-api.cjs is missing ${required}`);
+}
 // The supervisor page: master.js is the built copy of fidelity-master.js and is loaded before boot.js, which hands
 // a supervisor or an administrator over to it. The page only reads: the addresses it asks are these, each of a
 // sub-site under the sub-site's name, and its one request that is not a GET signs out.
@@ -478,7 +487,7 @@ for (const required of ["if (!(await window.WA_SITE.purge('priceList'))) return 
   assert(read(path.join(__dirname, 'fidelity-pricelist.js')).includes(required), `fidelity-pricelist.js is missing ${required}`);
 }
 assert(!read(path.join(__dirname, 'fidelity-pricelist.js')).includes('delete data.priceList'), 'the price list must not be removed by an ordinary save');
-for (const [file, required] of [['fidelity-boot.js', "answer = await request('/api/data', { method: 'DELETE', body: { baseVersion: version, field } });"], ['site-api.cjs', "const PURGEABLE = ['priceList'];"], ['site-api.cjs', "'DELETE /api/data': async req => {"], ['site-data.cjs', "db.exec('VACUUM');"], ['site-data.cjs', "db.exec('PRAGMA wal_checkpoint(TRUNCATE)');"], ['site-data.cjs', "else db.prepare('DELETE FROM saves WHERE version = ?').run(row.version);"]]) {
+for (const [file, required] of [['fidelity-boot.js', "answer = await request('/api/data', { method: 'DELETE', timeout: SAVE_TIMEOUT, body: { baseVersion: version, field } });"], ['site-api.cjs', "const PURGEABLE = ['priceList'];"], ['site-api.cjs', "'DELETE /api/data': async req => {"], ['site-data.cjs', "db.exec('VACUUM');"], ['site-data.cjs', "db.exec('PRAGMA wal_checkpoint(TRUNCATE)');"], ['site-data.cjs', "else db.prepare('DELETE FROM saves WHERE version = ?').run(row.version);"]]) {
   assert(read(path.join(__dirname, file)).includes(required), `${file} is missing ${required}`);
 }
 // The shortest password: the server's rule and what the page checks and says are the same number.
@@ -580,6 +589,7 @@ const summary = {
   messageTranslation: 'once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again',
   fileSending: 'up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most',
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
+  saveGuard: 'every save of the page has a time limit of 30 s and a guard around it: whatever goes wrong, the changes stay, the page says they are not saved and tries again, and the server\'s log is told once for each kind of trouble (POST /api/site/report, signed in; who, sub-site, kind, status, the first plain words of the error, never data)',
   reasoningEffort: 'AI_REASONING_EFFORT in the server\'s settings (none, minimal, low, medium or high) is sent to the model service as reasoning_effort and named by the status; a value outside these leaves the service not configured (bad-reasoning-effort); without it nothing is sent',
   voiceWithGemini: 'voice notes into text can use Google Gemini (VOICE_PROVIDER=gemini, model gemini-3.5-transcribe): the sound goes inline into a generateContent request with the key in its own header, 14 MB at most; the answer\'s words without the model\'s thoughts',
   sentTranslatedBack: 'a reply or caption that was put into the customer\'s language is translated back into the reading language after it is sent, like a message sent from the phone, and that translation shows under it; what went out as typed gets none; the typed words are not kept as a translation (plan 063 undone); requests for the same translation at the same moment share one call to the service',

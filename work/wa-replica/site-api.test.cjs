@@ -684,6 +684,25 @@ test('deleting an account: for supervisors and administrators, never one\'s own,
   }
 });
 
+test('a page that could not save tells the log, once for each kind: who, the sub-site, the kind, the status and the first plain words of the error — never data (plan 067)', async () => {
+  const cookie = await member('tamsin', 'agent', 's1');
+  const report = (body, options = {}) => call('/api/site/report', { method: 'POST', cookie, body, ...options });
+  assert.equal((await call('/api/site/report', { method: 'POST', body: { kind: 'timeout' } })).status, 401, 'signed in only');
+  for (const bad of [{}, { kind: 'other' }, { kind: 'error', status: 'x' }, { kind: 'error', status: 600 }, { kind: 'error', status: 1.5 }, { kind: 'error', error: 7 }]) assert.equal((await report(bad)).status, 400, JSON.stringify(bad));
+  assert.equal((await report({ kind: 'error' }, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403, 'not from a page of another site');
+  const before = logged.length;
+  assert.deepEqual((await report({ kind: 'error', status: 0, error: "TypeError: Converting circular structure to JSON --> starting at object with constructor 'Object' 13800138000 Gracias" })).json, { ok: true });
+  assert.equal((await report({ kind: 'timeout', status: 0, error: 'TimeoutError: signal timed out' })).status, 200);
+  assert.equal((await report({ kind: 'refused', status: 502 })).status, 200);
+  assert.equal((await report({ kind: 'unreachable', status: 0, error: 'TypeError: Failed to fetch 张伟 13800138000' })).status, 200);
+  assert.deepEqual(logged.slice(before), [
+    'site page save failed user=tamsin site=s1 kind=error status=0 error=TypeError: Converting circular structure to JSON --> starting at object with constructor',
+    'site page save failed user=tamsin site=s1 kind=timeout status=0 error=TimeoutError: signal timed out',
+    'site page save failed user=tamsin site=s1 kind=refused status=502 error=-',
+    'site page save failed user=tamsin site=s1 kind=unreachable status=0 error=TypeError: Failed to fetch',
+  ]);
+});
+
 test('the log names users and outcomes, never a password, a token or data', () => {
   const lines = logged.filter(line => line.startsWith('site '));
   assert(lines.some(line => line === 'site login ok user=ana') && lines.some(line => line === 'site login failed error=invalid-credentials') && lines.some(line => line === 'site password changed user=ben'), lines.slice(0, 8).join('\n'));

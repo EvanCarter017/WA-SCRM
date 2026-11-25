@@ -60,6 +60,10 @@ const STATUS = {
   'workspace-exists': 409, 'workspace-full': 409, 'workspace-low-memory': 409, 'workspace-busy': 409, 'workspace-unknown-site': 409, 'workspace-unavailable': 503,
 };
 const problem = (code, extra = {}) => Object.assign(new Error(code), { code, ...extra });
+// What a page may report about its saving (plan 067), and the words of an error as the log keeps them: up to the
+// first quotation mark (what follows often quotes data), letters and a few signs only — no digits — and short.
+const REPORT_KINDS = ['timeout', 'unreachable', 'refused', 'error'];
+const plainWords = text => String(text ?? '').split(/["'`]/)[0].replace(/[^A-Za-z .:>-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || '-';
 
 function sendJson(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
@@ -387,6 +391,17 @@ function create({ dir, siteId = 'default', now, workspaces = null }) {
       console.log(`site account removed by=${actor.username} user=${target.username} role=${target.role}`);
       // A sub-site another account still has stays — and stops when none of them can sign in any more.
       return { body: { ok: true, ...workspace, ...(shared ? await workspaceOff(actor, target) : {}) } };
+    },
+    // A page that could not save tells it here (plan 067), once for each kind of trouble: the log gets who, the
+    // sub-site, the kind, the status of the answer and the first plain words of the error — never data.
+    'POST /api/site/report': async req => {
+      const user = signedIn(req);
+      const body = await readJson(req);
+      const { kind, status, error } = body;
+      if (!REPORT_KINDS.includes(kind) || (status !== undefined && !(Number.isInteger(status) && status >= 0 && status < 600)) || (error !== undefined && typeof error !== 'string')) throw problem('invalid-request');
+      const words = plainWords(error);
+      console.error(`site page save failed user=${user.username} site=${user.site || '-'} kind=${kind} status=${status ?? '-'} error=${words}`);
+      return { body: { ok: true } };
     },
     'GET /api/data': req => {
       const user = signedIn(req);
