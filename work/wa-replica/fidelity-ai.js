@@ -109,7 +109,7 @@
     return fetch('/api/ai/reply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context, from: input.from }),
+      body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context }),
     }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
   }
 
@@ -213,15 +213,14 @@
     paintIcons(hint);
   }
 
-  // What the relay gets for a reply: the text, the customer's language, the tone, the business description,
-  // the last messages of the conversation as context, and the reading language, in which the seller writes (the
-  // relay keeps the typed words as the reply's translation into it — plan 063).
+  // What the relay gets for a reply: the text, the customer's language, the tone, the business description
+  // and the last messages of the conversation as context.
   function aiOutboundInput(c, text) {
     const settings = aiSettings();
     const context = (data.messages[c.id] || []).slice(-6)
       .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
       .filter(message => message.text.trim());
-    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context, from: settings.readLanguage };
+    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context };
   }
 
   // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first

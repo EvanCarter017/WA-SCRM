@@ -254,7 +254,7 @@ for (const required of ['const aiWantsTranslation = (message, language) => aiTra
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
 }
 assert.equal((aiSource.match(/aiRun\('translate\.inbound'/g) || []).length, 2, 'messages are translated in one place (the line), the words of a voice note in another');
-for (const required of ["translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };", "if (!e.history && e.type === 'text' && e.text) aiTranslateInbound(c, message);", 'delete m.translatedTo;']) {
+for (const required of ["...(outgoing === text ? { translatedTo: aiSettings().readLanguage } : {}) };", "if (!e.history && e.type === 'text' && e.text) aiTranslateInbound(c, message);", 'delete m.translatedTo;']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }
 for (const required of ["new DatabaseSync(path.join(dir, 'ai-translations.db'))", "const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\\n' + text).digest('hex');", "if (typeof known === 'string') return { text: known, inputChars: text.length, cached: true };", 'store?.put(key, translated);']) {
@@ -526,14 +526,19 @@ for (const required of ["const AI_SHORTCUT_DEFAULT = 'Ctrl+Enter';", 'const AI_S
 }
 assert(aiSource.includes('    if (combo) aiShortcutShow(combo);\n  }, true);\n'), 'the shortcut must be caught before the page sends on Enter');
 assert(!aiSource.includes('AI_SHORTCUT_TAKEN'), 'any key can be the shortcut: no combination is refused (plan 062)');
-// The words a seller typed are kept as the translation of the sent reply back into their reading language (plan
-// 063): the page names its reading language in a reply request, and the relay keeps the typed words when they are
-// written in it, so that another workspace of this server receiving the reply shows them.
-for (const required of ['return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context, from: settings.readLanguage };', 'body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context, from: input.from }),']) {
-  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+// A reply that was put into the customer's language is translated back into the reading language after it is sent
+// (plan 066): the page leaves its own translated message, and a file's translated caption, unmarked, so that the
+// translator of the conversation takes it like a message sent from the phone. The typed words are no longer kept as
+// the reply's translation back (plan 063 undone); two workspaces of a server show the same translation back, which
+// the relay keeps once; a translation on its way is shared by a request for the same one, so that two workspaces
+// asking at the same moment get the same words.
+for (const required of ['if (caption === text) message.translatedTo = aiSettings().readLanguage;', "else for (const field of ['translatedTo', 'translated']) delete message[field];"]) {
+  assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
-assert(read(path.join(__dirname, 'ai-relay.cjs')).includes('if (from && translated !== text && writtenIn(from, text)) translationStore()?.put(translationKey(from, translated), text);'), 'the relay must keep the typed words of a reply as its translation back');
+assert(!openwaSource.includes('{ translated: text }'), 'a sent message must not keep the typed words as its translation');
+assert(!read(path.join(__dirname, 'ai-relay.cjs')).includes('writtenIn(') && !aiSource.includes('from: settings.readLanguage'), 'the relay must not keep the typed words of a reply as its translation back');
+assert(read(path.join(__dirname, 'ai-relay.cjs')).includes('if (translating.has(key)) return { text: await translating.get(key), inputChars: text.length, cached: true };'), 'a translation on its way must be shared by a request for the same one');
 assert(read(path.join(out, 'icons.js')).includes('"Settings":[["path"'), 'the gear must be in the icon pool');
 // Pinning chats (plan 061): a right-click on a chat in the list opens a menu with 置顶 or 取消置顶; pinned chats come
 // first in every filter and search, marked with a pin; the pin is kept with the customer and survives the merging
@@ -577,7 +582,7 @@ const summary = {
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
   reasoningEffort: 'AI_REASONING_EFFORT in the server\'s settings (none, minimal, low, medium or high) is sent to the model service as reasoning_effort and named by the status; a value outside these leaves the service not configured (bad-reasoning-effort); without it nothing is sent',
   voiceWithGemini: 'voice notes into text can use Google Gemini (VOICE_PROVIDER=gemini, model gemini-3.5-transcribe): the sound goes inline into a generateContent request with the key in its own header, 14 MB at most; the answer\'s words without the model\'s thoughts',
-  replyWordsKeptBack: 'the words a seller typed are kept by the relay as the translation of the sent reply back into the seller\'s reading language (when written in it), so that another workspace of this server receiving the reply shows the seller\'s own words',
+  sentTranslatedBack: 'a reply or caption that was put into the customer\'s language is translated back into the reading language after it is sent, like a message sent from the phone, and that translation shows under it; what went out as typed gets none; the typed words are not kept as a translation (plan 063 undone); requests for the same translation at the same moment share one call to the service',
   pinnedChats: 'a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged',
   translateShortcut: 'a key, a combination or modifier keys on their own, recorded under the gear beside the customer\'s language once its field is clicked (Ctrl + Enter at first; any key, plan 062), translates the message box into the customer\'s language and shows it above the box, guard on or off; Enter (or the send button, when Enter is the shortcut) then sends the translation; the line under the box names it',
   priceCurrency: 'one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it ("USD 40") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers',

@@ -48,16 +48,6 @@ const MAX_VOICE_BYTES = 24 * 1024 * 1024;
 const VOICE_TIMEOUT_MS = Number(process.env.WA_SCRM_AI_VOICE_TIMEOUT_MS) || 60000;
 // A language name: letters of any script, spaces and a few separators.
 const LANGUAGE = /^[\p{L}\p{M} ()·-]{1,40}$/u;
-// The reading languages that have a script of their own; the others offered by the page are written in Latin letters.
-const READING_SCRIPTS = { '中文': /\p{Script=Han}/u, '日本語': /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u, '한국어': /\p{Script=Hangul}/u, 'Русский': /\p{Script=Cyrillic}/u, 'العربية': /\p{Script=Arabic}/u };
-// Whether a text is written in a reading language: at least half of its letters in that language's own script, or,
-// for a language written in Latin letters, Latin letters only.
-function writtenIn(language, text) {
-  const letters = text.match(/\p{L}/gu) || [];
-  if (!letters.length) return false;
-  const own = READING_SCRIPTS[language];
-  return own ? letters.filter(letter => own.test(letter)).length * 2 >= letters.length : letters.every(letter => /\p{Script=Latin}/u.test(letter));
-}
 // How a reply should sound. The keys are what the page sends.
 const TONES = {
   casual: 'Tone: casual and relaxed, like texting someone you know. Contractions and everyday words are fine.',
@@ -96,6 +86,11 @@ function translationStore() {
   return kept;
 }
 const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\n' + text).digest('hex');
+// Translations on their way to the service, by the same fingerprint: a request for one of them waits for it
+// instead of asking the service a second time (plan 066). Two workspaces of the server that ask for the same
+// message at the same moment — the one that sent it, translating it back, and the one that received it — so show
+// the same words.
+const translating = new Map();
 
 // KEY=VALUE lines. Blank lines and lines starting with # are ignored; Windows line endings are accepted.
 function parseEnv(text) {
@@ -291,32 +286,32 @@ async function translate(input, config) {
   // A translation made before is given again without asking the service.
   const store = translationStore(), key = translationKey(to, text), known = store?.get(key);
   if (typeof known === 'string') return { text: known, inputChars: text.length, cached: true };
-  const translated = await askModel(config, translationPrompt(to), text);
-  store?.put(key, translated);
-  return { text: translated, inputChars: text.length };
+  // One on its way is waited for; its failure is the failure of every request that waits for it.
+  if (translating.has(key)) return { text: await translating.get(key), inputChars: text.length, cached: true };
+  const asked = askModel(config, translationPrompt(to), text);
+  translating.set(key, asked);
+  try {
+    const translated = await asked;
+    store?.put(key, translated);
+    return { text: translated, inputChars: text.length };
+  } finally {
+    translating.delete(key);
+  }
 }
 
-// A reply the seller typed, put into the customer's language. tone, business, context and from (the seller's
-// reading language) are optional.
+// A reply the seller typed, put into the customer's language. tone, business and context are optional.
 async function reply(input, config) {
   const text = typeof input.text === 'string' ? input.text.trim() : '';
   const to = typeof input.to === 'string' ? input.to.trim() : '';
   const tone = input.tone === undefined ? 'casual' : input.tone;
   const business = input.business === undefined ? '' : input.business;
   const context = input.context === undefined ? [] : input.context;
-  const from = input.from === undefined ? '' : input.from;
   if (!text || !LANGUAGE.test(to) || typeof tone !== 'string' || !Object.hasOwn(TONES, tone) || typeof business !== 'string' || !Array.isArray(context)) throw failure(400, 'invalid-request');
-  if (typeof from !== 'string' || (from && !LANGUAGE.test(from))) throw failure(400, 'invalid-request');
   if (context.some(message => !message || typeof message.text !== 'string' || !['me', 'customer'].includes(message.from))) throw failure(400, 'invalid-request');
   if (text.length > MAX_TEXT || business.length > MAX_BUSINESS) throw failure(413, 'too-long');
   const oneLine = value => value.replace(/\s+/g, ' ').trim();
   const recent = context.slice(-MAX_CONTEXT_MESSAGES).map(message => ({ from: message.from, text: oneLine(message.text).slice(0, MAX_CONTEXT_TEXT) })).filter(message => message.text);
-  const translated = await askModel(config, replyPrompt({ to, tone, business: oneLine(business) }), replyTurn(text, recent));
-  // What the seller typed is what this reply says in their reading language (plan 063): it is kept as the reply's
-  // translation into that language, so that another workspace of this server that receives the reply shows the
-  // seller's own words instead of translating it anew. Only when the words are written in that language.
-  if (from && translated !== text && writtenIn(from, text)) translationStore()?.put(translationKey(from, translated), text);
-  return { text: translated, inputChars: text.length };
+  return { text: await askModel(config, replyPrompt({ to, tone, business: oneLine(business) }), replyTurn(text, recent)), inputChars: text.length };
 }
 
 const ACTIONS = { '/api/ai/translate': ['translate', translate], '/api/ai/reply': ['reply', reply] };

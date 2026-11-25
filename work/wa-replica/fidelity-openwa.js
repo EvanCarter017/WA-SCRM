@@ -567,8 +567,12 @@
       list.push(message);
       list.sort((x, y) => (x.at || 0) - (y.at || 0));
     }
-    // Like every message the page sends, it is marked as read in the reading language and never asked for.
-    Object.assign(message, { text: shown, type: sent.type, ...(sent.file ? { file: sent.file } : {}), translatedTo: aiSettings().readLanguage, ...(caption !== text ? { translated: text } : {}) });
+    // A caption that went out as it was typed is marked as read in the reading language and never asked for. One
+    // that was put into the customer's language is translated back into the reading language after it is sent,
+    // like a message sent from the phone (plan 066): what shows under it is what the customer reads.
+    Object.assign(message, { text: shown, type: sent.type, ...(sent.file ? { file: sent.file } : {}) });
+    if (caption === text) message.translatedTo = aiSettings().readLanguage;
+    else for (const field of ['translatedTo', 'translated']) delete message[field];
     if (list.at(-1) === message) Object.assign(c, { preview: shown, last: message.time, lastAt: message.at });
     c.unread = 0;
     if (draft(c).text.trim() === text) ui.drafts[c.id] = { text: '', translated: '', source: '' };
@@ -589,9 +593,10 @@
     const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
     // With files attached, the text is the caption of the first: they go out together.
     if (held) return openwaSendFiles(c, held, text, outgoing);
-    // What the employee sends from here is never asked for: it is marked as read in the reading language, and a
-    // reply that was put into the customer's language keeps what was typed as its translation.
-    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };
+    // What the employee sends from here as it was typed is marked as read in the reading language and never asked
+    // for. A reply that was put into the customer's language is translated back into the reading language after
+    // it is sent, like a message sent from the phone (plan 066): what shows under it is what the customer reads.
+    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', ...(outgoing === text ? { translatedTo: aiSettings().readLanguage } : {}) };
     (data.messages[c.id] ??= conversationMessages(c)).push(message);
     Object.assign(c, { preview: outgoing, last: message.time, lastAt: message.at, unread: 0 });
     ui.drafts[c.id] = { text: '', translated: '', source: '' };

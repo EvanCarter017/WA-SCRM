@@ -1945,8 +1945,12 @@ window.WA_START = () => {
       list.push(message);
       list.sort((x, y) => (x.at || 0) - (y.at || 0));
     }
-    // Like every message the page sends, it is marked as read in the reading language and never asked for.
-    Object.assign(message, { text: shown, type: sent.type, ...(sent.file ? { file: sent.file } : {}), translatedTo: aiSettings().readLanguage, ...(caption !== text ? { translated: text } : {}) });
+    // A caption that went out as it was typed is marked as read in the reading language and never asked for. One
+    // that was put into the customer's language is translated back into the reading language after it is sent,
+    // like a message sent from the phone (plan 066): what shows under it is what the customer reads.
+    Object.assign(message, { text: shown, type: sent.type, ...(sent.file ? { file: sent.file } : {}) });
+    if (caption === text) message.translatedTo = aiSettings().readLanguage;
+    else for (const field of ['translatedTo', 'translated']) delete message[field];
     if (list.at(-1) === message) Object.assign(c, { preview: shown, last: message.time, lastAt: message.at });
     c.unread = 0;
     if (draft(c).text.trim() === text) ui.drafts[c.id] = { text: '', translated: '', source: '' };
@@ -1967,9 +1971,10 @@ window.WA_START = () => {
     const d = draft(c), outgoing = d.translated && d.source === text ? d.translated : text;
     // With files attached, the text is the caption of the first: they go out together.
     if (held) return openwaSendFiles(c, held, text, outgoing);
-    // What the employee sends from here is never asked for: it is marked as read in the reading language, and a
-    // reply that was put into the customer's language keeps what was typed as its translation.
-    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', translatedTo: aiSettings().readLanguage, ...(outgoing !== text ? { translated: text } : {}) };
+    // What the employee sends from here as it was typed is marked as read in the reading language and never asked
+    // for. A reply that was put into the customer's language is translated back into the reading language after
+    // it is sent, like a message sent from the phone (plan 066): what shows under it is what the customer reads.
+    const message = { id: nextId('m'), side: 'out', text: outgoing, time: openwaClock(), at: Date.now(), request: nextId('r'), status: 'sending', ...(outgoing === text ? { translatedTo: aiSettings().readLanguage } : {}) };
     (data.messages[c.id] ??= conversationMessages(c)).push(message);
     Object.assign(c, { preview: outgoing, last: message.time, lastAt: message.at, unread: 0 });
     ui.drafts[c.id] = { text: '', translated: '', source: '' };
@@ -3970,7 +3975,7 @@ window.WA_START = () => {
     return fetch('/api/ai/reply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context, from: input.from }),
+      body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context }),
     }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
   }
 
@@ -4074,15 +4079,14 @@ window.WA_START = () => {
     paintIcons(hint);
   }
 
-  // What the relay gets for a reply: the text, the customer's language, the tone, the business description,
-  // the last messages of the conversation as context, and the reading language, in which the seller writes (the
-  // relay keeps the typed words as the reply's translation into it — plan 063).
+  // What the relay gets for a reply: the text, the customer's language, the tone, the business description
+  // and the last messages of the conversation as context.
   function aiOutboundInput(c, text) {
     const settings = aiSettings();
     const context = (data.messages[c.id] || []).slice(-6)
       .map(message => ({ from: message.side === 'out' ? 'me' : 'customer', text: String(message.text || '').slice(0, 300) }))
       .filter(message => message.text.trim());
-    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context, from: settings.readLanguage };
+    return { text, to: aiCustomerLanguage(c), tone: settings.tone, business: settings.business, context };
   }
 
   // Send guard. While the relay is in use, a reply that is not in the customer's language is translated first

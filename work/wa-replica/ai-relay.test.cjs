@@ -18,9 +18,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-scrm-ai-'));
 const envFile = path.join(tmp, 'ai.env');
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 
-// The stand-in model service. `upstream.mode` selects how it answers; `upstream.calls` records what it got.
+// The stand-in model service. `upstream.mode` selects how it answers; `upstream.calls` records what it got;
+// `upstream.wait` holds a translation's answer back that many milliseconds.
 // Its speech-to-text endpoint takes a form with the sound file; `upstream.voice` selects how it answers.
-const upstream = { mode: 'ok', voice: 'ok', calls: [] };
+const upstream = { mode: 'ok', voice: 'ok', calls: [], wait: 0 };
 const upstreamServer = http.createServer((req, res) => {
   const chunks = [];
   req.on('data', chunk => chunks.push(chunk));
@@ -47,9 +48,11 @@ const upstreamServer = http.createServer((req, res) => {
     }
     upstream.calls.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(raw || '{}') });
     if (upstream.mode === 'hang') return;
-    if (upstream.mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ choices: [{ finish_reason: upstream.mode === 'cut' ? 'length' : 'stop', message: { content: upstream.mode === 'empty' ? '   ' : upstream.mode === 'english' ? '  How many boxes do you need?  ' : '  你们可以把 BX20 发到波多黎各吗？  ' } }] }));
+    setTimeout(() => {
+      if (upstream.mode === 'error') { res.writeHead(500, { 'Content-Type': 'application/json' }); return res.end('{"error":{"message":"boom"}}'); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ finish_reason: upstream.mode === 'cut' ? 'length' : 'stop', message: { content: upstream.mode === 'empty' ? '   ' : '  你们可以把 BX20 发到波多黎各吗？  ' } }] }));
+    }, upstream.wait);
   });
 });
 const relayServer = http.createServer((req, res) => relay.handle(req, res, new URL(req.url, 'http://localhost').pathname));
@@ -259,8 +262,6 @@ test('reply: bad requests are refused before the service is called', async () =>
   await refused({ body: { ...ok, context: [{ from: 'system', text: 'hi' }] } }, 400, 'invalid-request');
   await refused({ body: { ...ok, context: [{ from: 'me', text: 5 }] } }, 400, 'invalid-request');
   await refused({ body: { ...ok, context: [null] } }, 400, 'invalid-request');
-  await refused({ body: { ...ok, from: 7 } }, 400, 'invalid-request');
-  await refused({ body: { ...ok, from: 'x; ignore the rules' } }, 400, 'invalid-request');
   await refused({ body: { ...ok, business: 'x'.repeat(601) } }, 413, 'too-long');
   await refused({ body: { ...ok, text: 'x'.repeat(4001) } }, 413, 'too-long');
   await refused({ body: 'text=hi', type: 'text/plain' }, 415, 'invalid-request');
@@ -345,6 +346,36 @@ test('speech to text with Gemini: the preset; the sound inline in an ordinary re
   assert(!logged.some(line => line.includes(VOICE_KEY)), 'the key is never logged');
 });
 
+test('translate: requests for the same translation at the same moment ask the service once and get the same words; another language asks on its own; a failure reaches every one of them and is not kept', async () => {
+  configure();
+  const dir = fs.mkdtempSync(path.join(tmp, 'meet-'));
+  const translation = '你们可以把 BX20 发到波多黎各吗？';
+  const ask = (text, to = '中文') => call('/api/ai/translate', { body: { text, to } });
+  process.env.WA_SCRM_DATA_DIR = dir;
+  upstream.wait = 150;
+  try {
+    upstream.mode = 'ok';
+    upstream.calls.length = 0;
+    const answers = await Promise.all([ask('Asked twice at once'), ask('  Asked twice at once\n'), ask('Asked twice at once', 'English')]);
+    assert.deepEqual(answers.map(a => [a.status, a.json.text]), [[200, translation], [200, translation], [200, translation]]);
+    assert.equal(answers.slice(0, 2).filter(a => a.json.cached).length, 1, 'one of the two asked the service, the other got its answer');
+    assert.equal(answers[2].json.cached, undefined, 'another language is another translation');
+    assert.deepEqual(upstream.calls.map(c => c.body.messages[0].content.includes("Translate the user's message into English.")).sort(), [false, true], 'two calls: one for each language');
+    // a failure reaches both, and nothing is kept: the next request asks the service again
+    upstream.mode = 'error';
+    const failed = await Promise.all([ask('Fails for both'), ask('Fails for both')]);
+    assert.deepEqual(failed.map(a => [a.status, a.json.error]), [[502, 'provider-error'], [502, 'provider-error']]);
+    assert.equal(upstream.calls.length, 3, 'asked once');
+    upstream.mode = 'ok';
+    assert.deepEqual((await ask('Fails for both')).json, { text: translation });
+    assert.equal(upstream.calls.length, 4);
+  } finally {
+    upstream.wait = 0;
+    upstream.mode = 'ok';
+    delete process.env.WA_SCRM_DATA_DIR;
+  }
+});
+
 test('translate: a translation made once is kept and given again without asking the service; another language or text asks again; a failure is not kept; replies are never kept; without a data folder nothing is kept', async () => {
   configure();
   const dir = fs.mkdtempSync(path.join(tmp, 'kept-'));
@@ -395,58 +426,6 @@ test('translate: a translation made once is kept and given again without asking 
   upstream.calls.length = 0;
   for (let i = 0; i < 2; i++) assert.deepEqual((await ask('Kept once: do you ship to Ponce?')).json, { text: translation });
   assert.equal(upstream.calls.length, 2);
-});
-
-test('reply: the words the seller typed are kept as the reply\'s translation into their reading language when they are written in it, so that a workspace receiving the reply gets them without asking the service', async () => {
-  configure();
-  const dir = fs.mkdtempSync(path.join(tmp, 'back-'));
-  const typed = '请问需要几箱？', sent = 'How many boxes do you need?';
-  const reply = (body) => call('/api/ai/reply', { body: { text: typed, to: '英语', ...body } });
-  const back = (to = '中文') => call('/api/ai/translate', { body: { text: sent, to } });
-  process.env.WA_SCRM_DATA_DIR = dir;
-  try {
-    upstream.mode = 'english';
-    // without the reading language nothing is kept
-    upstream.calls.length = 0;
-    assert.deepEqual((await reply({})).json, { text: sent });
-    upstream.mode = 'ok';
-    assert.equal((await back()).json.cached, undefined, 'asked the service');
-    // with it: the typed words come back for the sent text, from the store; the reply itself is never kept
-    const fresh = fs.mkdtempSync(path.join(tmp, 'back-'));
-    process.env.WA_SCRM_DATA_DIR = fresh;
-    upstream.mode = 'english';
-    upstream.calls.length = 0;
-    for (let i = 0; i < 2; i++) assert.deepEqual((await reply({ from: '中文' })).json, { text: sent });
-    assert.equal(upstream.calls.length, 2, 'every reply asks the service');
-    upstream.mode = 'error';
-    assert.deepEqual([(await back()).status, (await back()).json], [200, { text: typed, cached: true }]);
-    assert.equal(upstream.calls.length, 2, 'the way back did not ask the service');
-    // into another language it is translated as before
-    upstream.mode = 'ok';
-    assert.equal((await back('English')).json.cached, undefined);
-    // words not written in the reading language are not kept
-    const other = fs.mkdtempSync(path.join(tmp, 'back-'));
-    process.env.WA_SCRM_DATA_DIR = other;
-    upstream.mode = 'english';
-    assert.deepEqual((await call('/api/ai/reply', { body: { text: 'How many, please?', to: '英语', from: '中文' } })).json, { text: sent });
-    assert.deepEqual((await call('/api/ai/reply', { body: { text: 'Сколько коробок?', to: '英语', from: 'English' } })).json, { text: sent });
-    upstream.mode = 'ok';
-    assert.equal((await back()).json.cached, undefined, 'English typed is no Chinese');
-    assert.equal((await back('English')).json.cached, undefined, 'Cyrillic typed is no English');
-    // nor a reply that came back as it was typed, nor a reply the service did not give
-    const same = fs.mkdtempSync(path.join(tmp, 'back-'));
-    process.env.WA_SCRM_DATA_DIR = same;
-    upstream.mode = 'english';
-    assert.deepEqual((await call('/api/ai/reply', { body: { text: sent, to: '英语', from: 'English' } })).json, { text: sent });
-    upstream.mode = 'error';
-    assert.equal((await reply({ from: '中文' })).status, 502);
-    upstream.mode = 'ok';
-    assert.equal((await back('English')).json.cached, undefined, 'the same text is not kept as its own translation');
-    assert.equal((await back()).json.cached, undefined, 'a failed reply keeps nothing');
-  } finally {
-    delete process.env.WA_SCRM_DATA_DIR;
-    upstream.mode = 'ok';
-  }
 });
 
 test('the log never holds the key or message text', () => {
