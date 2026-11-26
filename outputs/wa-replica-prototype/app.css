@@ -1149,41 +1149,48 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-master { min-height:100dvh; display:flex; flex-direction:column; background:var(--color-bg); color:var(--color-text); }
 .fid-master[hidden] { display:none; }
 .fid-master-top { display:flex; align-items:center; gap:var(--fid-px-12); min-height:var(--fid-px-56); padding:var(--fid-px-8) var(--fid-px-20); border-bottom:var(--fid-px-1) solid var(--fid-frame); background:var(--color-surface); }
-.fid-master-title { margin-right:auto; padding:var(--fid-px-2) var(--fid-px-10); border-radius:var(--fid-px-999); background:var(--color-accent-soft); color:var(--color-accent); font-size:var(--fid-px-13); }
-.fid-master-user { color:var(--fid-quiet); font-size:var(--fid-px-13); }
+.fid-master-title { margin-right:auto; padding:var(--fid-px-2) var(--fid-px-12); border-radius:var(--fid-px-999); background:var(--color-accent-soft); color:var(--color-accent); font-size:var(--fid-px-12); }
+.fid-master-user { color:var(--fid-quiet); font-size:var(--fid-px-14); }
 .fid-master-body { flex:1; min-height:0; display:flex; flex-direction:column; gap:var(--fid-px-12); padding:var(--fid-px-16) var(--fid-px-20) var(--fid-px-20); }
 .fid-master-bar { display:flex; flex-wrap:wrap; align-items:center; gap:var(--fid-px-8) var(--fid-px-12); }
-.fid-master-bar h1 { margin:0 auto 0 0; font-size:var(--fid-px-17); font-weight:750; line-height:var(--fid-px-24); }
-.fid-master-bar p { flex-basis:100%; margin:0; color:var(--fid-quiet); font-size:var(--fid-px-13); line-height:var(--fid-px-20); }
-.fid-master-readonly { display:inline-flex; align-items:center; gap:var(--fid-px-4); padding:var(--fid-px-2) var(--fid-px-10); border-radius:var(--fid-px-999); background:var(--fid-mint-bg); color:var(--fid-mint); font-size:var(--fid-px-13); }
+.fid-master-bar h1 { margin:0 auto 0 0; font-size:var(--fid-px-20); font-weight:700; line-height:var(--fid-px-28); }
+.fid-master-bar p { flex-basis:100%; margin:0; color:var(--fid-quiet); font-size:var(--fid-px-14); line-height:var(--fid-px-20); }
+/* Reading an employee's workspace is read-only, and looks it (plan 087): the badge and the frame in the information
+   tint, not in the green of a state that is fine. */
+.fid-master-readonly { display:inline-flex; align-items:center; gap:var(--fid-px-4); padding:var(--fid-px-2) var(--fid-px-12); border:var(--fid-px-1) solid color-mix(in srgb,var(--fid-sky) 25%,var(--color-surface)); border-radius:var(--fid-px-999); background:var(--fid-sky-bg); color:var(--fid-sky); font-size:var(--fid-px-14); }
 .fid-master-readonly .icon,.fid-master-meta .icon,.fid-master-translation .icon { flex:none; width:var(--fid-px-14); height:var(--fid-px-14); }
-.fid-master-note { margin:0; padding:var(--fid-px-40) var(--fid-px-20); color:var(--fid-quiet); font-size:var(--fid-px-13); line-height:var(--fid-px-20); text-align:center; }
+.fid-master-note { margin:0; padding:var(--fid-px-40) var(--fid-px-20); color:var(--fid-quiet); font-size:var(--fid-px-14); line-height:var(--fid-px-20); text-align:center; }
+/* The overview's figures on the right (客户, 未读会话, 待跟进 — not a row whose cell spans them); 停用 in the danger
+   colour beside 重置密码; overdue in the amber of overdue follow-ups (plan 087). */
+.fid-master-table:not(.fid-master-accounts) :is(th,td):nth-child(n+3):nth-child(-n+5):not(:last-child) { text-align:right; }
+.fid-master-acts .link[data-master="disable"] { color:var(--color-danger); }
 .fid-master-table td { height:var(--fid-px-56); }
 .fid-master-table small { display:block; color:var(--fid-quiet); font-size:var(--fid-px-12); }
-.fid-master-table small.fid-master-late { color:var(--color-danger); }
+.fid-master-table small.fid-master-late { color:var(--fid-amber); }
 .fid-master-quiet { color:var(--fid-quiet); }
 .fid-master-number { display:flex; flex-wrap:wrap; align-items:center; gap:var(--fid-px-2) var(--fid-px-6); }
 .fid-master-number small { flex-basis:100%; padding-left:var(--fid-px-14); }
 .fid-master-dot { flex:none; width:var(--fid-px-8); height:var(--fid-px-8); border-radius:50%; background:var(--fid-amber); }
 .fid-master-dot.on { background:var(--fid-mint); }
-.fid-master-site { flex:1; min-height:var(--fid-px-400); max-height:calc(100dvh - var(--fid-px-190)); display:grid; grid-template-columns:var(--fid-px-320) minmax(0,1fr); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-14); background:var(--color-surface); overflow:hidden; }
+.fid-master-site { flex:1; min-height:var(--fid-px-400); max-height:calc(100dvh - var(--fid-px-190)); display:grid; grid-template-columns:var(--fid-px-320) minmax(0,1fr); border:var(--fid-px-1) solid color-mix(in srgb,var(--fid-sky) 30%,var(--fid-frame)); border-radius:var(--fid-px-12); background:var(--color-surface); overflow:hidden; }
 .fid-master-people { display:flex; flex-direction:column; min-height:0; border-right:var(--fid-px-1) solid var(--fid-frame); }
 .fid-master-search { padding:var(--fid-px-12); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
 .fid-master-search input { width:100%; height:var(--fid-px-36); padding:0 var(--fid-px-12); border:var(--fid-px-1) solid var(--color-border); border-radius:var(--fid-px-8); background:var(--color-surface); color:var(--color-text); font:inherit; }
 .fid-master-search input:focus { border-color:var(--color-accent); outline:var(--fid-px-1) solid var(--color-accent); outline-offset:0; }
 .fid-master-list { flex:1; min-height:0; overflow:auto; }
 .fid-master-row { display:flex; align-items:center; gap:var(--fid-px-10); width:100%; padding:var(--fid-px-10) var(--fid-px-12); border:0; border-bottom:var(--fid-px-1) solid var(--fid-frame); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-.fid-master-row:hover,.fid-master-row.selected { background:var(--color-accent-soft); }
+.fid-master-row:hover { background:var(--color-accent-soft); }
+.fid-master-row.selected { background:color-mix(in srgb,var(--color-accent) 8%,var(--color-surface)); }
 .fid-master-row .avatar,.fid-master-chat-head .avatar { flex:none; width:var(--fid-px-40); height:var(--fid-px-40); }
 .fid-master-row-main { flex:1; min-width:0; display:grid; gap:var(--fid-px-2); }
 .fid-master-row-line { display:flex; align-items:center; gap:var(--fid-px-8); min-width:0; }
 .fid-master-row-line strong,.fid-master-preview { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fid-master-row-line strong { font-size:var(--fid-px-14); font-weight:600; }
 .fid-master-row-line time,.fid-master-preview { color:var(--fid-quiet); font-size:var(--fid-px-12); }
-.fid-master-unread { flex:none; min-width:var(--fid-px-18); height:var(--fid-px-18); padding:0 var(--fid-px-5); border-radius:var(--fid-px-999); background:var(--fid-mint); color:var(--color-surface); font-size:var(--fid-px-12); line-height:var(--fid-px-18); text-align:center; }
+.fid-master-unread { flex:none; min-width:var(--fid-px-18); height:var(--fid-px-18); padding:0 var(--fid-px-6); border-radius:var(--fid-px-999); background:var(--color-accent); color:var(--color-surface); font-size:var(--fid-px-12); line-height:var(--fid-px-18); text-align:center; }
 .fid-master-chat { display:flex; flex-direction:column; min-width:0; min-height:0; }
 .fid-master-chat-head { display:flex; align-items:center; gap:var(--fid-px-10); padding:var(--fid-px-10) var(--fid-px-16); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
-.fid-master-chat-head h2 { margin:0; font-size:var(--fid-px-15); line-height:var(--fid-px-22); }
+.fid-master-chat-head h2 { margin:0; font-size:var(--fid-px-16); line-height:var(--fid-px-24); }
 .fid-master-chat-head p { margin:0; color:var(--fid-quiet); font-size:var(--fid-px-12); line-height:var(--fid-px-18); }
 .fid-master-back { display:none; }
 .fid-master-facts { display:grid; gap:var(--fid-px-4); margin:0; padding:var(--fid-px-10) var(--fid-px-16); border-bottom:var(--fid-px-1) solid var(--fid-frame); font-size:var(--fid-px-13); line-height:var(--fid-px-20); }
