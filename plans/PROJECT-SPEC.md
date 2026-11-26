@@ -2,7 +2,7 @@
 
 > **What this is.** A dense, verified description of the WA-SCRM system for an AI agent that has to understand, change, review or extend it: how the system works today, what must stay true, how it is built, verified and delivered, how it got here, what the owner decided, and what is still open. It is written to be shared: it contains no machine addresses, workspace or account names, keys, settings values or customer data.
 >
-> **Stamp.** Refreshed 2026-11-26 for the code as of commit `40ea119` (plan 080; later commits change only `plans/`). Every concrete claim in sections 1–11 — about 440 of them: names, paths, routes, settings, numbers, data fields, behaviours — was re-checked against that code by two read-only checker agents, and each correction was confirmed in the code by the advisor before it was written here. First written 2026-11-25 (commit `17da196`) with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents, every ranked finding vetted by the advisor.
+> **Stamp.** Refreshed 2026-11-26 for the code as of commit `40ea119` (plan 080; later commits change only `plans/`); section 12 and 13 also record plan 081 (the text font, commit `7ff5165`). Every concrete claim in sections 1–11 — about 440 of them: names, paths, routes, settings, numbers, data fields, behaviours — was re-checked against that code by two read-only checker agents, and each correction was confirmed in the code by the advisor before it was written here. First written 2026-11-25 (commit `17da196`) with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents, every ranked finding vetted by the advisor.
 >
 > **How to read it.** Sections 1–3 for orientation; 4–7 before touching code in that area; 8–10 before any change at all; 11 before planning work; 12 for how the project got here; **13 before proposing anything** (decisions not to undo); 14 for what is open; 15 for the Chinese UI words. Where this document and the code disagree, **the code wins** — record the drift.
 
@@ -323,7 +323,7 @@ OpenWA's own behaviour (webhook retry window, idempotency memory); runtime measu
 
 ---
 
-## 12. History — the 80 plans in short
+## 12. History — the plans in short
 
 Every change since 2026-11-17 was made through a numbered plan (`plans/NNN-*.md`, index in `plans/README.md`), executed by an executor agent and reviewed before merging. Read the plan file for any detail; the index records each owner request and each review.
 
@@ -341,6 +341,8 @@ Every change since 2026-11-17 was made through a numbered plan (`plans/NNN-*.md`
 
 **Deep audit fixes and owner requests (2026-11-25 – 26).** 072 a stopped page stays stopped · 073 a linked number is not removed from the account list · 074 the WhatsApp feed starts also when its first questions fail · 075 a reply whose outcome is open shows once · 076 a customer made by hand starts with an empty conversation · 077 its chat list row reads 新建客户档案 until the first message · 078 several prices ticked in the quote dialog; currency signs · 079 the persona of the customer profile is for manual entry only · 080 quote dialog: a box per product and a confirm window with quantity, unit price, amount and total.
 
+**UI upgrade (2026-11-26 –).** The owner's upgrade brief (kept outside the repository) was planned and approved: Pass A = 081–084 (font; colours, type and shell; inbox; quote dialogs and profile drawer), Pass B = 085–087 (home and follow-ups; tables; supervisor page). 081 the page's text in HarmonyOS Sans SC, shipped with the app.
+
 ---
 
 ## 13. Owner decisions (do not undo them)
@@ -351,6 +353,7 @@ These are the owner's own choices, recorded with their dates in `plans/README.md
 - **Follow-ups are manual only** (plans 031, 035, 036, 039, 041): nothing creates to-dos or signals by itself; a customer without a hand-made follow-up shows no follow-up information anywhere.
 - **The persona of the customer profile is manual only** (plan 079): nothing fills it in; the automatic values were cleared once.
 - **Customers come from conversations only** (2026-11-26): contacts saved on the phone are not imported.
+- **Text font HarmonyOS Sans SC, shipped with the app** (081, 2026-11-26): Huawei's Regular and Bold files unmodified (the licence forbids changes — no subsetting, no WOFF2), the licence file beside them, the notice 本系统使用 HarmonyOS Sans 字体 on the sign-in screen; a new version of the font needs new file names (browsers keep `/fonts/*.ttf` a year). The UI upgrade's colour world (teal accent, cool neutrals, hairlines) and the row of page tabs hidden on the chat page come with plans 082–083.
 - **The customer's language is chosen per chat**, never preset (038); a message is translated once and kept (042).
 - **AI keys stay on the servers**; the browser talks only to its own origin (018 onwards).
 - **Quotes** (037, 049, 059, 078, 080): one currency per price list; the quote dialog ticks products with a box; a confirm window takes quantity and unit price and adds amounts and a total; the price list can be removed with no trace.
