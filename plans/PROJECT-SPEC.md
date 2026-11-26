@@ -4,7 +4,7 @@
 >
 > **Stamp.** Written against commit `17da196` on `main`, 2026-11-25, with the *improve — deep* framework: recon by the advisor, an audit by eight parallel read-only agents (correctness ×2, security, performance, tests, architecture + dependencies, tooling + docs, direction), then every ranked finding in section 11 (the table and its details) re-checked against the code by the advisor; the short list in 11.4 is given as the agents reported it. Facts in sections 1–10 come from the advisor's own reading of the code.
 >
-> **Updated** 2026-11-25 after plans 072–075 (merged and live at commit `2de0a82`; the owner chose findings 1, 3, 4 and 5 of the audit's top five, not 2): findings #1, #3, #4 (its start half) and #5 are fixed and marked so in section 11; sections 4.2, 4.4 and 10 describe the new behaviour. Updated again 2026-11-26 after plans 076 and 077 (live at `240ce1c`): finding #6 is fixed, and a customer made by hand shows 新建客户档案 as its preview line until the first message (owner request); the owner declined importing contacts saved on the phone — customers keep coming from conversations only (section 4.4).
+> **Updated** 2026-11-25 after plans 072–075 (merged and live at commit `2de0a82`; the owner chose findings 1, 3, 4 and 5 of the audit's top five, not 2): findings #1, #3, #4 (its start half) and #5 are fixed and marked so in section 11; sections 4.2, 4.4 and 10 describe the new behaviour. Updated again 2026-11-26 after plans 076 and 077 (live at `240ce1c`): finding #6 is fixed, and a customer made by hand shows 新建客户档案 as its preview line until the first message (owner request); the owner declined importing contacts saved on the phone — customers keep coming from conversations only (section 4.4). Updated 2026-11-26 after plans 078 and 079 (live at `eeb257c`): the quote dialog ticks several prices and prices carry currency signs; the persona of the customer profile is for manual entry only (its automatic values were cleared once).
 >
 > **How to read it.** Sections 1–3 for orientation; 4–7 before touching code in that area; 8–10 before any change at all; 11 before planning work. Where this document and the code disagree, **the code wins** — record the drift (it is a finding).
 >
@@ -24,7 +24,7 @@ Core capabilities, as built:
 |---|---|
 | WhatsApp chat (`#inbox`, 在线聊天) | Real WhatsApp messages through a self-hosted bridge (OpenWA): receive, send text and files, media (pictures, voice, video, documents), delivery ticks, retries, history catch-up, profile pictures, pinned chats, customer per chat. |
 | Follow-up loop (`#followups`, 跟进闭环) | To-dos (待办) created **by hand only**; completing one forces a choice: schedule the next or end the follow-up with a reason; a customer who writes again after "ended" resurfaces (复联待处理). Three prompts: awaiting reply, overdue, re-contact. |
-| Customers (`#customers`) | List with grade (S/A/B/C/D) and status (已成交 / 弃单 / 自然线索), filters, export; 360° profile drawer with tabs (profile & follow-up, activity, **order tracking** with shipping steps and undo, notes). |
+| Customers (`#customers`) | List with grade (S/A/B/C/D) and status (已成交 / 弃单 / 自然线索), filters, export; 360° profile drawer with tabs (profile & follow-up, activity, **order tracking** with shipping steps and undo, notes). The persona in 画像与跟进 (意向等级, 预计规模, 核心咨询需求, 收件地区, 沟通时段, 当前异议) holds only what a person saved with 保存画像; nothing fills it in (plan 079). |
 | Tags | Fully user-defined tag groups; no presets, no automatic tagging; tag statistics page. |
 | Chat records (`#chat-records`, 聊天记录) | Snapshots of a conversation moved in by hand with a reason, for review; no ratings. |
 | AI (`#ai`, AI 能力) | Through a server relay only (keys never reach the browser): **translate incoming messages once** and keep them; **translate a reply before sending** (Enter or a configurable shortcut shows the translation, the next press sends it; a "send guard" stops untranslated replies); **translate a sent reply back** into the reading language; **voice note to text** on click. Per-capability switches and usage records. |
@@ -233,6 +233,7 @@ Browser behaviour has **no tests in the repository** (a deliberate zero-dependen
 12. A page stopped with a notice stays stopped: nothing draws the app behind the notice, and the WhatsApp feed is read no more (plan 072).
 13. A number that is still linked to WhatsApp is never removed from the page's account list (plan 073).
 14. Every way of making a customer gives it its own conversation list (`data.messages[id] = []`), so no message from the customer is made up (`openwaNewCustomer`; plan 076 for customers made by hand).
+15. The persona of the customer profile holds only what a person entered with 保存画像: no default intent level, no value filled in from messages, notes, country or language, no made-up attribution (plan 079; owner decision 2026-11-26).
 
 ---
 
