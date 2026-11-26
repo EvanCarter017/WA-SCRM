@@ -274,11 +274,11 @@
 .lc-radar-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 31px;
-  padding: 0 10px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
   border: 1px solid var(--fid-frame);
-  border-radius: 18px;
+  border-radius: 999px;
   background: var(--color-surface-alt);
   color: var(--fid-ink);
   font-size: 12px;
@@ -295,23 +295,30 @@
 }
 .lc-radar-chip b {
   font-variant-numeric: tabular-nums;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.06);
-  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  font-size: 12px;
 }
 .lc-radar-chip[aria-pressed="true"] b {
   background: rgba(255, 255, 255, 0.22);
   color: var(--color-surface);
 }
+/* The follow-up signals in the tints of their states (plan 085): awaiting the customer's reply ("alert") sky, overdue
+   ("hot") amber, re-contact ("hot", data-id recontact) rose — as the chips in the chat and the lists (plan 083). */
 .lc-radar-chip.is-alert:not([aria-pressed="true"]) {
-  border-color: color-mix(in srgb, var(--fid-amber) 38%, var(--fid-frame));
-  background: color-mix(in srgb, var(--fid-amber) 7%, var(--color-surface));
-  color: var(--fid-amber);
+  border-color: color-mix(in srgb, var(--fid-sky) 30%, var(--fid-frame));
+  background: var(--fid-sky-bg);
+  color: var(--fid-sky);
 }
 .lc-radar-chip.is-hot:not([aria-pressed="true"]) {
-  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--fid-frame));
-  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--fid-amber) 35%, var(--fid-frame));
+  background: var(--color-warning-soft);
+  color: var(--fid-amber);
+}
+.lc-radar-chip.is-hot[data-id="recontact"]:not([aria-pressed="true"]) {
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--fid-frame));
+  background: var(--fid-rose-bg);
   color: var(--color-danger);
 }
 .lc-radar-chip .icon {
@@ -1070,12 +1077,12 @@
   align-items: center;
   gap: 6px;
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--fid-frame);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--color-surface);
   color: var(--fid-ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 .lc-subtab[aria-pressed="true"] {
@@ -1084,10 +1091,20 @@
   color: var(--color-surface);
 }
 .lc-subtab b {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 9px;
-  background: rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+}
+/* One 完成并闭环 per row of the to-do list: tinted, so that the list is not a column of solid buttons (plan 085). */
+.lc-todo-table .fid-btn.blue:not(:disabled) {
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--fid-frame));
+  color: var(--color-accent);
+}
+.lc-todo-table .fid-btn.blue:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 .lc-subtab[aria-pressed="true"] b {
   background: rgba(255, 255, 255, 0.22);

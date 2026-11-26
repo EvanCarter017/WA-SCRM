@@ -684,6 +684,19 @@ for (const required of ['border-radius:12px; box-shadow:0 16px 40px rgba(15,23,4
   assert(pageCss.includes(required), `fidelity.css is missing ${required}`);
 }
 assert(lifecycleCss.includes('.lc-card-block.hot-block {\n  border-color: color-mix(in srgb, var(--fid-amber) 35%, var(--fid-frame));\n  background: var(--color-warning-soft);\n}'), 'an overdue to-do must be amber like the overdue follow-ups');
+// 首页 and 跟进闭环 on the closed scale (plan 085): the follow-up signals in the tints of their states (awaiting reply
+// sky, overdue amber, re-contact rose by data-id), a tinted 完成并闭环 in the rows of the to-do list, the home page's
+// title 24 px and labels 14 px; and a dialog's footer stays in view while a long dialog scrolls (a stress check of
+// 确认报价 with 50 products).
+const dashCss = read(path.join(__dirname, 'fidelity-dashboard.css'));
+for (const required of ['.lc-radar-chip.is-hot[data-id="recontact"]:not([aria-pressed="true"]) {', '  background: var(--fid-sky-bg);\n  color: var(--fid-sky);\n}', '.lc-todo-table .fid-btn.blue:not(:disabled) {']) {
+  assert(lifecycleCss.includes(required), `fidelity-lifecycle.css is missing ${required}`);
+}
+for (const required of ['  --dash-radius: 12px;', '.dash-header h1 { margin: 0; font-size: 24px;', '.dash-metric-label { width: 100%; display: flex; gap: 8px; align-items: center; font-size: 14px;']) {
+  assert(dashCss.includes(required), `fidelity-dashboard.css is missing ${required}`);
+}
+assert(pageCss.includes('background:var(--color-surface); position:sticky; bottom:0; z-index:1; box-shadow:0 -1px 0 var(--fid-frame); }'), 'a dialog\'s footer must stay in view while a long dialog scrolls');
+assert(!/font-size: 1[13]px/.test(dashCss), 'the home page uses the closed scale of text sizes (no 11 or 13 px)');
 const summary = {
   version: req.version,
   status: 'passed',
@@ -717,6 +730,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
+  homeAndFollowups: '首页 and 跟进闭环 on the closed scale (plan 085): the follow-up signals in the tints of their states (awaiting reply sky, overdue amber, re-contact rose), a tinted 完成并闭环 in the to-do list, the home page\'s title 24 px and labels 14 px; a dialog\'s footer stays in view while a long dialog scrolls',
   dialogsAndProfile: 'dialogs, the quote dialog and the 360° profile on the closed scale (plan 084): radius 12 with a slate backdrop that starts below the header on the chat page; the quote list\'s rows a target for their boxes, the count a badge, the confirm window\'s figures on the right; the profile\'s tabs, labels and fields at 12–14 px on an 8 px grid, an overdue to-do amber',
   chatRoom: 'the chat page gives the conversation its room (plan 083): no row of page tabs there (the sidebar opens every page), compact rows above the messages, the strip on one line with icon buttons that keep their names as tooltips below 1600 px, the layout filling the page; white incoming bubbles with a hairline, close messages of one side, recessed translations; follow-up states in their own tints (overdue amber, re-contact rose, awaiting reply sky)',
   colourWorld: 'one colour world (plan 082): a teal accent (#0f766e, white text on it 5.47:1), cool neutrals, hairlines instead of shadows, greys of 4.5:1 and more on every surface, declared on :root so that the base follows; the shell, the shared controls and the sign-in screen on the closed scale of lengths',
