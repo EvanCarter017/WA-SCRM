@@ -1,9 +1,9 @@
   // ============================================================================
   // The price list (plan 037). A person uploads an Excel or CSV file on the page "价格表"; the file is read in the
   // browser (pricefile.js) and its products replace the list. In a conversation the button "报价" beside the
-  // message box finds a product and puts its price into the message box. Nothing here sends a message, suggests
-  // a product by itself or calls a server; a price is shown as the file gives it, in the currency chosen for the
-  // list when it was uploaded (plan 059).
+  // message box finds products, and the prices ticked there go into the message box together (plan 078). Nothing
+  // here sends a message, suggests a product by itself or calls a server; a price is shown as the file gives it, with
+  // the sign of the currency chosen for the list when it was uploaded (plans 059, 078).
   // ============================================================================
   const PRICE_MESSAGES = {
     'too-large': '文件超过 5 MB，无法作为价格表。',
@@ -15,7 +15,7 @@
     'no-prices': '文件里没有找到价格列：价格一列的内容应为数字。',
   };
   const PRICE_QUOTE_ROWS = 50;
-  const priceView = { query: '', quote: '', pending: null };
+  const priceView = { query: '', quote: '', pending: null, picked: [] };
   ui.pageSizes.prices ||= 20;
 
   // The list in use: { file, at, by, columns: { code, name, spec, prices: [..] }, rows: [{ code, name, spec, prices }] }.
@@ -53,6 +53,10 @@
   // existed has no currency and shows every price in the currency its own column's header names, as before.
   const PRICE_CURRENCIES = [['USD', '美元'], ['EUR', '欧元'], ['CNY', '人民币'], ['GBP', '英镑'], ['HKD', '港币'], ['JPY', '日元'], ['AUD', '澳元'], ['CAD', '加元'], ['SGD', '新加坡元'], ['MXN', '墨西哥比索'], ['BRL', '巴西雷亚尔'], ['INR', '印度卢比'], ['AED', '阿联酋迪拉姆'], ['SAR', '沙特里亚尔'], ['RUB', '俄罗斯卢布'], ['KRW', '韩元'], ['VND', '越南盾'], ['THB', '泰铢']];
   const PRICE_SIGN_CODES = { 'US$': 'USD', 'HK$': 'HKD', $: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'CNY', '₹': 'INR', '₽': 'RUB', '₩': 'KRW', '₫': 'VND', '฿': 'THB', RMB: 'CNY' };
+  // The sign that stands for the list's currency in front of a price (plan 078): "$40", not "USD 40". The other
+  // dollars and the yen have signs of their own, so that "$" always means US dollars; a currency without a common
+  // sign (AED, SAR) keeps its code: "AED 40".
+  const PRICE_SYMBOLS = { USD: '$', EUR: '€', GBP: '£', CNY: '¥', JPY: 'JP¥', HKD: 'HK$', AUD: 'A$', CAD: 'C$', SGD: 'S$', MXN: 'MX$', BRL: 'R$', INR: '₹', RUB: '₽', KRW: '₩', VND: '₫', THB: '฿' };
   // The currency a header names, as a code: "Price ($)" gives USD, "售价（人民币）" gives CNY, "售价" gives ''.
   function priceHeaderCurrency(label) {
     const sign = PRICE_CURRENCY.exec(label || '')?.[0]?.toUpperCase();
@@ -60,11 +64,11 @@
     return sign ? PRICE_SIGN_CODES[sign] || sign : PRICE_SIGN_CODES[word] || '';
   }
   const priceCurrencyLabel = code => `${code} ${PRICE_CURRENCIES.find(([known]) => known === code)?.[1] || ''}`.trim();
-  // A price as the page shows and quotes it: in the list's currency ("USD 40"), or with none when none was chosen.
-  // A price that carries its own sign in the file ("$40") stays as it is.
+  // A price as the page shows and quotes it: with the sign of the list's currency ("$40"; plan 078), or with none
+  // when none was chosen. A price that carries its own sign in the file ("$40") stays as it is.
   function priceShown(list, at, value) {
     if (list.currency === undefined) return priceMoney(list.columns.prices[at], value);
-    return list.currency && !/[$€£¥]/.test(value) ? `${list.currency} ${value}` : value;
+    return list.currency && !/[$€£¥]/.test(value) ? (PRICE_SYMBOLS[list.currency] || list.currency + ' ') + value : value;
   }
   // A price column's head: as the file names it; once a currency was chosen for the list, without the header's own
   // currency and with the chosen one: "Price ($)" with EUR chosen is "Price（EUR）".
@@ -129,7 +133,7 @@
     fidDialog('确认价格表', `<div class="modal-body price-preview">
       <p>文件：<strong>${esc(priceView.pending.file)}</strong></p>
       <p>读取到 <strong>${list.rows.length}</strong> 个产品${list.skipped ? `，另有 ${list.skipped} 行没有价格，已略过` : ''}。各列按表头识别为：${names.map(([name, label]) => `${name} = ${esc(label)}`).join('；')}。</p>
-      ${fidFormRow('售价币种', `<select class="fid-select" id="price-currency">${option('', '不显示币种', start)}${PRICE_CURRENCIES.map(([code]) => option(code, priceCurrencyLabel(code), start)).join('')}</select><span class="fid-field-help">报价时每个价格都带上这个币种，例如「USD 40」。${start ? '已按表头选好，可以更改。' : ''}</span>`, 'price-currency')}
+      ${fidFormRow('售价币种', `<select class="fid-select" id="price-currency">${option('', '不显示币种', start)}${PRICE_CURRENCIES.map(([code]) => option(code, priceCurrencyLabel(code), start)).join('')}</select><span class="fid-field-help">报价时每个价格前都带上这个币种的符号，例如「$40」；没有通用符号的币种写代码，例如「AED 40」。${start ? '已按表头选好，可以更改。' : ''}</span>`, 'price-currency')}
       <div class="fid-table-scroll"><table class="fid-table price-table"><thead><tr>${heads.map(head => `<th scope="col">${head}</th>`).join('')}</tr></thead><tbody>${first.map(entry => `<tr>${priceCells(list, entry).map(cell => `<td>${esc(cell || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
       <p class="price-note">${list.rows.length > first.length ? `以上为前 ${first.length} 个产品。` : ''}确认后将${priceList() ? '替换当前价格表' : '作为价格表使用'}。</p>
     </div>`, fidButton('确认使用', 'priceUse', '', 'blue') + fidButton('取 消', 'close'), true);
@@ -147,22 +151,37 @@
     if (!found.length) return '<div class="price-quote-empty"><p>没有匹配的产品</p></div>';
     const several = list.columns.prices.length > 1;
     const rows = found.slice(0, PRICE_QUOTE_ROWS).map(entry => {
-      const prices = entry.prices.map((value, at) => (value
-        ? `<button type="button" class="fid-btn slim tint" data-action="priceInsert" data-id="${list.rows.indexOf(entry)}:${at}" title="${esc(priceLine(list, entry, at))}">${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceShown(list, at, value))}</button>`
-        : '')).join('');
+      // A click ticks a price or unticks it (plan 078); a ticked price is drawn pressed, with a check mark.
+      const prices = entry.prices.map((value, at) => {
+        if (!value) return '';
+        const id = `${list.rows.indexOf(entry)}:${at}`, picked = priceView.picked.includes(id);
+        return `<button type="button" class="fid-btn slim ${picked ? 'blue' : 'tint'}" data-action="pricePick" data-id="${id}" aria-pressed="${picked}" title="${esc(priceLine(list, entry, at))}">${picked ? icon('Check') : ''}${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceShown(list, at, value))}</button>`;
+      }).join('');
       return `<li class="price-quote-row"><span class="price-quote-product"><strong>${esc(entry.code)}</strong>${entry.name ? ` <span>${esc(entry.name)}</span>` : ''}${entry.spec ? ` <small>${esc(entry.spec)}</small>` : ''}</span><span class="price-quote-prices">${prices}</span></li>`;
     }).join('');
     const more = found.length - PRICE_QUOTE_ROWS;
     return `<ul class="price-quote-list">${rows}</ul>${more > 0 ? `<p class="price-note">还有 ${more} 个产品未显示，请继续输入以缩小范围。</p>` : ''}`;
   }
+  // Draws the rows again after a price was ticked, where the list was scrolled to, and says how many are ticked.
+  function priceQuoteRefresh() {
+    const rows = $('#price-quote-rows');
+    if (!rows) return;
+    const top = rows.querySelector('.price-quote-list')?.scrollTop || 0;
+    rows.innerHTML = priceQuoteRows();
+    paintIcons(rows);
+    const list = rows.querySelector('.price-quote-list');
+    if (list) list.scrollTop = top;
+    $('#price-quote-count').textContent = `已选 ${priceView.picked.length} 项`;
+    $('#price-quote-insert').disabled = !priceView.picked.length;
+  }
   function priceQuoteOpen() {
     if (!selectedCustomer() || !$('#composer-text')) return;
-    priceView.quote = '';
+    Object.assign(priceView, { quote: '', picked: [] });
     fidDialog('报价', `<div class="modal-body price-quote">
       <input type="search" class="fid-input" id="price-quote-search" aria-label="查找产品" placeholder="输入产品简称或名称查找" ${priceList() ? '' : 'disabled'}>
-      <p class="price-note">点击价格，把这一行报价放入消息框；不会自动发送。</p>
+      <p class="price-note">点击价格选中，可以多选，再点一次取消；查找其他产品时，已选的保留。「放入消息框」按选中的顺序逐行放入，不会自动发送。</p>
       <div id="price-quote-rows">${priceQuoteRows()}</div>
-    </div>`, fidButton('关 闭', 'close'), true);
+    </div>`, `<span class="fid-small-note" id="price-quote-count">已选 0 项</span>${fidButton('放入消息框', 'priceInsert', '', 'blue', 'id="price-quote-insert" disabled')}${fidButton('关 闭', 'close')}`, true);
     $('#price-quote-search')?.focus();
   }
 
@@ -191,13 +210,25 @@
     },
     priceQuote: priceQuoteOpen,
     priceOpenPage: () => { close(); navigate('prices'); },
-    // Puts the line of one price at the end of the message box. The message is not sent.
-    priceInsert: id => {
-      const list = priceList(), [row, at] = String(id).split(':').map(Number), entry = list?.rows[row], box = $('#composer-text');
-      if (!entry || !entry.prices[at] || !box) return;
+    // Ticks a price, or unticks it (plan 078). The ticks stay while the search changes.
+    pricePick: id => {
+      const list = priceList(), [row, at] = String(id).split(':').map(Number);
+      if (!list?.rows[row]?.prices[at]) return;
+      const key = `${row}:${at}`, picked = priceView.picked;
+      if (picked.includes(key)) picked.splice(picked.indexOf(key), 1);
+      else picked.push(key);
+      priceQuoteRefresh();
+    },
+    // Puts the ticked prices at the end of the message box, one line each, in the order they were ticked. The
+    // message is not sent.
+    priceInsert: () => {
+      const list = priceList(), box = $('#composer-text');
+      const lines = priceView.picked.map(key => key.split(':').map(Number)).filter(([row, at]) => list?.rows[row]?.prices[at]).map(([row, at]) => priceLine(list, list.rows[row], at));
+      if (!lines.length || !box) return;
       close();
+      priceView.picked = [];
       const before = box.value.replace(/\s+$/, '');
-      box.value = (before ? before + '\n' : '') + priceLine(list, entry, at);
+      box.value = (before ? before + '\n' : '') + lines.join('\n');
       box.dispatchEvent(new Event('input', { bubbles: true }));
       box.focus();
       box.setSelectionRange(box.value.length, box.value.length);

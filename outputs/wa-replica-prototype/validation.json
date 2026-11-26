@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-26T14:22:06.733Z",
+  "checkedAt": "2026-11-26T15:03:43.548Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -49,11 +49,12 @@
   "signIn": "the page opens on a sign-in screen, loads the sub-site data from the server and saves changed parts back; the browser keeps only drafts and open tabs; a new sub-site starts empty",
   "leftovers": "removed: code that added sample customers, orders, archive entries and a sample material; the single-file bundles; the Windows launcher of the old preview",
   "whatsappConnection": "real, through the sub-site's own server: QR code, incoming events, sending; no simulation",
-  "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts one product's price into the message box and sends nothing; the list can be taken out for good: its rows, its name in the log of saves and what it left in the database files",
+  "priceList": "an .xlsx or .csv file is read in the browser (pricefile.js) and, once confirmed, replaces the list; the button 报价 beside the message box puts the ticked prices into the message box, one line each, and sends nothing; the list can be taken out for good: its rows, its name in the log of saves and what it left in the database files",
   "messageTranslation": "once per message and reading language: kept on the message (translatedTo) and saved; the conversation on screen asks only for messages without a mark; the relay keeps every translation in ai-translations.db and gives it again",
   "fileSending": "up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "customerPictures": "the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp's own servers or the gateway, kept for a day; the initials stay when there is none",
   "handMadeEmpty": "a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)",
+  "quotePicks": "the quote dialog (报价) ticks prices: a click ticks or unticks one, the ticks stay while the search changes, and 放入消息框 puts every ticked price into the message box, one line each, in the order they were ticked; a price carries the sign of the list's currency (\"$40\"; HK$, A$, C$, S$, MX$, R$, JP¥ so that \"$\" and \"¥\" stay clear; AED and SAR keep their code)",
   "handMadePreview": "the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer's last message",
   "openOutcomeMatched": "a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy's status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)",
   "feedStartsAgain": "the WhatsApp feed starts also when its first questions fail (the server restarting, a moment without network): the server's state and the feed for this page are asked again after 2, 4, 8 … at most 30 s until they are answered; an ended session shows 登录已失效, as the feed loop does",
@@ -69,6 +70,6 @@
   "sentTranslatedBack": "a reply or caption that was put into the customer's language is translated back into the reading language after it is sent, like a message sent from the phone, and that translation shows under it; what went out as typed gets none; the typed words are not kept as a translation (plan 063 undone); requests for the same translation at the same moment share one call to the service",
   "pinnedChats": "a right-click (or the menu key) on a chat in the list opens a menu with 置顶 / 取消置顶; pinned chats stay at the top of the list in every filter and search, in the order of their last message, marked with a pin; kept with the customer in this workspace, WhatsApp on the phone unchanged",
   "translateShortcut": "a key, a combination or modifier keys on their own, recorded under the gear beside the customer's language once its field is clicked (Ctrl + Enter at first; any key, plan 062), translates the message box into the customer's language and shows it above the box, guard on or off; Enter (or the send button, when Enter is the shortcut) then sends the translation; the line under the box names it",
-  "priceCurrency": "one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries it (\"USD 40\") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers",
+  "priceCurrency": "one currency for the whole price list, chosen in the confirm dialog of an upload (18 currencies or none) and starting on the one the headers name; every price shown on the page and quoted into the message box carries its sign (\"$40\"; AED and SAR their code: \"AED 40\") unless the file gives the price with its own sign; a list saved before keeps the currencies of its headers",
   "externalNetworkCalls": false
 }
