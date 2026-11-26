@@ -1306,7 +1306,9 @@
         language: v('language'), owner: a?.owner || ui.persona, account: a?.id || myAccounts()[0]?.id,
         tags: [], engagement: 'open',
         source: v('source'), campaign: '', ad: '',
-        unread: 0, star: false, last: '刚刚', preview: v('demand') || '新建客户档案', translation: '',
+        // The row's preview line reads 新建客户档案 until the first message (plan 077): the 初步需求 is the employee's
+        // note, kept in the profile and the notes; as the preview it looked like the customer's last message.
+        unread: 0, star: false, last: '刚刚', preview: '新建客户档案', translation: '',
         followup: null, notes: v('demand'), contactRefs: [{ account: a?.id, owner: a?.owner || ui.persona }],
         createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-补录', intentLevel: '中意向',
         reactivatedCount: 0,
