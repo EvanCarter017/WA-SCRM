@@ -656,6 +656,12 @@ for (const required of ['return [...list.filter(c => c.pinned), ...list.filter(c
 assert(openwaSource.includes('star: keep.star || drop.star, pinned: keep.pinned || drop.pinned,'), 'merging a duplicate chat must keep its pin');
 for (const name of ['"Pin":[["path"', '"PinOff":[["path"']) assert(read(path.join(out, 'icons.js')).includes(name), `the icon pool must hold ${name}`);
 
+// One colour world for the workbench (plan 082): the UI upgrade's teal accent, cool neutrals, hairlines and greys that
+// read on every surface, declared on :root (where the base works out --accent, --muted, --line…), in the source and in
+// the built style sheet.
+for (const required of [':root {', '--color-accent:#0f766e;', '--color-text-muted:#58667a;', '--fid-quiet:#58667a;', '--color-border:rgba(15,23,42,.08);', '--fid-violet:#0f766e; --fid-royal:#0f766e;', '--fid-sky:#0369a1; --fid-sky-bg:#f0f9ff; --fid-rose-bg:#fff1f2; --fid-ease:cubic-bezier(.16,1,.3,1);']) {
+  assert(read(path.join(__dirname, 'fidelity.css')).includes(required) && read(path.join(out, 'app.css')).includes(required), `the colour world is missing ${required}`);
+}
 const summary = {
   version: req.version,
   status: 'passed',
@@ -689,6 +695,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
+  colourWorld: 'one colour world (plan 082): a teal accent (#0f766e, white text on it 5.47:1), cool neutrals, hairlines instead of shadows, greys of 4.5:1 and more on every surface, declared on :root so that the base follows; the shell, the shared controls and the sign-in screen on the closed scale of lengths',
   textFont: 'the page draws its text in HarmonyOS Sans SC: Huawei\'s Regular and Bold files, unmodified, with their licence (work/wa-replica/fonts, copied by the build); the sign-in screen says 本系统使用 HarmonyOS Sans 字体 as the licence asks; the server sends the files as font/ttf that the browser keeps, the gateway compresses them; a conversation that shows its end keeps showing it when the font arrives',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',
   openOutcomeMatched: 'a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy\'s status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)',
