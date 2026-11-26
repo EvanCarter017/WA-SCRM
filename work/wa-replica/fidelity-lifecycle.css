@@ -1206,18 +1206,20 @@
 .fid-customer-table {
   min-width: 1260px;
 }
-.fid-customer-table col:nth-child(1) { width: 3.5%; }
-.fid-customer-table col:nth-child(2) { width: 4.5%; }
-.fid-customer-table col:nth-child(3) { width: 9.5%; }
-.fid-customer-table col:nth-child(4) { width: 12.5%; }
-.fid-customer-table col:nth-child(5) { width: 10%; }
-.fid-customer-table col:nth-child(6) { width: 6.5%; }
-.fid-customer-table col:nth-child(7) { width: 10%; }
-.fid-customer-table col:nth-child(8) { width: 10.5%; }
-.fid-customer-table col:nth-child(9) { width: 12.5%; }
-.fid-customer-table col:nth-child(10),
+/* Thirteen columns that add up to 100% (plan 086): the twelve widths before came to 100.5% and left 操作 none. */
+.fid-customer-table col:nth-child(1) { width: 3%; }
+.fid-customer-table col:nth-child(2) { width: 3.5%; }
+.fid-customer-table col:nth-child(3) { width: 9%; }
+.fid-customer-table col:nth-child(4) { width: 11%; }
+.fid-customer-table col:nth-child(5) { width: 9.5%; }
+.fid-customer-table col:nth-child(6) { width: 5.5%; }
+.fid-customer-table col:nth-child(7) { width: 8%; }
+.fid-customer-table col:nth-child(8) { width: 9%; }
+.fid-customer-table col:nth-child(9) { width: 11%; }
+.fid-customer-table col:nth-child(10) { width: 9.5%; }
 .fid-customer-table col:nth-child(11) { width: 6.5%; }
-.fid-customer-table col:nth-child(12) { width: 8%; }
+.fid-customer-table col:nth-child(12) { width: 7.5%; }
+.fid-customer-table col:nth-child(13) { width: 7%; }
 .fid-page,
 .lc-page {
   padding-bottom: 92px;

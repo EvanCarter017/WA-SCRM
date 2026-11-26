@@ -127,7 +127,10 @@
 .fid-small-note { margin-left:auto; color:var(--fid-quiet); font-size:12px; }
 .fid-table-scroll { min-width:0; overflow:auto; }
 .fid-table { width:100%; border-collapse:collapse; color:var(--color-text); table-layout:fixed; font-size:14px; }
-.fid-table th,.fid-table td { border:1px solid var(--fid-frame); padding:8px 10px; vertical-align:middle; text-align:center; overflow-wrap:anywhere; }
+.fid-table th,.fid-table td { border:1px solid var(--fid-frame); padding:8px 12px; vertical-align:middle; text-align:left; overflow-wrap:anywhere; }
+/* Tables read alike (plan 086): text on the left; a tick box and an empty state in the middle; figures on the right
+   (by table, with the rules of each table). */
+.fid-table th:has(>input[type=checkbox]),.fid-table td:has(>input[type=checkbox]),.fid-table td.fid-plain-empty,.fid-table td.fid-large-empty { text-align:center; }
 .fid-table th { background:var(--color-surface-alt); color:var(--fid-ink); height:50px; font-weight:500; }
 .fid-table td { height:50px; background:var(--color-surface); }
 .fid-table tbody tr:hover td { background:color-mix(in srgb,var(--color-accent-soft) 38%,var(--color-surface)); }
@@ -149,6 +152,19 @@
 .fid-pager .icon { width:13px; height:13px; }
 .fid-table-card { overflow:hidden; background:var(--color-surface); border:1px solid var(--fid-frame); border-radius:12px; }
 .fid-table-card>.fid-pager { padding:14px 16px; margin:0; }
+/* The headers of the paged lists stay in view while the page scrolls (plan 086): where a table fits — the lists from
+   1280 px, the customer list (at least 1280 px wide itself) from 1600 px — its wrapper does not scroll sideways, so its
+   header can stick to the top of the page; below that the wrapper scrolls sideways as before. */
+@media(min-width:1280px) {
+  .fidelity .fid-table-card:has(:is(.lc-todo-table,.lc-closed-table,.fid-log-table,.fid-tag-table,.price-table,.fid-ai-usage)) { overflow:clip; }
+  .fidelity .fid-table-scroll:has(>:is(.lc-todo-table,.lc-closed-table,.fid-log-table,.fid-tag-table,.price-table,.fid-ai-usage)) { overflow:visible; }
+  .fidelity :is(.lc-todo-table,.lc-closed-table,.fid-log-table,.fid-tag-table,.price-table,.fid-ai-usage) thead th { position:sticky; top:0; z-index:1; box-shadow:inset 0 -1px 0 var(--fid-frame); }
+}
+@media(min-width:1600px) {
+  .fidelity .fid-table-card:has(.fid-customer-table) { overflow:clip; }
+  .fidelity .fid-table-scroll:has(>.fid-customer-table) { overflow:visible; }
+  .fidelity .fid-customer-table thead th { position:sticky; top:0; z-index:1; box-shadow:inset 0 -1px 0 var(--fid-frame); }
+}
 
 .fid-tag-query .fid-input { width:180px; }
 .fid-tag-query .fid-btn,.fid-log-filter .fid-btn { min-width:82px; }
@@ -181,19 +197,21 @@
 .fid-list-toolbar { margin:14px 0; }
 .fid-list-toolbar .fid-btn { min-height:36px; border-radius:8px; }
 .fid-customer-table { min-width:980px; }
-.fid-customer-table th { height:42px; font-size:13px; font-weight:650; }
+.fid-customer-table th { height:42px; font-size:14px; font-weight:650; }
 .fid-customer-table th,.fid-customer-table td { text-align:left; }
 .fid-customer-table th:first-child,.fid-customer-table td:first-child,.fid-customer-table th:nth-child(2),.fid-customer-table td:nth-child(2) { text-align:center; }
 .fid-customer-table td.fid-large-empty { text-align:center; }
-.fid-customer-table td { font-size:13px; }
+.fid-customer-table td { font-size:14px; }
+.fid-customer-table td:nth-child(9) { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fid-customer-table td:nth-child(6) { white-space:nowrap; }
 .fid-customer-table .fid-icon-actions { justify-content:flex-start; }
-.fid-customer-table .fid-cell-detail { display:block; color:var(--fid-quiet); font-size:11px; margin-top:3px; }
+.fid-customer-table .fid-cell-detail { display:block; color:var(--fid-quiet); font-size:12px; margin-top:2px; }
 .fid-customer-table .fid-cell-note { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 .fid-customer-table .fid-note-link { display:block; width:100%; text-align:left; }
 .fid-customer-table .fid-tag-cell { display:flex; width:100%; min-height:28px; align-items:center; gap:3px; border-radius:5px; color:var(--fid-royal); font-size:12px; text-align:left; }
 .fid-customer-table .fid-tag-cell:hover { background:var(--color-accent-soft); }
-.fid-customer-table .fid-tag-cell>.tag { display:block; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-inline:3px; font-size:11px; }
-.fid-customer-table .fid-tag-cell>small { font-size:11px; flex-shrink:0; }
+.fid-customer-table .fid-tag-cell>.tag { display:block; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-inline:4px; font-size:12px; }
+.fid-customer-table .fid-tag-cell>small { font-size:12px; flex-shrink:0; }
 .fid-customer-table .fid-tag-cell>.icon svg { width:11px; height:11px; }
 .fid-batchbar { display:none; }
 .fid-customer-table col:nth-child(1) { width:4%; }
@@ -216,6 +234,7 @@
 .fid-account-filter .fid-input,.fid-account-filter>.fid-select { border-radius:8px; }
 .fid-account-actions { margin:14px 0; }
 .fid-account-table { min-width:1686px; }
+.fid-account-table td:nth-child(5),.fid-account-table td:nth-child(9) { white-space:nowrap; }
 .fid-account-table th { font-size:14px; font-weight:650; }
 .fid-account-table th:first-child,.fid-account-table td:first-child { width:40px; }
 .fid-account-table .fid-large-empty { height:220px; }
@@ -224,7 +243,8 @@
 .fid-account-table col:nth-child(2),.fid-account-table col:nth-child(7),.fid-account-table col:nth-child(8),.fid-account-table col:nth-child(10) { width:91px; }
 .fid-account-table col:nth-child(3) { width:160px; }
 .fid-account-table col:nth-child(4) { width:151px; }
-.fid-account-table col:nth-child(5),.fid-account-table col:nth-child(11),.fid-account-table col:nth-child(13) { width:114px; }
+.fid-account-table col:nth-child(5) { width:137px; }
+.fid-account-table col:nth-child(11),.fid-account-table col:nth-child(13) { width:114px; }
 .fid-account-table col:nth-child(6) { width:162px; }
 .fid-account-table col:nth-child(9) { width:240px; }
 .fid-account-table col:nth-child(12) { width:137px; }
@@ -527,6 +547,7 @@
 .ai-guard.on .icon { color:var(--fid-mint); }
 .ai-guard:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }
 .fid-ai-capabilities,.fid-ai-usage { min-width:640px; }
+.fid-ai-capabilities :is(th,td):nth-child(n+4),.fid-ai-usage :is(th,td):nth-child(5),.fid-ai-usage :is(th,td):nth-child(6),.lc-closed-table :is(th,td):nth-child(5) { text-align:right; }
 .fid-ai-capabilities col:nth-child(1) { width:22%; }
 .fid-ai-capabilities col:nth-child(3) { width:112px; }
 .fid-ai-capabilities col:nth-child(4),.fid-ai-capabilities col:nth-child(5),.fid-ai-capabilities col:nth-child(6) { width:11%; }
@@ -641,6 +662,7 @@
 .price-note { margin:10px 0; color:var(--fid-quiet); font-size:12px; line-height:1.6; }
 .price-table { min-width:540px; }
 .price-table th,.price-table td { text-align:left; }
+.price-table :is(th,td):nth-child(n+5) { text-align:right; }
 .price-table col:first-child { width:64px; }
 .price-preview p { margin:0 0 10px; font-size:13px; }
 .price-preview .fid-form-row { margin:4px 0 12px; }
