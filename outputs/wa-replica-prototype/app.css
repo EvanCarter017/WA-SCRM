@@ -808,16 +808,24 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-member-table col:nth-child(6) { width:var(--fid-px-80); }
 .fid-member-table col:nth-child(7),.fid-member-table col:nth-child(8),.fid-member-table col:nth-child(9) { width:12%; }
 
-.fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(var(--fid-px-540),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); max-width:none; max-height:calc(100dvh - var(--fid-top) - var(--fid-px-28)); margin:auto; border:0; border-radius:var(--fid-px-10); box-shadow:0 var(--fid-px-16) var(--fid-px-40) rgba(0,0,0,.23); animation:none; background:var(--color-surface); color:var(--color-text); }
-.fidelity #dialog.fid-dialog::backdrop { background:rgba(0,0,0,.45); clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-240)); }
+.fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(var(--fid-px-540),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); max-width:none; max-height:calc(100dvh - var(--fid-top) - var(--fid-px-28)); margin:auto; border:0; border-radius:var(--fid-px-12); box-shadow:0 var(--fid-px-16) var(--fid-px-40) rgba(15,23,42,.18); animation:none; background:var(--color-surface); color:var(--color-text); }
+.fidelity #dialog.fid-dialog::backdrop { background:rgba(15,23,42,.45); clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-240)); }
 .fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-64)); }
+/* On the chat page, which has no row of page tabs (plan 083), a dialog's backdrop starts below the header (plan 084). */
+@media(min-width:761px) {
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-240)); }
+  .fidelity:has(#view .inbox-page):has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-64)); }
+}
+@media(min-width:761px) and (max-width:920px) {
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-160)); }
+}
 .fidelity #dialog.fid-wide { width:min(var(--fid-px-660),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); }
-.fidelity .fid-dialog .modal-head { min-height:var(--fid-px-50); padding:var(--fid-px-14) var(--fid-px-20) var(--fid-px-6); border-bottom:0; }
-.fidelity .fid-dialog .modal-head h2 { font-size:var(--fid-px-18); font-weight:750; }
+.fidelity .fid-dialog .modal-head { min-height:var(--fid-px-50); padding:var(--fid-px-16) var(--fid-px-20) var(--fid-px-8); border-bottom:0; }
+.fidelity .fid-dialog .modal-head h2 { font-size:var(--fid-px-20); font-weight:700; line-height:var(--fid-px-28); }
 .fidelity .fid-dialog .modal-head .icon-button { width:var(--fid-px-22); height:var(--fid-px-24); }
 .fidelity .fid-dialog .modal-head .icon-button .icon { width:var(--fid-px-15); height:var(--fid-px-15); }
-.fidelity .fid-dialog .modal-body { padding:var(--fid-px-10) var(--fid-px-20) var(--fid-px-12); }
-.fidelity .fid-dialog .modal-footer { padding:var(--fid-px-12) var(--fid-px-20) var(--fid-px-18); gap:var(--fid-px-10); border:0; justify-content:flex-end; background:var(--color-surface); }
+.fidelity .fid-dialog .modal-body { padding:var(--fid-px-8) var(--fid-px-20) var(--fid-px-16); }
+.fidelity .fid-dialog .modal-footer { padding:var(--fid-px-12) var(--fid-px-20) var(--fid-px-20); gap:var(--fid-px-8); border:0; justify-content:flex-end; background:var(--color-surface); }
 .fidelity .fid-dialog .modal-footer .fid-btn { min-width:var(--fid-px-70); }
 #fid-tag-form .fid-form-row:last-of-type { margin-bottom:0; }
 .fid-tag-group-label { display:flex; align-items:center; min-height:var(--fid-px-34); overflow-wrap:anywhere; }
@@ -1086,9 +1094,12 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .price-quote-list { list-style:none; max-height:var(--fid-px-360); margin:0; padding:0; overflow:auto; border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-8); }
 .price-quote-row { display:flex; align-items:center; justify-content:space-between; gap:var(--fid-px-10); padding:var(--fid-px-8) var(--fid-px-12); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
 .price-quote-row:last-child { border-bottom:0; }
-.price-quote-product { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--fid-px-4) var(--fid-px-8); min-width:0; font-size:var(--fid-px-13); }
+.price-quote-row:hover { background:color-mix(in srgb,var(--color-accent) 4%,var(--color-surface)); }
+.price-quote-product { flex:1; display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--fid-px-4) var(--fid-px-8); min-width:0; font-size:var(--fid-px-14); cursor:pointer; }
+.price-quote-product input[type=checkbox] { flex:none; align-self:center; width:var(--fid-px-16); height:var(--fid-px-16); margin:0; accent-color:var(--color-accent); }
+#price-quote-count { padding:var(--fid-px-2) var(--fid-px-8); border-radius:var(--fid-px-999); background:var(--color-accent-soft); color:var(--color-accent); font-variant-numeric:tabular-nums; }
 .price-quote-product small { color:var(--fid-quiet); font-size:var(--fid-px-12); }
-.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:var(--fid-px-6); margin-left:auto; }
+.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:var(--fid-px-6); margin-left:auto; font-variant-numeric:tabular-nums; }
 .price-quote-prices small { margin-right:var(--fid-px-4); opacity:.75; }
 .price-quote-empty { display:grid; justify-items:center; gap:var(--fid-px-10); padding:var(--fid-px-20); color:var(--fid-quiet); font-size:var(--fid-px-13); }
 /* The confirm window of a quote (plan 080): the product column wide, quantity, unit price and amount narrower. */
@@ -1096,7 +1107,11 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .price-confirm-table col:nth-child(2) { width:15%; }
 .price-confirm-table col:nth-child(3) { width:19%; }
 .price-confirm-table col:nth-child(4) { width:15%; }
-.price-confirm-table .fid-input { width:100%; }
+.price-confirm-table .fid-input { width:100%; text-align:right; }
+/* The confirm window's figures line up on the right (plan 084): quantity, unit price, amount and the total. */
+.price-confirm-table th:first-child,.price-confirm-table td:first-child { text-align:left; }
+.price-confirm-table th:nth-child(n+2):nth-child(-n+4),.price-confirm-table td:nth-child(n+2):nth-child(-n+4) { text-align:right; }
+.price-confirm-table tfoot td { font-weight:700; }
 /* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
 @media(max-width:1000px) {
   .price-quote-button { margin-left:0; padding:var(--fid-px-2) var(--fid-px-4); }
@@ -2236,7 +2251,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 }
 .lc-mini-kpi span {
   display: block;
-  font-size: var(--fid-px-11);
+  font-size: var(--fid-px-12);
   color: var(--color-text-muted);
 }
 .lc-mini-kpi strong {
@@ -2264,7 +2279,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   border-bottom: var(--fid-px-2) solid transparent;
   background: none;
   color: var(--color-text-muted);
-  font-size: var(--fid-px-13);
+  font-size: var(--fid-px-14);
   font-weight: 550;
   white-space: nowrap;
 }
@@ -2274,7 +2289,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   font-weight: 700;
 }
 .lc-dossier-tab b {
-  font-size: var(--fid-px-11);
+  font-size: var(--fid-px-12);
   padding: 0 var(--fid-px-5);
   border-radius: var(--fid-px-8);
   background: var(--color-surface-alt);
@@ -2290,17 +2305,18 @@ dialog>#toast,dialog>#toast.show{transform:none}
 }
 .lc-card-block {
   border: var(--fid-px-1) solid var(--fid-frame);
-  border-radius: var(--fid-px-10);
-  padding: var(--fid-px-13) var(--fid-px-14);
+  border-radius: var(--fid-px-12);
+  padding: var(--fid-px-12) var(--fid-px-16);
   background: var(--color-surface);
 }
 .lc-card-block.warn-block {
   border-color: color-mix(in srgb, var(--fid-amber) 45%, var(--fid-frame));
   background: color-mix(in srgb, var(--fid-amber) 6%, var(--color-surface));
 }
+/* An overdue to-do in the amber of overdue follow-ups (plan 084). */
 .lc-card-block.hot-block {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--fid-frame));
-  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--fid-amber) 35%, var(--fid-frame));
+  background: var(--color-warning-soft);
 }
 .lc-block-head {
   display: flex;
@@ -2313,7 +2329,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   display: inline-flex;
   align-items: center;
   gap: var(--fid-px-6);
-  font-size: var(--fid-px-13);
+  font-size: var(--fid-px-14);
   font-weight: 700;
 }
 .lc-block-head h3 .icon {
@@ -2324,7 +2340,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .lc-qual-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fid-px-10);
+  gap: var(--fid-px-8) var(--fid-px-16);
 }
 .lc-qual-grid .full {
   grid-column: 1 / -1;
@@ -2335,7 +2351,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   gap: var(--fid-px-4);
 }
 .lc-field span {
-  font-size: var(--fid-px-11);
+  font-size: var(--fid-px-12);
   color: var(--color-text-muted);
   font-weight: 600;
 }
@@ -2343,15 +2359,15 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .lc-field .fid-select,
 .lc-field textarea {
   width: 100%;
-  border: var(--fid-px-1) solid var(--color-border);
-  border-radius: var(--fid-px-6);
-  padding: var(--fid-px-6) var(--fid-px-9);
-  font-size: var(--fid-px-13);
+  border: var(--fid-px-1) solid var(--color-border-input);
+  border-radius: var(--fid-px-8);
+  padding: var(--fid-px-8) var(--fid-px-12);
+  font-size: var(--fid-px-14);
   background: var(--color-surface);
   color: var(--color-text);
 }
 .lc-field textarea {
-  min-height: var(--fid-px-62);
+  min-height: var(--fid-px-64);
   resize: vertical;
 }
 

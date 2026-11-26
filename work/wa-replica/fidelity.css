@@ -367,16 +367,24 @@
 .fid-member-table col:nth-child(6) { width:80px; }
 .fid-member-table col:nth-child(7),.fid-member-table col:nth-child(8),.fid-member-table col:nth-child(9) { width:12%; }
 
-.fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(540px,calc(100vw - var(--fid-sidebar) - 36px)); max-width:none; max-height:calc(100dvh - var(--fid-top) - 28px); margin:auto; border:0; border-radius:10px; box-shadow:0 16px 40px rgba(0,0,0,.23); animation:none; background:var(--color-surface); color:var(--color-text); }
-.fidelity #dialog.fid-dialog::backdrop { background:rgba(0,0,0,.45); clip-path:inset(107px 0 0 240px); }
+.fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(540px,calc(100vw - var(--fid-sidebar) - 36px)); max-width:none; max-height:calc(100dvh - var(--fid-top) - 28px); margin:auto; border:0; border-radius:12px; box-shadow:0 16px 40px rgba(15,23,42,.18); animation:none; background:var(--color-surface); color:var(--color-text); }
+.fidelity #dialog.fid-dialog::backdrop { background:rgba(15,23,42,.45); clip-path:inset(107px 0 0 240px); }
 .fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(107px 0 0 64px); }
+/* On the chat page, which has no row of page tabs (plan 083), a dialog's backdrop starts below the header (plan 084). */
+@media(min-width:761px) {
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 240px); }
+  .fidelity:has(#view .inbox-page):has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 64px); }
+}
+@media(min-width:761px) and (max-width:920px) {
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 160px); }
+}
 .fidelity #dialog.fid-wide { width:min(660px,calc(100vw - var(--fid-sidebar) - 36px)); }
-.fidelity .fid-dialog .modal-head { min-height:50px; padding:14px 20px 6px; border-bottom:0; }
-.fidelity .fid-dialog .modal-head h2 { font-size:18px; font-weight:750; }
+.fidelity .fid-dialog .modal-head { min-height:50px; padding:16px 20px 8px; border-bottom:0; }
+.fidelity .fid-dialog .modal-head h2 { font-size:20px; font-weight:700; line-height:28px; }
 .fidelity .fid-dialog .modal-head .icon-button { width:22px; height:24px; }
 .fidelity .fid-dialog .modal-head .icon-button .icon { width:15px; height:15px; }
-.fidelity .fid-dialog .modal-body { padding:10px 20px 12px; }
-.fidelity .fid-dialog .modal-footer { padding:12px 20px 18px; gap:10px; border:0; justify-content:flex-end; background:var(--color-surface); }
+.fidelity .fid-dialog .modal-body { padding:8px 20px 16px; }
+.fidelity .fid-dialog .modal-footer { padding:12px 20px 20px; gap:8px; border:0; justify-content:flex-end; background:var(--color-surface); }
 .fidelity .fid-dialog .modal-footer .fid-btn { min-width:70px; }
 #fid-tag-form .fid-form-row:last-of-type { margin-bottom:0; }
 .fid-tag-group-label { display:flex; align-items:center; min-height:34px; overflow-wrap:anywhere; }
@@ -645,9 +653,12 @@
 .price-quote-list { list-style:none; max-height:360px; margin:0; padding:0; overflow:auto; border:1px solid var(--fid-frame); border-radius:8px; }
 .price-quote-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--fid-frame); }
 .price-quote-row:last-child { border-bottom:0; }
-.price-quote-product { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; font-size:13px; }
+.price-quote-row:hover { background:color-mix(in srgb,var(--color-accent) 4%,var(--color-surface)); }
+.price-quote-product { flex:1; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; font-size:14px; cursor:pointer; }
+.price-quote-product input[type=checkbox] { flex:none; align-self:center; width:16px; height:16px; margin:0; accent-color:var(--color-accent); }
+#price-quote-count { padding:2px 8px; border-radius:999px; background:var(--color-accent-soft); color:var(--color-accent); font-variant-numeric:tabular-nums; }
 .price-quote-product small { color:var(--fid-quiet); font-size:12px; }
-.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:6px; margin-left:auto; }
+.price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:6px; margin-left:auto; font-variant-numeric:tabular-nums; }
 .price-quote-prices small { margin-right:4px; opacity:.75; }
 .price-quote-empty { display:grid; justify-items:center; gap:10px; padding:20px; color:var(--fid-quiet); font-size:13px; }
 /* The confirm window of a quote (plan 080): the product column wide, quantity, unit price and amount narrower. */
@@ -655,7 +666,11 @@
 .price-confirm-table col:nth-child(2) { width:15%; }
 .price-confirm-table col:nth-child(3) { width:19%; }
 .price-confirm-table col:nth-child(4) { width:15%; }
-.price-confirm-table .fid-input { width:100%; }
+.price-confirm-table .fid-input { width:100%; text-align:right; }
+/* The confirm window's figures line up on the right (plan 084): quantity, unit price, amount and the total. */
+.price-confirm-table th:first-child,.price-confirm-table td:first-child { text-align:left; }
+.price-confirm-table th:nth-child(n+2):nth-child(-n+4),.price-confirm-table td:nth-child(n+2):nth-child(-n+4) { text-align:right; }
+.price-confirm-table tfoot td { font-weight:700; }
 /* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
 @media(max-width:1000px) {
   .price-quote-button { margin-left:0; padding:2px 4px; }
