@@ -3817,6 +3817,10 @@ window.WA_START = () => {
         qualification: { demand: v('demand'), volume: '', deliveryRegion: country({ country: v('country') }), objection: '', commWindow: v('language') ? v('language') + '沟通' : '' },
       };
       data.customers.unshift(c);
+      // A customer made by hand starts with an empty conversation (plan 076): the 初步需求 is the employee's note,
+      // kept in the profile and the notes; without a list of its own, the conversation would show it as a message
+      // from the customer, and the first message sent would save it so.
+      data.messages[id] = [];
       lcLog(id, 'profile', '手动建档');
       persist();
       close();
