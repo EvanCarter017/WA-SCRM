@@ -662,6 +662,21 @@ for (const name of ['"Pin":[["path"', '"PinOff":[["path"']) assert(read(path.joi
 for (const required of [':root {', '--color-accent:#0f766e;', '--color-text-muted:#58667a;', '--fid-quiet:#58667a;', '--color-border:rgba(15,23,42,.08);', '--fid-violet:#0f766e; --fid-royal:#0f766e;', '--fid-sky:#0369a1; --fid-sky-bg:#f0f9ff; --fid-rose-bg:#fff1f2; --fid-ease:cubic-bezier(.16,1,.3,1);']) {
   assert(read(path.join(__dirname, 'fidelity.css')).includes(required) && read(path.join(out, 'app.css')).includes(required), `the colour world is missing ${required}`);
 }
+// The conversation's room (plan 083): the chat page has no row of page tabs and its dialogs are placed below the
+// header; the layout fills the page instead of a height worked out from the screen; the strip's four buttons carry
+// their names as tooltips (below 1600 px they show their icons only); the follow-up states carry data-state, so that
+// overdue (amber) and re-contact (rose), both "hot", and awaiting a reply (sky) have their own tints.
+const pageCss = read(path.join(__dirname, 'fidelity.css')), lifecycleCss = read(path.join(__dirname, 'fidelity-lifecycle.css'));
+for (const [source, built] of [['.fidelity:has(#view .inbox-page) { --fid-top:56px; }', '.fidelity:has(#view .inbox-page) { --fid-top:var(--fid-px-56); }'], ['.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }', '.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }'], ['.fidelity .fid-wa .inbox-layout { flex:1; height:auto; min-height:400px;', '.fidelity .fid-wa .inbox-layout { flex:1; height:auto; min-height:var(--fid-px-400);']]) {
+  assert(pageCss.includes(source) && read(path.join(out, 'app.css')).includes(built), `the conversation's room is missing ${source}`);
+}
+assert(!pageCss.includes('100dvh - 203px') && !pageCss.includes('100dvh - 178px'), 'the chat page must fill the page, not a height worked out from the screen');
+for (const required of ['.lc-pill.hot[data-state="recontact"] {', 'background: var(--fid-sky-bg);', 'background: var(--color-warning-soft);', '@media (max-width: 1599px) {']) {
+  assert(lifecycleCss.includes(required), `fidelity-lifecycle.css is missing ${required}`);
+}
+assert.equal((moduleSource.match(/data-state="\$\{h\.primary\.key\}"/g) || []).length, 3, 'the three follow-up state chips must carry data-state');
+assert.equal((appJs.match(/data-state="\$\{h\.primary\.key\}"/g) || []).length, 3, 'the built page must carry data-state on the three follow-up state chips');
+for (const name of ['设置标签', '移入聊天记录', '360° 档案']) assert(moduleSource.includes(`\${fidActionID(c.id)} title="${name}"`), `the strip's button ${name} must carry its name as a tooltip`);
 const summary = {
   version: req.version,
   status: 'passed',
@@ -695,6 +710,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
+  chatRoom: 'the chat page gives the conversation its room (plan 083): no row of page tabs there (the sidebar opens every page), compact rows above the messages, the strip on one line with icon buttons that keep their names as tooltips below 1600 px, the layout filling the page; white incoming bubbles with a hairline, close messages of one side, recessed translations; follow-up states in their own tints (overdue amber, re-contact rose, awaiting reply sky)',
   colourWorld: 'one colour world (plan 082): a teal accent (#0f766e, white text on it 5.47:1), cool neutrals, hairlines instead of shadows, greys of 4.5:1 and more on every surface, declared on :root so that the base follows; the shell, the shared controls and the sign-in screen on the closed scale of lengths',
   textFont: 'the page draws its text in HarmonyOS Sans SC: Huawei\'s Regular and Bold files, unmodified, with their licence (work/wa-replica/fonts, copied by the build); the sign-in screen says 本系统使用 HarmonyOS Sans 字体 as the licence asks; the server sends the files as font/ttf that the browser keeps, the gateway compresses them; a conversation that shows its end keeps showing it when the font arrives',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',
