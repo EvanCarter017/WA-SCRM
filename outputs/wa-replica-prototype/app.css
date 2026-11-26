@@ -1043,6 +1043,12 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:var(--fid-px-6); margin-left:auto; }
 .price-quote-prices small { margin-right:var(--fid-px-4); opacity:.75; }
 .price-quote-empty { display:grid; justify-items:center; gap:var(--fid-px-10); padding:var(--fid-px-20); color:var(--fid-quiet); font-size:var(--fid-px-13); }
+/* The confirm window of a quote (plan 080): the product column wide, quantity, unit price and amount narrower. */
+.price-confirm-table col:nth-child(1) { width:36%; }
+.price-confirm-table col:nth-child(2) { width:15%; }
+.price-confirm-table col:nth-child(3) { width:19%; }
+.price-confirm-table col:nth-child(4) { width:15%; }
+.price-confirm-table .fid-input { width:100%; }
 /* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
 @media(max-width:1000px) {
   .price-quote-button { margin-left:0; padding:var(--fid-px-2) var(--fid-px-4); }

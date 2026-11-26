@@ -1,9 +1,10 @@
   // ============================================================================
   // The price list (plan 037). A person uploads an Excel or CSV file on the page "价格表"; the file is read in the
   // browser (pricefile.js) and its products replace the list. In a conversation the button "报价" beside the
-  // message box finds products, and the prices ticked there go into the message box together (plan 078). Nothing
-  // here sends a message, suggests a product by itself or calls a server; a price is shown as the file gives it, with
-  // the sign of the currency chosen for the list when it was uploaded (plans 059, 078).
+  // message box finds products; the products ticked there are checked in a confirm window — quantity, unit price,
+  // amount and total — and go into the message box together (plans 078, 080). Nothing here sends a message, suggests
+  // a product by itself or calls a server; a price is shown as the file gives it, with the sign of the currency
+  // chosen for the list when it was uploaded (plans 059, 078).
   // ============================================================================
   const PRICE_MESSAGES = {
     'too-large': '文件超过 5 MB，无法作为价格表。',
@@ -75,13 +76,20 @@
   const priceHead = (list, label, i) => (list.currency === undefined ? label || `价格 ${i + 1}` : `${priceColumnName(label) || `价格 ${i + 1}`}${list.currency ? `（${list.currency}）` : ''}`);
   const priceHeads = list => [list.columns.code || '简称', ...(list.columns.name ? [list.columns.name] : []), ...(list.columns.spec ? [list.columns.spec] : []), ...list.columns.prices.map((label, i) => priceHead(list, label, i))];
   const priceCells = (list, entry) => [entry.code, ...(list.columns.name ? [entry.name] : []), ...(list.columns.spec ? [entry.spec] : []), ...list.columns.prices.map((label, i) => entry.prices[i] || '')];
-  // The line that goes into the message box, e.g. "Product Alpha PRDA01 (100*10 Units): $40". With several price
-  // columns the line says which one: "... : $10.5 (100+)".
-  function priceLine(list, entry, at) {
+  // The line of a product, e.g. "Product Alpha PRDA01 (100*10 Units): $40", with the list's price or the unit price
+  // given in the confirm window (plan 080). With several price columns the line says which one: "... : $10.5 (100+)".
+  function priceLine(list, entry, at, value = entry.prices[at]) {
     const label = list.columns.prices[at] || '';
     const column = list.columns.prices.length > 1 ? priceColumnName(label) : '';
-    return `${[entry.name, entry.code].filter(Boolean).join(' ')}${entry.spec ? ` (${entry.spec})` : ''}: ${priceShown(list, at, entry.prices[at])}${column ? ` (${column})` : ''}`;
+    return `${[entry.name, entry.code].filter(Boolean).join(' ')}${entry.spec ? ` (${entry.spec})` : ''}: ${priceShown(list, at, value)}${column ? ` (${column})` : ''}`;
   }
+  // Figures of the confirm window (plan 080): a price of the file as a number ("1,200.50" is 1200.5; none is NaN),
+  // a number as the page writes it (at most two decimals, none when whole: 400, 37.5), a quantity (a whole number,
+  // at least 1) and a unit price (a number) as typed, and the amount of a product.
+  const priceNumber = value => { const text = String(value ?? '').replace(/[^\d.]/g, ''); return text ? Number(text) : NaN; };
+  const priceFigure = number => (Number.isFinite(number) ? String(Number(number.toFixed(2))) : '');
+  const priceValid = item => /^\d+$/.test(item.qty) && Number(item.qty) >= 1 && /^\d+(\.\d+)?$/.test(item.price);
+  const priceAmount = item => Number(item.qty) * Number(item.price);
 
   // ---- page: #prices (价格表) ----
   function priceTableHTML() {
@@ -151,38 +159,66 @@
     if (!found.length) return '<div class="price-quote-empty"><p>没有匹配的产品</p></div>';
     const several = list.columns.prices.length > 1;
     const rows = found.slice(0, PRICE_QUOTE_ROWS).map(entry => {
-      // A click ticks a price or unticks it (plan 078); a ticked price is drawn pressed, with a check mark.
-      const prices = entry.prices.map((value, at) => {
-        if (!value) return '';
-        const id = `${list.rows.indexOf(entry)}:${at}`, picked = priceView.picked.includes(id);
-        return `<button type="button" class="fid-btn slim ${picked ? 'blue' : 'tint'}" data-action="pricePick" data-id="${id}" aria-pressed="${picked}" title="${esc(priceLine(list, entry, at))}">${picked ? icon('Check') : ''}${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceShown(list, at, value))}</button>`;
-      }).join('');
-      return `<li class="price-quote-row"><span class="price-quote-product"><strong>${esc(entry.code)}</strong>${entry.name ? ` <span>${esc(entry.name)}</span>` : ''}${entry.spec ? ` <small>${esc(entry.spec)}</small>` : ''}</span><span class="price-quote-prices">${prices}</span></li>`;
+      // A box on the left ticks the product (plan 080); its prices are shown, and chosen in the confirm window.
+      const row = list.rows.indexOf(entry), picked = priceView.picked.some(item => item.row === row);
+      const prices = entry.prices.map((value, at) => (value ? `<span>${several && priceColumnName(list.columns.prices[at]) ? `<small>${esc(priceColumnName(list.columns.prices[at]))}</small> ` : ''}${esc(priceShown(list, at, value))}</span>` : '')).join('');
+      return `<li class="price-quote-row"><label class="price-quote-product"><input type="checkbox" data-price-pick="${row}" ${picked ? 'checked' : ''}><strong>${esc(entry.code)}</strong>${entry.name ? ` <span>${esc(entry.name)}</span>` : ''}${entry.spec ? ` <small>${esc(entry.spec)}</small>` : ''}</label><span class="price-quote-prices">${prices}</span></li>`;
     }).join('');
     const more = found.length - PRICE_QUOTE_ROWS;
     return `<ul class="price-quote-list">${rows}</ul>${more > 0 ? `<p class="price-note">还有 ${more} 个产品未显示，请继续输入以缩小范围。</p>` : ''}`;
   }
-  // Draws the rows again after a price was ticked, where the list was scrolled to, and says how many are ticked.
-  function priceQuoteRefresh() {
-    const rows = $('#price-quote-rows');
-    if (!rows) return;
-    const top = rows.querySelector('.price-quote-list')?.scrollTop || 0;
-    rows.innerHTML = priceQuoteRows();
-    paintIcons(rows);
-    const list = rows.querySelector('.price-quote-list');
-    if (list) list.scrollTop = top;
-    $('#price-quote-count').textContent = `已选 ${priceView.picked.length} 项`;
-    $('#price-quote-insert').disabled = !priceView.picked.length;
+  // Says how many products are ticked; 确认 needs at least one.
+  function priceQuoteCount() {
+    const count = $('#price-quote-count'), button = $('#price-quote-confirm');
+    if (count) count.textContent = `已选 ${priceView.picked.length} 项`;
+    if (button) button.disabled = !priceView.picked.length;
+  }
+  // The list to tick products in, with the ticks and the search as they are (opened anew, or back from the confirm
+  // window). priceView.picked holds the ticked products in the order ticked: { row, at, qty, price } — the price
+  // column and, as typed, the quantity and the unit price.
+  function priceQuoteShow() {
+    fidDialog('报价', `<div class="modal-body price-quote">
+      <input type="search" class="fid-input" id="price-quote-search" aria-label="查找产品" placeholder="输入产品简称或名称查找" value="${esc(priceView.quote)}" ${priceList() ? '' : 'disabled'}>
+      <p class="price-note">勾选左侧方框选择产品，可以多选；查找其他产品时，已选的保留。点击「确认」后核对数量和单价，再放入消息框，不会自动发送。</p>
+      <div id="price-quote-rows">${priceQuoteRows()}</div>
+    </div>`, `<span class="fid-small-note" id="price-quote-count">已选 ${priceView.picked.length} 项</span>${fidButton('确认', 'priceConfirm', '', 'blue', `id="price-quote-confirm" ${priceView.picked.length ? '' : 'disabled'}`)}${fidButton('关 闭', 'close')}`, true);
+    $('#price-quote-search')?.focus();
   }
   function priceQuoteOpen() {
     if (!selectedCustomer() || !$('#composer-text')) return;
     Object.assign(priceView, { quote: '', picked: [] });
-    fidDialog('报价', `<div class="modal-body price-quote">
-      <input type="search" class="fid-input" id="price-quote-search" aria-label="查找产品" placeholder="输入产品简称或名称查找" ${priceList() ? '' : 'disabled'}>
-      <p class="price-note">点击价格选中，可以多选，再点一次取消；查找其他产品时，已选的保留。「放入消息框」按选中的顺序逐行放入，不会自动发送。</p>
-      <div id="price-quote-rows">${priceQuoteRows()}</div>
-    </div>`, `<span class="fid-small-note" id="price-quote-count">已选 0 项</span>${fidButton('放入消息框', 'priceInsert', '', 'blue', 'id="price-quote-insert" disabled')}${fidButton('关 闭', 'close')}`, true);
-    $('#price-quote-search')?.focus();
+    priceQuoteShow();
+  }
+  // The confirm window (plan 080): the ticked products in the order ticked, each with its quantity, its unit price
+  // — and, when the list has several price columns, the column — its amount, and the total. A product can be
+  // deleted; 返回列表 goes back to the ticks; 放入消息框 needs a valid quantity and unit price for every product.
+  function priceConfirmOpen() {
+    const list = priceList();
+    priceView.picked = priceView.picked.filter(item => list?.rows[item.row]?.prices[item.at]);
+    const items = priceView.picked, several = list && list.columns.prices.length > 1, ready = items.length > 0 && items.every(priceValid);
+    const rows = items.map((item, i) => {
+      const entry = list.rows[item.row];
+      const columns = several ? `<select class="fid-select" data-price-tier="${i}" aria-label="价格列">${entry.prices.map((value, at) => (value ? option(String(at), `${priceColumnName(list.columns.prices[at]) || `价格 ${at + 1}`}：${priceShown(list, at, value)}`, String(item.at)) : '')).join('')}</select>` : '';
+      return `<tr><td><strong>${esc([entry.name, entry.code].filter(Boolean).join(' '))}</strong>${entry.spec ? ` <small>${esc(entry.spec)}</small>` : ''}${columns}</td>
+        <td><input type="number" class="fid-input" min="1" step="1" inputmode="numeric" data-price-qty="${i}" value="${esc(item.qty)}" aria-label="数量"></td>
+        <td><input type="number" class="fid-input" min="0" step="any" inputmode="decimal" data-price-unit="${i}" value="${esc(item.price)}" aria-label="单价"></td>
+        <td id="price-amount-${i}">${esc(priceValid(item) ? priceShown(list, item.at, priceFigure(priceAmount(item))) : '—')}</td>
+        <td>${fidButton('删除', 'priceDrop', '', 'slim', fidActionID(String(i)))}</td></tr>`;
+    }).join('');
+    const total = ready ? priceShown(list, items[0].at, priceFigure(items.reduce((sum, item) => sum + priceAmount(item), 0))) : '—';
+    fidDialog('确认报价', `<div class="modal-body price-quote">${items.length
+      ? `<div class="fid-table-scroll"><table class="fid-table price-confirm-table"><colgroup><col><col><col><col><col></colgroup><thead><tr><th scope="col">产品</th><th scope="col">数量</th><th scope="col">单价</th><th scope="col">金额</th><th scope="col"><span class="sr-only">删除</span></th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th scope="row" colspan="3">合计</th><td id="price-confirm-total">${esc(total)}</td><td></td></tr></tfoot></table></div>
+      <p class="price-note">数量与单价可以修改，金额与合计随之计算。放入消息框后不会自动发送。</p>`
+      : '<div class="price-quote-empty"><p>没有选中的产品</p></div>'}</div>`, `${fidButton('返回列表', 'priceBack')}${fidButton('放入消息框', 'priceInsert', '', 'blue', `id="price-confirm-insert" ${ready ? '' : 'disabled'}`)}${fidButton('取 消', 'close')}`, true);
+  }
+  // The amounts, the total and 放入消息框 follow what is typed in the confirm window.
+  function priceConfirmTotals() {
+    const list = priceList(), items = priceView.picked, ready = items.length > 0 && items.every(priceValid);
+    items.forEach((item, i) => { const cell = $(`#price-amount-${i}`); if (cell) cell.textContent = priceValid(item) ? priceShown(list, item.at, priceFigure(priceAmount(item))) : '—'; });
+    const total = $('#price-confirm-total');
+    if (total) total.textContent = ready ? priceShown(list, items[0].at, priceFigure(items.reduce((sum, item) => sum + priceAmount(item), 0))) : '—';
+    const button = $('#price-confirm-insert');
+    if (button) button.disabled = !ready;
   }
 
   Object.assign(fidActions, {
@@ -210,21 +246,19 @@
     },
     priceQuote: priceQuoteOpen,
     priceOpenPage: () => { close(); navigate('prices'); },
-    // Ticks a price, or unticks it (plan 078). The ticks stay while the search changes.
-    pricePick: id => {
-      const list = priceList(), [row, at] = String(id).split(':').map(Number);
-      if (!list?.rows[row]?.prices[at]) return;
-      const key = `${row}:${at}`, picked = priceView.picked;
-      if (picked.includes(key)) picked.splice(picked.indexOf(key), 1);
-      else picked.push(key);
-      priceQuoteRefresh();
+    priceConfirm: () => { if (priceView.picked.length) priceConfirmOpen(); },
+    priceBack: priceQuoteShow,
+    priceDrop: id => {
+      priceView.picked.splice(Number(id), 1);
+      priceConfirmOpen();
     },
-    // Puts the ticked prices at the end of the message box, one line each, in the order they were ticked. The
-    // message is not sent.
+    // Puts one line per product — "Product Alpha PRDA01: $40 x 10 = $400" — and the total at the end of the message
+    // box, in the order the products were ticked (plan 080). The message is not sent.
     priceInsert: () => {
-      const list = priceList(), box = $('#composer-text');
-      const lines = priceView.picked.map(key => key.split(':').map(Number)).filter(([row, at]) => list?.rows[row]?.prices[at]).map(([row, at]) => priceLine(list, list.rows[row], at));
-      if (!lines.length || !box) return;
+      const list = priceList(), box = $('#composer-text'), items = priceView.picked;
+      if (!list || !box || !items.length || !items.every(item => priceValid(item) && list.rows[item.row]?.prices[item.at])) return;
+      const lines = items.map(item => `${priceLine(list, list.rows[item.row], item.at, priceFigure(Number(item.price)))} x ${item.qty} = ${priceShown(list, item.at, priceFigure(priceAmount(item)))}`);
+      lines.push(`Total: ${priceShown(list, items[0].at, priceFigure(items.reduce((sum, item) => sum + priceAmount(item), 0)))}`);
       close();
       priceView.picked = [];
       const before = box.value.replace(/\s+$/, '');
@@ -252,5 +286,26 @@
       const rows = $('#price-quote-rows');
       rows.innerHTML = priceQuoteRows();
       paintIcons(rows);
+    } else if (input.dataset.priceQty !== undefined || input.dataset.priceUnit !== undefined) {
+      const item = priceView.picked[Number(input.dataset.priceQty ?? input.dataset.priceUnit)];
+      if (!item) return;
+      item[input.dataset.priceQty !== undefined ? 'qty' : 'price'] = input.value.trim();
+      priceConfirmTotals();
+    }
+  });
+  // A product ticked or unticked in the list (it starts with quantity 1 and the price of its first price column), or
+  // another price column chosen for a product in the confirm window (its unit price becomes that column's).
+  document.addEventListener('change', event => {
+    const input = event.target, list = priceList();
+    if (input.dataset?.pricePick !== undefined) {
+      const row = Number(input.dataset.pricePick), entry = list?.rows[row], at = entry ? entry.prices.findIndex(Boolean) : -1;
+      priceView.picked = priceView.picked.filter(item => item.row !== row);
+      if (input.checked && at >= 0) priceView.picked.push({ row, at, qty: '1', price: priceFigure(priceNumber(entry.prices[at])) });
+      priceQuoteCount();
+    } else if (input.dataset?.priceTier !== undefined) {
+      const item = priceView.picked[Number(input.dataset.priceTier)], at = Number(input.value), value = item && list?.rows[item.row]?.prices[at];
+      if (!value) return;
+      Object.assign(item, { at, price: priceFigure(priceNumber(value)) });
+      priceConfirmOpen();
     }
   });

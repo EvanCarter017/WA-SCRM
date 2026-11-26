@@ -602,6 +602,12 @@
 .price-quote-prices { display:flex; flex:none; flex-wrap:wrap; justify-content:flex-end; gap:6px; margin-left:auto; }
 .price-quote-prices small { margin-right:4px; opacity:.75; }
 .price-quote-empty { display:grid; justify-items:center; gap:10px; padding:20px; color:var(--fid-quiet); font-size:13px; }
+/* The confirm window of a quote (plan 080): the product column wide, quantity, unit price and amount narrower. */
+.price-confirm-table col:nth-child(1) { width:36%; }
+.price-confirm-table col:nth-child(2) { width:15%; }
+.price-confirm-table col:nth-child(3) { width:19%; }
+.price-confirm-table col:nth-child(4) { width:15%; }
+.price-confirm-table .fid-input { width:100%; }
 /* Where the conversation is narrow the button shows its icon only, and stands close to its neighbours. */
 @media(max-width:1000px) {
   .price-quote-button { margin-left:0; padding:2px 4px; }
