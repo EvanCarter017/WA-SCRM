@@ -28,7 +28,7 @@ Core capabilities, as built:
 | Tags | Fully user-defined tag groups; no presets, no automatic tagging; tag statistics page. |
 | Chat records (`#chat-records`, 聊天记录) | Snapshots of a conversation moved in by hand with a reason, for review; no ratings. |
 | AI (`#ai`, AI 能力) | Through a server relay only (keys never reach the browser): **translate incoming messages once** and keep them; **translate a reply before sending** (Enter or a configurable shortcut shows the translation, the next press sends it; a "send guard" stops untranslated replies); **translate a sent reply back** into the reading language; **voice note to text** on click. Per-capability switches and usage records. |
-| Price list (`#prices`, 价格表) | Upload an .xlsx/.csv price list (parsed in the browser), one currency for the list, a "报价" (quote) button beside the message box; can be removed for good. |
+| Price list (`#prices`, 价格表) | Upload an .xlsx/.csv price list (parsed in the browser), one currency for the list; the "报价" (quote) button beside the message box opens a searchable list in which prices are ticked and then put into the message box together, one line each, in the order ticked (plan 078); prices carry the currency's sign ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ keep $ and ¥ clear; AED and SAR by code; the 价格表 page names the currency by code); can be removed for good. |
 | Supervisor page | Employee list, per-workspace read-only customers and chats, account management (create, reset, disable, remove). |
 | Emoji | The page ships Noto Color Emoji (11 WOFF2 parts) so every emoji renders on any computer. |
 
