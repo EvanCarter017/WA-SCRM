@@ -1,7 +1,7 @@
 {
   "version": "0.8-scrm-engagement",
   "status": "passed",
-  "checkedAt": "2026-11-26T15:03:43.548Z",
+  "checkedAt": "2026-11-26T15:30:18.005Z",
   "projectRoot": "WA-SCRM",
   "historicalBaselineVerified": 0,
   "engagementStates": [
@@ -54,6 +54,7 @@
   "fileSending": "up to ten files at once from the message box (the + button, paste, drop), sent by the server through OpenWA one after the other, each as a message of its own, the typed words as the caption of the first; told by its bytes: JPEG and PNG as a picture, MP4 (H.264) as a video, MP3, OGG, M4A and AAC as a recording, everything else as a document; 16 MB at most",
   "customerPictures": "the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp's own servers or the gateway, kept for a day; the initials stay when there is none",
   "handMadeEmpty": "a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)",
+  "personaManual": "the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona",
   "quotePicks": "the quote dialog (报价) ticks prices: a click ticks or unticks one, the ticks stay while the search changes, and 放入消息框 puts every ticked price into the message box, one line each, in the order they were ticked; a price carries the sign of the list's currency (\"$40\"; HK$, A$, C$, S$, MX$, R$, JP¥ so that \"$\" and \"¥\" stay clear; AED and SAR keep their code)",
   "handMadePreview": "the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer's last message",
   "openOutcomeMatched": "a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy's status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)",

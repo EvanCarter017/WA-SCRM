@@ -55,25 +55,24 @@
   };
 
   function lcSeed() {
-    // Ensure every customer has an engagement state and safe defaults
+    // Once, for the persona that the page used to fill in by itself (plan 079): a customer whose persona was never
+    // saved by a person (no history line 更新客户需求画像) gets it empty again, without an intent level and without
+    // the attribution the page made up. data.personaManual notes that it was done.
+    if (!data.personaManual) {
+      for (const c of data.customers) {
+        if ((data.activities[c.id] || []).some(a => a.category === 'profile' && String(a.text || '').startsWith('更新客户需求画像'))) continue;
+        c.qualification = { demand: '', volume: '', deliveryRegion: '', objection: '', commWindow: '' };
+        delete c.intentLevel;
+        delete c.attribution;
+      }
+      data.personaManual = 1;
+    }
+    // Ensure every customer has an engagement state and safe defaults. The persona holds only what a person entered
+    // with 保存画像 (plan 079): its fields start empty and the intent level unselected.
     for (const c of data.customers) {
       lcMigrateEngagement(c);
-      c.intentLevel ||= '中意向';
       c.reactivatedCount ??= 0;
-      c.qualification = {
-        demand: '',
-        volume: '',
-        deliveryRegion: `${country(c)}${c.city && c.city !== '待补充' ? ' · ' + c.city : ''}`,
-        objection: '',
-        commWindow: aiCustomerLanguage(c) ? `${aiCustomerLanguage(c)}沟通` : '',
-        ...(c.qualification || {}),
-      };
-      c.attribution ||= {
-        platform: c.source || '未知来源',
-        method: c.campaign ? '广告入口参数' : '人工核实',
-        campaign: c.campaign || '',
-        ad: c.ad || '',
-      };
+      c.qualification = { demand: '', volume: '', deliveryRegion: '', objection: '', commWindow: '', ...(c.qualification || {}) };
       const pending = data.tasks.filter(t => t.customer === c.id && !t.done).sort((a, b) => new Date(a.due) - new Date(b.due));
       c.followup = pending[0]?.due || null;
     }
@@ -322,7 +321,7 @@
             <button type="submit" class="fid-btn slim blue">${icon('Check')}保存画像</button>
           </div>
           <div class="lc-qual-grid">
-            <label class="lc-field"><span>意向等级</span><select class="fid-select" name="intentLevel">${LC_INTENT_LEVELS.map(x => option(x, x, c.intentLevel)).join('')}</select></label>
+            <label class="lc-field"><span>意向等级</span><select class="fid-select" name="intentLevel">${option('', '请选择', c.intentLevel || '')}${LC_INTENT_LEVELS.map(x => option(x, x, c.intentLevel)).join('')}</select></label>
             <label class="lc-field"><span>预计规模 / 预算区间</span><input class="fid-input" name="volume" value="${esc(c.qualification?.volume || '')}" placeholder="如 $1,500 - $2,500 / 批"></label>
             <label class="lc-field full"><span>核心咨询需求与关注点</span><input class="fid-input" name="demand" value="${esc(c.qualification?.demand || '')}" placeholder="客户主要询问的品类方向、规格或合作诉求"></label>
             <label class="lc-field"><span>收件地区与时效要求</span><input class="fid-input" name="deliveryRegion" value="${esc(c.qualification?.deliveryRegion || '')}" placeholder="如 US · TX Austin"></label>
@@ -337,7 +336,7 @@
           </div>
           <div class="tag-row" style="margin-bottom:12px">${tagsHTML(c, 99, true) || '<span class="muted">暂未打标（可在标签管理自定义分组标签）</span>'}</div>
           <div class="info-row"><span>进线渠道</span><span><strong>${esc(c.source)}</strong>${c.campaign ? ' · ' + esc(c.campaign) : ''}</span></div>
-          <div class="info-row"><span>广告素材 / 证据</span><span>${esc(c.ad || c.attribution?.method || '人工建档')}</span></div>
+          <div class="info-row"><span>广告素材 / 证据</span><span>${esc(c.ad || '—')}</span></div>
           <div class="info-row"><span>负责聊手 / 接待号</span><span>${esc(m?.name || '未分配')} · ${esc(a?.name || '—')}</span></div>
           ${duplicateNotice}
         </div>`;
@@ -1203,7 +1202,7 @@
         commWindow: v('commWindow'),
         objection: v('objection'),
       });
-      lcLog(c.id, 'profile', `更新客户需求画像（意向度：${c.intentLevel}${c.qualification.volume ? ' · 规模：' + c.qualification.volume : ''}）`);
+      lcLog(c.id, 'profile', `更新客户需求画像（意向度：${c.intentLevel || '未选择'}${c.qualification.volume ? ' · 规模：' + c.qualification.volume : ''}）`);
       persist();
       render();
       openProfile(c.id, 'overview');
@@ -1310,9 +1309,10 @@
         // note, kept in the profile and the notes; as the preview it looked like the customer's last message.
         unread: 0, star: false, last: '刚刚', preview: '新建客户档案', translation: '',
         followup: null, notes: v('demand'), contactRefs: [{ account: a?.id, owner: a?.owner || ui.persona }],
-        createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-补录', intentLevel: '中意向',
+        createdAt: nowIso, updatedAt: nowIso, clientType: '新增线索-补录',
         reactivatedCount: 0,
-        qualification: { demand: v('demand'), volume: '', deliveryRegion: country({ country: v('country') }), objection: '', commWindow: v('language') ? v('language') + '沟通' : '' },
+        // The persona starts empty (plan 079): the 初步需求 typed here stays in the notes.
+        qualification: { demand: '', volume: '', deliveryRegion: '', objection: '', commWindow: '' },
       };
       data.customers.unshift(c);
       // A customer made by hand starts with an empty conversation (plan 076): the 初步需求 is the employee's note,
@@ -1331,13 +1331,8 @@
   function lcSyncRuntimeCustomers() {
     for (const c of data.customers) {
       lcMigrateEngagement(c);
-      c.qualification ||= {
-        demand: c.notes || c.preview || '',
-        volume: '待确认',
-        deliveryRegion: country(c),
-        objection: '',
-        commWindow: aiCustomerLanguage(c) ? aiCustomerLanguage(c) + '沟通' : '',
-      };
+      // A customer that came in from WhatsApp gets an empty persona (plan 079): nothing is filled in by itself.
+      c.qualification ||= { demand: '', volume: '', deliveryRegion: '', objection: '', commWindow: '' };
       // Follow-up to-dos are made by hand only. A first message is noted in the customer's history; nothing about
       // follow-ups shows for the customer until a person plans one.
       if (c.needsFirstReply) {
