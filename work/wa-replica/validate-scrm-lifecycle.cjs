@@ -329,15 +329,32 @@ assert(appJs.includes("${t('刷新视图', 'refreshUI', 'RefreshCw')}\n    </asi
 const emojiFontDir = path.join(__dirname, 'fonts');
 const emojiParts = Array.from({ length: 11 }, (_, n) => `noto-color-emoji-v50-${n}.woff2`);
 const emojiFiles = [...emojiParts, 'noto-color-emoji-OFL.txt'].sort();
-assert.deepEqual(fs.readdirSync(emojiFontDir).sort(), emojiFiles, 'work/wa-replica/fonts must hold the eleven parts of the emoji font and its licence');
-assert.deepEqual(fs.readdirSync(path.join(out, 'fonts')).sort(), emojiFiles, 'the built fonts folder must hold the same files');
-for (const file of emojiFiles) assert(fs.readFileSync(path.join(out, 'fonts', file)).equals(fs.readFileSync(path.join(emojiFontDir, file))), `fonts/${file} must be the built copy`);
+// The text in HarmonyOS Sans SC (plan 081): Huawei's own files, unmodified as their licence asks — the bytes of
+// HarmonyOS-Sans.zip from developer.huawei.com — with the licence beside them and the notice on the sign-in screen.
+const textFont = {
+  'HarmonyOS_Sans_SC_Regular.ttf': '297b088424be212207df2ce8b98e335468b782aa6b96832af0b8b773d711e2b1',
+  'HarmonyOS_Sans_SC_Bold.ttf': '43a424b85e47fb53a17b3b32026a71801f86f8e022ca6798d186b47d39fa5f01',
+  'HarmonyOS-Sans-LICENSE.txt': 'b2ffec0e6269ee41c3b5fc0345ab37600b46d66ebea6c9c58ff37f517bdfa164',
+};
+const fontFiles = [...emojiFiles, ...Object.keys(textFont)].sort();
+assert.deepEqual(fs.readdirSync(emojiFontDir).sort(), fontFiles, 'work/wa-replica/fonts must hold the eleven parts of the emoji font, the text font and their licences');
+assert.deepEqual(fs.readdirSync(path.join(out, 'fonts')).sort(), fontFiles, 'the built fonts folder must hold the same files');
+for (const [file, hash] of Object.entries(textFont)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(emojiFontDir, file))).digest('hex'), hash, `fonts/${file} must be Huawei's file, unmodified`);
+for (const file of fontFiles) assert(fs.readFileSync(path.join(out, 'fonts', file)).equals(fs.readFileSync(path.join(emojiFontDir, file))), `fonts/${file} must be the built copy`);
 assert(read(path.join(emojiFontDir, 'noto-color-emoji-OFL.txt')).includes('SIL Open Font License, Version 1.1'), 'the licence of the emoji font must be shipped');
 const builtCss = read(path.join(out, 'app.css'));
 for (const file of emojiParts) assert(builtCss.includes(`src:url("fonts/${file}") format("woff2") tech(color-COLRv1); unicode-range:U+`), `app.css must name ${file}`);
 assert.equal((builtCss.match(/font-family:"SCRM Emoji"/g) || []).length, 11, 'app.css must have the eleven parts of the emoji font');
-assert(builtCss.includes('font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the emoji font must come after the fonts of the text');
-for (const required of ["'.woff2': 'font/woff2',", "'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache',"]) {
+for (const [weight, file] of [[400, 'HarmonyOS_Sans_SC_Regular.ttf'], [700, 'HarmonyOS_Sans_SC_Bold.ttf']]) {
+  assert(builtCss.includes(`@font-face { font-family:"HarmonyOS Sans SC"; font-style:normal; font-weight:${weight}; font-display:swap; src:url("fonts/${file}") format("truetype"); }`), `app.css must name ${file}`);
+}
+assert(builtCss.includes('font-family:"HarmonyOS Sans SC",system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the text font must come first, the emoji font after the fonts of the text');
+for (const page of [path.join(__dirname, 'fidelity-index.html'), path.join(out, 'index.html')]) {
+  assert(read(page).includes('<p class="fid-sign-in-font">本系统使用 HarmonyOS Sans 字体</p>'), 'the sign-in screen must say that HarmonyOS Sans is used, as its licence asks');
+}
+const textFontEnd = "if (face.family.replace(/\"/g, '') === 'HarmonyOS Sans SC') face.loaded.then(() => { if (openwaAtEnd) openwaShowEnd(); }, () => {});";
+assert(openwaSource.includes(textFontEnd) && appJs.includes(textFontEnd), 'a conversation that shows its end must keep showing it when the text font arrives');
+for (const required of ["'.woff2': 'font/woff2',", "'.ttf': 'font/ttf',", "'Cache-Control': pathname.startsWith('/fonts/') && /\\.(woff2|ttf)$/.test(pathname) ? 'public, max-age=31536000, immutable' : 'no-cache',"]) {
   assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
 }
 // A page whose saving goes wrong keeps trying and says so (plan 067): every save has a time limit, a guard catches
@@ -397,7 +414,7 @@ assert(!/log_format[^;]*\$(request|request_uri|args|query_string)\b/.test(deploy
 // A lighter page (plan 069): the gateway compresses what goes out as text, also through a proxy or a VPN; the server
 // lets the browser keep the page's files and answers an empty 304, by a tag of their content, when they did not
 // change — a weak tag from a compressing gateway counts the same.
-for (const required of ['gzip on;', 'gzip_proxied any;', 'gzip_vary on;', 'gzip_types text/css application/javascript application/json text/plain;']) {
+for (const required of ['gzip on;', 'gzip_proxied any;', 'gzip_vary on;', 'gzip_types text/css application/javascript application/json text/plain font/ttf;']) {
   assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
 }
 for (const required of ["const tag = '\"' + crypto.createHash('sha256').update(body).digest('base64url').slice(0, 32) + '\"';", "if (String(req.headers['if-none-match'] || '').split(',').some(asked => asked.trim().replace(/^W\\//, '') === tag)) {", 'res.writeHead(304, kept);']) {
@@ -672,6 +689,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
+  textFont: 'the page draws its text in HarmonyOS Sans SC: Huawei\'s Regular and Bold files, unmodified, with their licence (work/wa-replica/fonts, copied by the build); the sign-in screen says 本系统使用 HarmonyOS Sans 字体 as the licence asks; the server sends the files as font/ttf that the browser keeps, the gateway compresses them; a conversation that shows its end keeps showing it when the font arrives',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',
   openOutcomeMatched: 'a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy\'s status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)',
   feedStartsAgain: 'the WhatsApp feed starts also when its first questions fail (the server restarting, a moment without network): the server\'s state and the feed for this page are asked again after 2, 4, 8 … at most 30 s until they are answered; an ended session shows 登录已失效, as the feed loop does',

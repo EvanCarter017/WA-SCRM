@@ -28,6 +28,7 @@ const mime = {
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
 };
 
 function sendJson(res, status, body) {
@@ -55,8 +56,9 @@ async function serveFile(req, res, pathname) {
   // tag as weak (W/), which counts the same.
   const tag = '"' + crypto.createHash('sha256').update(body).digest('base64url').slice(0, 32) + '"';
   const kept = {
-    // The parts of the emoji font never change under their name (plan 068): the browser keeps them without asking.
-    'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache',
+    // The parts of the emoji font (plan 068) and the text font (plan 081) never change under their name: the browser
+    // keeps them without asking.
+    'Cache-Control': pathname.startsWith('/fonts/') && /\.(woff2|ttf)$/.test(pathname) ? 'public, max-age=31536000, immutable' : 'no-cache',
     ETag: tag,
   };
   if (String(req.headers['if-none-match'] || '').split(',').some(asked => asked.trim().replace(/^W\//, '') === tag)) {

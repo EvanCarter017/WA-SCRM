@@ -1525,6 +1525,11 @@ window.WA_START = () => {
       if (box && box.contains(event.target) && openwaAtEnd) openwaShowEnd();
     }, true);
   }
+  // The text font (plan 081) comes after the first drawing, and its letters take other room than the ones drawn
+  // before it: a conversation that showed its end goes on showing it once a weight of the font is there.
+  document.fonts?.forEach(face => {
+    if (face.family.replace(/"/g, '') === 'HarmonyOS Sans SC') face.loaded.then(() => { if (openwaAtEnd) openwaShowEnd(); }, () => {});
+  });
 
   // The mark after the time of a message the employee sent.
   function openwaMessageMark(m) {

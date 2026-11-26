@@ -455,7 +455,13 @@ dialog>#toast,dialog>#toast.show{transform:none}
 @font-face { font-family:"SCRM Emoji"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/noto-color-emoji-v50-8.woff2") format("woff2") tech(color-COLRv1); unicode-range:U+200d,U+2640,U+2642,U+2695-2696,U+26f7,U+26f9,U+2708,U+2764,U+27a1,U+fe0f,U+1f33e,U+1f373,U+1f37c,U+1f384-1f385,U+1f393,U+1f3a4,U+1f3a8,U+1f3c2-1f3c4,U+1f3c7,U+1f3ca-1f3cc,U+1f3eb,U+1f3ed,U+1f3fb-1f3ff,U+1f430,U+1f466-1f469,U+1f46b-1f478,U+1f47c,U+1f481-1f483,U+1f486-1f487,U+1f48b,U+1f48f,U+1f491,U+1f4bb-1f4bc,U+1f527,U+1f52c,U+1f574-1f575,U+1f57a,U+1f645-1f647,U+1f64b,U+1f64d-1f64e,U+1f680,U+1f692,U+1f6a3,U+1f6b4-1f6b6,U+1f6c0,U+1f6cc,U+1f91d,U+1f926,U+1f930-1f931,U+1f934-1f93a,U+1f93c-1f93e,U+1f977,U+1f9af-1f9b3,U+1f9b8-1f9b9,U+1f9bc-1f9bd,U+1f9cc-1f9cf,U+1f9d1-1f9df,U+1fa70,U+1fa82,U+1fac3-1fac5,U+1fac8,U+1faef; }
 @font-face { font-family:"SCRM Emoji"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/noto-color-emoji-v50-9.woff2") format("woff2") tech(color-COLRv1); unicode-range:U+200d,U+2194-2195,U+2603,U+261d,U+2620,U+2639-263a,U+2665,U+26a1,U+26c4,U+270a-270d,U+2728,U+2763-2764,U+2b50,U+fe0f,U+1f31a-1f31f,U+1f32b,U+1f389-1f38a,U+1f3fb-1f3ff,U+1f440-1f450,U+1f463-1f465,U+1f479-1f47b,U+1f47d-1f480,U+1f485,U+1f48b-1f48c,U+1f493-1f49f,U+1f4a2,U+1f4a4-1f4a6,U+1f4a8-1f4ab,U+1f4af,U+1f525,U+1f573,U+1f590,U+1f595-1f596,U+1f5a4,U+1f5e3,U+1f600-1f644,U+1f648-1f64a,U+1f64c,U+1f64f,U+1f90c-1f925,U+1f927-1f92f,U+1f932-1f933,U+1f970-1f976,U+1f978-1f97a,U+1f9a0,U+1f9b4-1f9b7,U+1f9bb,U+1f9be-1f9bf,U+1f9d0,U+1f9e0-1f9e1,U+1fa75-1fa79,U+1fac0-1fac2,U+1fac6,U+1fae0-1fae6,U+1fae8-1faea,U+1faef-1fafa; }
 @font-face { font-family:"SCRM Emoji"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/noto-color-emoji-v50-10.woff2") format("woff2") tech(color-COLRv1); unicode-range:U+1f6d9,U+1fa8b-1fa8d,U+1facc,U+1fadd,U+1faeb; }
-.fidelity { --fid-sidebar:var(--fid-px-240); --fid-top:var(--fid-px-107); --fid-gradient:linear-gradient(115deg,var(--fid-violet),var(--fid-royal)); font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif; }
+/* The text of the page in HarmonyOS Sans SC (plan 081): Huawei's own files, unmodified, under the HarmonyOS Sans Fonts
+   License Agreement (fonts/HarmonyOS-Sans-LICENSE.txt), which asks for the notice on the sign-in screen. Regular and
+   Bold: a weight up to 500 is drawn Regular, a heavier one Bold. A browser loads a weight when text needs it and keeps
+   it; until it is there, and where it cannot be loaded, the fonts after it draw the text. */
+@font-face { font-family:"HarmonyOS Sans SC"; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/HarmonyOS_Sans_SC_Regular.ttf") format("truetype"); }
+@font-face { font-family:"HarmonyOS Sans SC"; font-style:normal; font-weight:700; font-display:swap; src:url("fonts/HarmonyOS_Sans_SC_Bold.ttf") format("truetype"); }
+.fidelity { --fid-sidebar:var(--fid-px-240); --fid-top:var(--fid-px-107); --fid-gradient:linear-gradient(115deg,var(--fid-violet),var(--fid-royal)); font-family:"HarmonyOS Sans SC",system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif; }
 .fidelity .app-shell { --list:var(--fid-px-300); }
 .fidelity:has(.nav-collapsed) { --fid-sidebar:var(--fid-px-64); }
 .fidelity .brand { padding-inline:var(--fid-px-16); gap:var(--fid-px-10); }
@@ -514,6 +520,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-sign-in-panel h1 { font-size:var(--fid-px-22); }
 .fid-sign-in-panel .fid-btn { min-height:var(--fid-px-44); padding-inline:var(--fid-px-18); }
 .fid-sign-in-note { margin:0; color:var(--fid-quiet); font-size:var(--fid-px-13); line-height:var(--fid-px-20); text-align:center; }
+.fid-sign-in-font { margin:0; color:var(--color-text-muted); font-size:var(--fid-px-12); line-height:var(--fid-px-20); text-align:center; }
 .fid-sign-in-form { display:grid; gap:var(--fid-px-14); width:100%; }
 .fid-sign-in-form[hidden] { display:none; }
 .fid-sign-in-form .field { display:grid; gap:var(--fid-px-6); font-size:var(--fid-px-13); }
