@@ -1732,3 +1732,16 @@
 .fidelity #dialog.drawer.lc-dossier-drawer > #toast {
   bottom: calc(var(--lc-dossier-foot, 0px) + 20px);
 }
+
+/* The strip above a conversation takes one line on the WhatsApp API page where it fits, and a second one where the
+   conversation is narrow (plan 090); below 1600 px its four buttons show their icons only, and their names when
+   pointed at. */
+@media (min-width: 761px) {
+  .fidelity .fid-wa .lc-chat-strip { gap: 6px; padding: 6px 14px; }
+  .fidelity .fid-wa .lc-chat-strip .tag-row { flex: 0 1 auto; min-width: 0; }
+  .fidelity .fid-wa .lc-chat-strip-right { margin-left: auto; width: auto; flex-wrap: nowrap; gap: 4px; }
+}
+@media (min-width: 761px) and (max-width: 1599px) {
+  .fidelity .fid-wa .lc-chat-strip-right .fid-btn { width: 30px; padding: 0; gap: 0; justify-content: center; font-size: 0; }
+  .fidelity .fid-wa .lc-chat-strip-right .fid-btn .icon { width: 15px; height: 15px; }
+}

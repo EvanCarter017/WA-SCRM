@@ -272,7 +272,7 @@
       button.outerHTML = aiGuardHTML(c);
       paintIcons($('.composer-tools'));
       aiRefreshDraftPreview(c);
-      const enter = $('.composer-foot span');
+      const enter = $('.composer-keys');
       if (enter) { enter.innerHTML = icon('Keyboard') + aiEnterHint(c); paintIcons(enter); }
     }
     toast(on ? '发送保护已开启。' : '发送保护已关闭，回复按原文直接发送。');

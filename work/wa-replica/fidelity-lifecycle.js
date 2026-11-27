@@ -211,7 +211,7 @@
   viewIcon = id => ({
     dashboard: 'LayoutDashboard',
     inbox: 'MessageCircle',
-    accounts: 'Smartphone',
+    numbers: 'Smartphone',
     customers: 'ContactRound',
     followups: 'ClipboardList',
     'chat-records': 'MessagesSquare',
@@ -238,7 +238,7 @@
     return (
       renderItem('dashboard', views.dashboard) +
       renderItem('inbox', views.inbox) +
-      renderItem('accounts', views.accounts) +
+      renderItem('numbers', views.numbers) +
       '<div class="nav-caption">客户与跟进</div>' +
       navGroup('客户与跟进闭环', 'ContactRound', 'fidNavCustomers', ui.customerNavOpen, lcCustomerMenu) +
       (operationsMenu.length ? navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) : '') +
@@ -893,10 +893,10 @@
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
       <div class="lc-chat-strip-right">
-        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
-        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
-        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
-        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
+        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id) + ` title="${h.closed ? '重新跟进' : '安排跟进'}"`)}
+        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id) + ' title="设置标签"')}
+        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id) + ' title="移入聊天记录"')}
+        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id) + ' title="360° 档案"')}
       </div>
     </div>`;
     return html.replace('<div class="source-strip">', strip + '<div class="source-strip">');

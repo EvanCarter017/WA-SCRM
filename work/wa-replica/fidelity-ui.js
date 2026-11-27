@@ -54,7 +54,7 @@
   fidSeed();
   ui.pageSizes.customers=20; ui.pageSizes.followups=20;
   ui.tagGroup=(fidGroupList().find(canEditGroup)||fidGroupList()[0])?.id||'all';
-  ui.openTabs=[...new Set(['dashboard','accounts','inbox',...customerMenu,...ui.openTabs])];
+  ui.openTabs=[...new Set(['dashboard','inbox','numbers',...customerMenu,...ui.openTabs])];
 
   function fidButton(label, action, glyph='', style='', attrs='') {
     return `<button type="button" class="fid-btn ${style}" ${action?`data-action="${action}"`:''} ${attrs}>${glyph?icon(glyph):''}${esc(label)}</button>`;
@@ -424,7 +424,7 @@
     fidLogReset:()=>{fid.logFilter={start:'',end:'',app:'all',field:'customer',query:''};ui.pages.followups=0;render();},
     fidTasks:()=>{fid.followMode='todo';ui.pages.followups=0;navigate('followups');},
     fidLogHistory:()=>{fid.followMode='history';ui.pages.followups=0;render();},
-    fidWaTab:id=>{fid.waTab=id==='numbers'?'numbers':'chat';render();},
+    fidWaTab:id=>navigate(id==='numbers'?'numbers':'inbox'),
     fidChatFilters:()=>fidDialog('会话筛选','<div class="modal-body fid-conversation-filters">'+Object.entries(fidConversationFilters).map(([id,label])=>fidButton(label,'fidChatFilter','',ui.conversationFilter===id?'blue':'',`${fidActionID(id)} aria-pressed="${ui.conversationFilter===id}"`)).join('')+'</div>'),
     fidChatFilter:id=>{ui.conversationFilter=id;close();render();},
     fidClearChatFilter:()=>{ui.conversationFilter='all';render();$('#conversation-search')?.focus({preventScroll:true});},

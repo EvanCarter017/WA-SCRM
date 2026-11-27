@@ -218,7 +218,7 @@ for (const required of ["fetch('/api/ai/reply', {", 'function aiTranslateDraft(c
 for (const required of ["const ACTIONS = { '/api/ai/translate': ['translate', translate], '/api/ai/reply': ['reply', reply] };", 'function replyPrompt({ to, tone, business })', 'const MAX_CONTEXT_MESSAGES = 6;']) {
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
-for (const required of ["aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class=\"send-button\"", "icon('Keyboard')+aiEnterHint(c)+'</span>"]) {
+for (const required of ["aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()", "<span class=\"composer-keys\">'+icon('Keyboard')+aiEnterHint(c)+'</span>"]) {
   assert(appJs.includes(required), `the message box must take its hint, guard switch and Enter line from the AI module (${required})`);
 }
 assert(!appJs.includes("'发送译文':'发送原文'"), 'the fixed hint texts of the baseline must be replaced');
@@ -260,7 +260,7 @@ for (const required of ["...(outgoing === text ? { translatedTo: aiSettings().re
 for (const required of ["new DatabaseSync(path.join(dir, 'ai-translations.db'))", "const translationKey = (to, text) => crypto.createHash('sha256').update(to + '\\n' + text).digest('hex');", "if (typeof known === 'string') return { text: known, inputChars: text.length, cached: true };", 'store?.put(key, translated);']) {
   assert(read(path.join(__dirname, 'ai-relay.cjs')).includes(required), `ai-relay.cjs is missing ${required}`);
 }
-assert(appJs.includes('m.translated&&showTranslation?') && !appJs.includes("m.side==='in'&&m.translated"), 'a translation must be shown below a message of either side');
+assert(appJs.includes('shown=m.translated&&showTranslation;') && appJs.includes("(shown?'<div class=\"message-translation\">") && !appJs.includes("m.side==='in'&&m.translated"), 'a translation must be shown below a message of either side');
 const bootSource = read(path.join(__dirname, 'fidelity-boot.js'));
 for (const call of bootSource.match(/request\('[^']*'/g) || []) assert(/^request\('\/api\/(site\/(status|report)|auth\/(session|login|logout|password)|data)'$/.test(call), `fidelity-boot.js calls an unexpected address: ${call}`);
 assert(!/\bfetch\s*\(\s*['"`]/.test(bootSource), 'fidelity-boot.js must send every request through its request helper');
@@ -492,9 +492,9 @@ for (const required of ['function aiCustomerLanguage(c) {', 'function aiLanguage
   assert(read(path.join(__dirname, 'fidelity-ai.js')).includes(required), `fidelity-ai.js is missing ${required}`);
 }
 assert(!/language: '其他'/.test(read(path.join(__dirname, 'fidelity-openwa.js'))), 'a customer made from a WhatsApp chat must not get a preset language');
-assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');"), 'a refresh must not draw the page again under a list box that is being chosen from');
+assert(read(path.join(__dirname, 'fidelity-openwa.js')).includes("const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip, .composer-tools');"), 'a refresh must not draw the page again under a list box that is being chosen from');
 assert.equal((appJs.match(/\.language (===|!==) '其他'/g) || []).length, 1, 'whether a customer has a language is asked through aiCustomerLanguage, the only place that knows the old value');
-assert(appJs.includes("+aiLanguagePicker(c)+'</div>'") && appJs.includes("esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)"), 'the conversation must offer the choice of the customer\'s language and show it beside the message box');
+assert(appJs.includes("<div class=\"composer-tools\">'+aiLanguagePicker(c)+'<span class=\"language-hint\">'") && appJs.includes("esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)"), 'the message box must offer the choice of the customer\'s language and show it (plan 090: in its toolbar)');
 // The price list: a file a person uploads is read in the browser by pricefile.js — the built copy of
 // fidelity-pricefile.js, which the page loads before the app. Neither the reader nor the page module calls a
 // server or runs what a file holds, and the button "报价" puts a price into the message box without sending.
@@ -508,7 +508,7 @@ assert(!/\bsend\s*\(/.test(pricePage), 'the price list must not send a message')
 for (const required of ['function priceQuoteButton() {', 'function renderPriceList() {', 'window.WA_PRICE_FILE.read(new Uint8Array(await file.arrayBuffer()))', "fidButton('确认使用', 'priceUse', '', 'blue')", 'priceInsert: () => {', "box.dispatchEvent(new Event('input', { bubbles: true }));"]) {
   assert(pricePage.includes(required), `fidelity-pricelist.js is missing ${required}`);
 }
-for (const required of ["+priceQuoteButton()+'<span class=\"language-hint\">'", "ai:'AI 能力',prices:'价格表'}", 'ai:renderAiPage,prices:renderPriceList}', "renderItem('prices', views.prices)"]) {
+for (const required of ["+aiGuardHTML(c)+priceQuoteButton()+'<button type=\"button\" class=\"composer-chip\" data-action=\"quickAll\"", "ai:'AI 能力',prices:'价格表'}", 'ai:renderAiPage,prices:renderPriceList}', "renderItem('prices', views.prices)"]) {
   assert(appJs.includes(required), `app.js is missing ${required}`);
 }
 // In the rows of the list of conversations the dot of the number is drawn only when the number is not connected.
@@ -520,14 +520,14 @@ assert(openwaSource.includes("const state = a.state === 'online' ? '' : `<span c
 for (const required of ['function openwaMediaUrl(c, m) {', "'/api/wa/media?account=' + encodeURIComponent(owner.account)", 'function openwaMediaHTML(c, m) {', 'function openwaKeepPlaying(draw) {', "...(e.media?.name ? { file: e.media.name } : {})"]) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }
-assert(appJs.includes("<div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?"), 'a message bubble must show its media and the text under it');
+assert(appJs.includes("caption=openwaCaption(c,m),") && appJs.includes("<div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(caption?'<div class=\"message-text\">'+esc(caption)"), 'a message bubble must show its media and the text under it');
 // A file is attached to a message and sent with it: the button stands where the baseline had its made-up one, the
 // file goes to the server as it is, what the page sends is marked like every message, and what was just sent or
 // has just arrived stays in view.
 for (const required of ['function openwaAttachButton() {', "fetch('/api/wa/send-file', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([details, '\\n', item.file]) })", 'if (held) return openwaSendFiles(c, held, text, outgoing);', "if (item.caption !== caption) Object.assign(item, { caption, request: nextId('r') });", 'const OPENWA_FILES_MAX = 10;', "for (let first = true; held.list.length && !failed; first = false) failed = await openwaSendFile(c, held.list[0], first ? text : '', first ? caption : '');", 'for (const id of Object.keys(ui.attachments)) delete ui.attachments[id];', 'if (e.fromMe && openwaFiles.get(c.id)?.sending) message.translatedTo = aiSettings().readLanguage;', 'if (box && box.contains(event.target) && openwaAtEnd) openwaShowEnd();', 'requestAnimationFrame(openwaShowEnd);']) {
   assert(openwaSource.includes(required), `fidelity-openwa.js is missing ${required}`);
 }
-for (const required of ["<div class=\"composer-tools\">'+openwaAttachButton()+'<button class=\"icon-button\" data-action=\"quickAll\"", 'enabled=online&&(d.text.trim()||ui.attachment);']) {
+for (const required of ["<div class=\"composer-input\">'+openwaAttachButton()+'<textarea id=\"composer-text\"", 'enabled=online&&(d.text.trim()||ui.attachment);']) {
   assert(appJs.includes(required), `the built page is missing ${required}`);
 }
 assert(!/添加演示附件|data-action="attachment"/.test(appJs), 'the made-up attachment of the baseline must be gone');
@@ -652,6 +652,22 @@ for (const required of ['const OPENWA_SCAN_POLL_MS = 10000, OPENWA_BUSY_POLL_MS 
   assert(appJs.includes(required), `the QR dialog must ask the server less often (plan 091): ${required}`);
 }
 assert(!appJs.includes('setTimeout(() => openwaPoll(pair), 2000)'), 'the QR dialog must not ask every two seconds while a code waits to be scanned');
+// The WhatsApp API page (plan 090): 号码管理 is a page of its own in the place of 账号列表 — in the menu, among the tabs
+// and as an address —; the chat page has no switch and no row of page tabs; the number and the source sit in the
+// line under the customer's name; the time of a message is inside its bubble; the message box is a toolbar above
+// one bar.
+assert(appJs.includes("inbox:'WhatsApp API',numbers:'号码管理',") && !appJs.includes("accounts:'账号列表'"), '号码管理 must take the place of 账号列表 among the pages');
+assert(appJs.includes('numbers:renderOpenwaNumbers,') && appJs.includes("renderItem('numbers', views.numbers)") && appJs.includes("'dashboard','inbox','numbers'"), '号码管理 must be a page of its own, in the menu and among the tabs');
+assert(!appJs.includes('fid-wa-tabs') && !appJs.includes("if (fid.waTab === 'numbers') return renderOpenwaNumbers();"), 'the chat page must have no switch between numbers and chat');
+assert(appJs.includes("fidWaTab:id=>navigate(id==='numbers'?'numbers':'inbox'),"), 'a button that asks for 号码管理 must open its page');
+assert(appJs.includes("<a href=\"#numbers\" data-nav=\"numbers\">'+icon('Smartphone')+'号码管理</a></div></div>") && !appJs.includes("data-nav=\"accounts\">'+icon('Settings2')+'账号管理</a></div></div>"), 'the narrow-screen tools of a conversation must lead to 号码管理');
+assert(appJs.includes('<span class="openwa-chat-number">') && !appJs.includes('<div class="openwa-chat-status">'), 'the number of a chat must sit in the line under the customer\'s name');
+assert(appJs.includes("const meta='<span class=\"message-meta\">'") && appJs.includes("+esc(m.translated)+meta+'</div></div>'"), 'the time of a message must sit inside its bubble, at the end of its last line of text');
+assert(appJs.includes("<div class=\"composer-input\">'+openwaAttachButton()+'<textarea id=\"composer-text\"") && !appJs.includes('<div class="composer-foot">'), 'the message box must be one bar — + for files, the message, send — below its toolbar');
+const whatsappCss = read(path.join(__dirname, 'fidelity.css'));
+for (const required of ['.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }', '.fidelity .fid-wa .inbox-layout { height:calc(100dvh - 92px);', '.fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 240px); }', '.fidelity .message-meta { float:right;', '.fidelity .fid-wa .send-button .icon { display:block;']) {
+  assert(whatsappCss.includes(required), `fidelity.css is missing ${required}`);
+}
 const summary = {
   version: req.version,
   status: 'passed',
@@ -685,6 +701,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   qrPolling: 'the QR dialog (plan 091): while a code waits to be scanned it asks the server every 10 s (every 2 s while the code is prepared or checked), for at most 3 minutes; then it says the code expired and offers 刷新二维码; a scan that went through is told by the feed at once — a dialog left open no longer uses up OpenWA\'s limit of 1000 questions an hour',
+  whatsappPage: 'the WhatsApp API page (plan 090): 号码管理 is a page of its own in the place of 账号列表 (menu, tabs, #numbers; #accounts opens the home page); the chat page has no numbers/chat switch and no row of page tabs; the number and the source sit in the line under the customer\'s name; the strip takes one line where it fits; bubbles are WhatsApp-sized with the time inside; the message box is a toolbar (customer language, what a reply does, send guard, 报价, 快捷回复, keys) above one bar (+ for files, the message, send)',
   uiUpgradeWithdrawn: 'the UI upgrade of plans 081–087 (font, colours, chat-page layout, tables, dialogs, supervisor page) is withdrawn at the owner\'s request; kept: a dialog\'s footer stays in view while a long dialog scrolls, and the customer list\'s thirteen columns add up to 100%',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',

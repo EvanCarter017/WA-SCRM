@@ -673,7 +673,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fid-wa-tabs { display:inline-flex; flex-shrink:0; border:var(--fid-px-1) solid var(--fid-frame); background:var(--color-surface); padding:var(--fid-px-3); gap:var(--fid-px-2); border-radius:var(--fid-px-10); }
 .fid-wa-tabs .fid-btn { min-width:var(--fid-px-107); height:var(--fid-px-36); border:0; border-radius:var(--fid-px-8); font-size:var(--fid-px-14); }
 .fid-wa-tabs .fid-btn.gradient { box-shadow:0 var(--fid-px-2) var(--fid-px-5) color-mix(in srgb,var(--fid-royal) 30%,transparent); }
-.fidelity .fid-wa .inbox-layout { height:calc(100dvh - var(--fid-px-203)); min-height:var(--fid-px-400); grid-template-columns:var(--fid-px-300) minmax(0,1fr) var(--fid-px-52); background:var(--color-surface); border-radius:var(--fid-px-15); border:var(--fid-px-1) solid var(--fid-frame); overflow:hidden; }
+.fidelity .fid-wa .inbox-layout { height:calc(100dvh - var(--fid-px-92)); min-height:var(--fid-px-400); grid-template-columns:var(--fid-px-300) minmax(0,1fr) var(--fid-px-52); background:var(--color-surface); border-radius:var(--fid-px-15); border:var(--fid-px-1) solid var(--fid-frame); overflow:hidden; }
 .fidelity .fid-wa .conversation-top { padding:var(--fid-px-12); border-bottom:var(--fid-px-1) solid var(--fid-frame); }
 .fid-wa-active-filter { display:flex; align-items:center; justify-content:space-between; gap:var(--fid-px-6); border-radius:var(--fid-px-7); padding:var(--fid-px-2) var(--fid-px-4) var(--fid-px-2) var(--fid-px-9); background:var(--color-accent-soft); color:var(--fid-royal); font-size:var(--fid-px-12); }
 .fid-wa-active-filter .icon-button { width:var(--fid-px-26); height:var(--fid-px-26); color:inherit; }
@@ -763,6 +763,9 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(var(--fid-px-540),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); max-width:none; max-height:calc(100dvh - var(--fid-top) - var(--fid-px-28)); margin:auto; border:0; border-radius:var(--fid-px-10); box-shadow:0 var(--fid-px-16) var(--fid-px-40) rgba(0,0,0,.23); animation:none; background:var(--color-surface); color:var(--color-text); }
 .fidelity #dialog.fid-dialog::backdrop { background:rgba(0,0,0,.45); clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-240)); }
 .fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-64)); }
+/* The chat page has no row of page tabs (plan 090): there the backdrop starts below the top bar. */
+.fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-240)); }
+.fidelity:has(.nav-collapsed):has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-64)); }
 .fidelity #dialog.fid-wide { width:min(var(--fid-px-660),calc(100vw - var(--fid-sidebar) - var(--fid-px-36))); }
 .fidelity .fid-dialog .modal-head { min-height:var(--fid-px-50); padding:var(--fid-px-14) var(--fid-px-20) var(--fid-px-6); border-bottom:0; }
 .fidelity .fid-dialog .modal-head h2 { font-size:var(--fid-px-18); font-weight:750; }
@@ -808,6 +811,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
 @media(min-width:761px) and (max-width:920px) {
   .fidelity { --fid-sidebar:var(--fid-px-160); }
   .fidelity #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-107) 0 0 var(--fid-px-160)); }
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(var(--fid-px-56) 0 0 var(--fid-px-160)); }
   .fidelity .brand-name strong { font-size:var(--fid-px-15); }
   .fidelity .fid-wa .inbox-layout { grid-template-columns:var(--fid-px-230) minmax(0,1fr) var(--fid-px-48); }
 }
@@ -837,7 +841,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   .fid-pager .fid-jump { display:none; }
   .fid-wa,.fidelity .fid-wa.inbox-page { padding:var(--fid-px-12) var(--fid-px-12) var(--fid-px-10); gap:0; }
   .fid-wa-top { margin-bottom:var(--fid-px-11); }
-  .fidelity .fid-wa .inbox-layout { display:flex; min-height:0; height:calc(100dvh - var(--fid-px-178)); }
+  .fidelity .fid-wa .inbox-layout { display:flex; min-height:0; height:calc(100dvh - var(--fid-px-78)); }
   .openwa-panel-head { padding:var(--fid-px-12); }
   .fid-numbers-table { min-width:0; }
   .fid-numbers-table colgroup,.fid-numbers-table tr>:nth-child(n+3):nth-child(-n+5) { display:none; }
@@ -845,7 +849,7 @@ dialog>#toast,dialog>#toast.show{transform:none}
   .fid-numbers-table th:nth-child(2) { width:21%; }
   .fid-numbers-table th,.fid-numbers-table td { padding-inline:var(--fid-px-8); }
   .openwa-chat-status { padding-inline:var(--fid-px-10); }
-  .fidelity .openwa-chat-status + .source-strip + .connection-banner>div>span { display:block; }
+  .fidelity .source-strip + .connection-banner>div>span { display:block; }
   .fidelity #dialog.fid-dialog { inset:0; max-height:calc(100dvh - var(--fid-px-24)); }
   .fidelity #dialog.fid-dialog::backdrop,.fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:none; }
   .fid-form-row { grid-template-columns:minmax(0,1fr); gap:var(--fid-px-4); margin-bottom:var(--fid-px-12); }
@@ -1150,6 +1154,53 @@ dialog>#toast,dialog>#toast.show{transform:none}
 /* On a narrow screen the two lists keep a width that can be read and are moved sideways inside their frame. */
 .fid-master-table { min-width:var(--fid-px-820); }
 .fid-master-table.fid-master-accounts { min-width:var(--fid-px-640); }
+
+/* The WhatsApp API page (plan 090). 号码管理 is a page of its own; the chat page has no row of page tabs and no switch,
+   so the conversation reaches up to the top bar. The number and the source sit in the line under the customer's
+   name; the strip is one line. Bubbles are WhatsApp-sized, with the time inside at the end of the last line of
+   text; the message box is a slim toolbar above one bar: + for files, the message, send. */
+.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }
+.fid-wa-numbers .fid-wa-top { justify-content:flex-end; }
+.fidelity .fid-wa .chat-heading { min-height:0; padding:var(--fid-px-8) var(--fid-px-14); }
+.fidelity .fid-wa .chat-person { min-width:0; }
+.fidelity .fid-wa .chat-person .customer-sub { flex-wrap:nowrap; white-space:nowrap; overflow:hidden; min-width:0; }
+.fidelity .fid-wa .chat-person .customer-sub>span { flex:none; }
+.fidelity .fid-wa .chat-person .customer-sub>span:last-child { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.fidelity .fid-wa .chat-pane .source-strip { display:none; }
+.fidelity .messages { gap:var(--fid-px-4); padding:var(--fid-px-10) 6% var(--fid-px-8); }
+.fidelity .message-row,.fidelity .message-row.out { max-width:min(65%,var(--fid-px-520)); }
+.fidelity .message-row + .message-row { margin-top:0; }
+.fidelity .message-bubble { padding:var(--fid-px-6) var(--fid-px-9) var(--fid-px-7); border-radius:var(--fid-px-8); display:flow-root; }
+.fidelity .message-row.out .message-bubble { border-radius:var(--fid-px-8); }
+.fidelity .message-text { line-height:var(--fid-px-19); display:flow-root; }
+.fidelity .message-translation { margin-top:var(--fid-px-4); padding-top:var(--fid-px-4); line-height:var(--fid-px-18); }
+.fidelity .message-translation>div { display:flow-root; }
+.fidelity .translation-label { margin-bottom:var(--fid-px-1); font-size:var(--fid-px-11); }
+.fidelity .message-meta { float:right; display:inline-flex; align-items:center; gap:var(--fid-px-3); margin:var(--fid-px-5) 0 var(--fid-px-neg-4) var(--fid-px-10); font-size:var(--fid-px-11); line-height:var(--fid-px-15); color:var(--color-text-muted); user-select:none; }
+.fidelity .message-meta .icon { width:var(--fid-px-14); height:var(--fid-px-14); }
+.fidelity .day-separator { width:max-content; margin:var(--fid-px-6) auto; padding:var(--fid-px-2) var(--fid-px-10); border-radius:var(--fid-px-7); background:var(--color-surface); }
+.fidelity .day-separator::before,.fidelity .day-separator::after { display:none; }
+.fidelity .fid-wa .composer { display:grid; gap:var(--fid-px-6); padding:var(--fid-px-6) var(--fid-px-14) var(--fid-px-10); }
+.fidelity .fid-wa .composer-tools { display:flex; flex-wrap:wrap; align-items:center; gap:var(--fid-px-4) var(--fid-px-8); min-width:0; font-size:var(--fid-px-12); }
+.fidelity .fid-wa .composer-tools>* { flex:none; margin:0; }
+.fidelity .fid-wa .composer-tools .ai-language-pick { margin:0; }
+.fidelity .fid-wa .composer-tools .ai-language-pick .fid-select { width:auto; max-width:var(--fid-px-120); }
+.fidelity .fid-wa .composer-tools .language-hint { max-width:none; }
+.fidelity .fid-wa .composer-tools .ai-shortcut-gear { width:var(--fid-px-26); height:var(--fid-px-26); color:var(--color-text-muted); }
+.fidelity .fid-wa .composer-tools .ai-shortcut-gear .icon { width:var(--fid-px-15); height:var(--fid-px-15); }
+.composer-chip { display:inline-flex; align-items:center; gap:var(--fid-px-4); padding:var(--fid-px-2) var(--fid-px-8); border:var(--fid-px-1) solid var(--fid-frame); border-radius:var(--fid-px-999); background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:var(--fid-px-12); cursor:pointer; }
+.composer-chip:hover { border-color:var(--color-accent); color:var(--color-accent); }
+.composer-chip:focus-visible { outline:var(--fid-px-2) solid var(--color-accent); outline-offset:var(--fid-px-1); }
+.composer-chip .icon { width:var(--fid-px-14); height:var(--fid-px-14); }
+.fidelity .fid-wa .composer-tools .composer-keys { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; color:var(--color-text-muted); }
+.composer-keys .icon { width:var(--fid-px-13); height:var(--fid-px-13); margin-right:var(--fid-px-3); vertical-align:var(--fid-px-neg-2); }
+.fidelity .fid-wa .composer-input { display:flex; align-items:flex-end; gap:var(--fid-px-8); padding:0; border:0; background:none; box-shadow:none; }
+.fidelity .fid-wa .composer-input [data-action="openwaAttach"] { width:var(--fid-px-42); height:var(--fid-px-42); border-radius:50%; flex:none; }
+.fidelity .fid-wa .composer-input textarea { flex:1; min-width:0; min-height:var(--fid-px-42); height:var(--fid-px-42); max-height:var(--fid-px-140); field-sizing:content; padding:var(--fid-px-10) var(--fid-px-16); border:var(--fid-px-1) solid var(--color-border-input); border-radius:var(--fid-px-21); background:var(--color-surface); resize:none; font-size:var(--fid-px-14); line-height:var(--fid-px-20); }
+.fidelity .fid-wa .composer-input textarea:focus-visible { outline:var(--fid-px-2) solid var(--color-accent); outline-offset:var(--fid-px-1); }
+.fidelity .fid-wa .send-button { width:var(--fid-px-42); height:var(--fid-px-42); min-height:0; padding:0; border-radius:50%; display:grid; place-items:center; flex:none; }
+.fidelity .fid-wa .send-button .icon { display:block; width:var(--fid-px-18); height:var(--fid-px-18); }
+@media(max-width:760px) { .fidelity .fid-wa .composer-tools .composer-keys { display:none; } }
 
 .dash {
   --dash-ink: var(--color-text);
@@ -3083,4 +3134,17 @@ dialog>#toast,dialog>#toast.show{transform:none}
 }
 .fidelity #dialog.drawer.lc-dossier-drawer > #toast {
   bottom: calc(var(--lc-dossier-foot, var(--fid-px-0)) + var(--fid-px-20));
+}
+
+/* The strip above a conversation takes one line on the WhatsApp API page where it fits, and a second one where the
+   conversation is narrow (plan 090); below 1600 px its four buttons show their icons only, and their names when
+   pointed at. */
+@media (min-width: 761px) {
+  .fidelity .fid-wa .lc-chat-strip { gap: var(--fid-px-6); padding: var(--fid-px-6) var(--fid-px-14); }
+  .fidelity .fid-wa .lc-chat-strip .tag-row { flex: 0 1 auto; min-width: 0; }
+  .fidelity .fid-wa .lc-chat-strip-right { margin-left: auto; width: auto; flex-wrap: nowrap; gap: var(--fid-px-4); }
+}
+@media (min-width: 761px) and (max-width: 1599px) {
+  .fidelity .fid-wa .lc-chat-strip-right .fid-btn { width: var(--fid-px-30); padding: 0; gap: 0; justify-content: center; font-size: 0; }
+  .fidelity .fid-wa .lc-chat-strip-right .fid-btn .icon { width: var(--fid-px-15); height: var(--fid-px-15); }
 }

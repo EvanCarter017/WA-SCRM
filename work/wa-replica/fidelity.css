@@ -232,7 +232,7 @@
 .fid-wa-tabs { display:inline-flex; flex-shrink:0; border:1px solid var(--fid-frame); background:var(--color-surface); padding:3px; gap:2px; border-radius:10px; }
 .fid-wa-tabs .fid-btn { min-width:107px; height:36px; border:0; border-radius:8px; font-size:14px; }
 .fid-wa-tabs .fid-btn.gradient { box-shadow:0 2px 5px color-mix(in srgb,var(--fid-royal) 30%,transparent); }
-.fidelity .fid-wa .inbox-layout { height:calc(100dvh - 203px); min-height:400px; grid-template-columns:300px minmax(0,1fr) 52px; background:var(--color-surface); border-radius:15px; border:1px solid var(--fid-frame); overflow:hidden; }
+.fidelity .fid-wa .inbox-layout { height:calc(100dvh - 92px); min-height:400px; grid-template-columns:300px minmax(0,1fr) 52px; background:var(--color-surface); border-radius:15px; border:1px solid var(--fid-frame); overflow:hidden; }
 .fidelity .fid-wa .conversation-top { padding:12px; border-bottom:1px solid var(--fid-frame); }
 .fid-wa-active-filter { display:flex; align-items:center; justify-content:space-between; gap:6px; border-radius:7px; padding:2px 4px 2px 9px; background:var(--color-accent-soft); color:var(--fid-royal); font-size:12px; }
 .fid-wa-active-filter .icon-button { width:26px; height:26px; color:inherit; }
@@ -322,6 +322,9 @@
 .fidelity #dialog.fid-dialog { position:fixed; inset:var(--fid-top) 0 0 var(--fid-sidebar); width:min(540px,calc(100vw - var(--fid-sidebar) - 36px)); max-width:none; max-height:calc(100dvh - var(--fid-top) - 28px); margin:auto; border:0; border-radius:10px; box-shadow:0 16px 40px rgba(0,0,0,.23); animation:none; background:var(--color-surface); color:var(--color-text); }
 .fidelity #dialog.fid-dialog::backdrop { background:rgba(0,0,0,.45); clip-path:inset(107px 0 0 240px); }
 .fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:inset(107px 0 0 64px); }
+/* The chat page has no row of page tabs (plan 090): there the backdrop starts below the top bar. */
+.fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 240px); }
+.fidelity:has(.nav-collapsed):has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 64px); }
 .fidelity #dialog.fid-wide { width:min(660px,calc(100vw - var(--fid-sidebar) - 36px)); }
 .fidelity .fid-dialog .modal-head { min-height:50px; padding:14px 20px 6px; border-bottom:0; }
 .fidelity .fid-dialog .modal-head h2 { font-size:18px; font-weight:750; }
@@ -367,6 +370,7 @@
 @media(min-width:761px) and (max-width:920px) {
   .fidelity { --fid-sidebar:160px; }
   .fidelity #dialog.fid-dialog::backdrop { clip-path:inset(107px 0 0 160px); }
+  .fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 160px); }
   .fidelity .brand-name strong { font-size:15px; }
   .fidelity .fid-wa .inbox-layout { grid-template-columns:230px minmax(0,1fr) 48px; }
 }
@@ -396,7 +400,7 @@
   .fid-pager .fid-jump { display:none; }
   .fid-wa,.fidelity .fid-wa.inbox-page { padding:12px 12px 10px; gap:0; }
   .fid-wa-top { margin-bottom:11px; }
-  .fidelity .fid-wa .inbox-layout { display:flex; min-height:0; height:calc(100dvh - 178px); }
+  .fidelity .fid-wa .inbox-layout { display:flex; min-height:0; height:calc(100dvh - 78px); }
   .openwa-panel-head { padding:12px; }
   .fid-numbers-table { min-width:0; }
   .fid-numbers-table colgroup,.fid-numbers-table tr>:nth-child(n+3):nth-child(-n+5) { display:none; }
@@ -404,7 +408,7 @@
   .fid-numbers-table th:nth-child(2) { width:21%; }
   .fid-numbers-table th,.fid-numbers-table td { padding-inline:8px; }
   .openwa-chat-status { padding-inline:10px; }
-  .fidelity .openwa-chat-status + .source-strip + .connection-banner>div>span { display:block; }
+  .fidelity .source-strip + .connection-banner>div>span { display:block; }
   .fidelity #dialog.fid-dialog { inset:0; max-height:calc(100dvh - 24px); }
   .fidelity #dialog.fid-dialog::backdrop,.fidelity:has(.nav-collapsed) #dialog.fid-dialog::backdrop { clip-path:none; }
   .fid-form-row { grid-template-columns:minmax(0,1fr); gap:4px; margin-bottom:12px; }
@@ -709,3 +713,50 @@
 /* On a narrow screen the two lists keep a width that can be read and are moved sideways inside their frame. */
 .fid-master-table { min-width:820px; }
 .fid-master-table.fid-master-accounts { min-width:640px; }
+
+/* The WhatsApp API page (plan 090). 号码管理 is a page of its own; the chat page has no row of page tabs and no switch,
+   so the conversation reaches up to the top bar. The number and the source sit in the line under the customer's
+   name; the strip is one line. Bubbles are WhatsApp-sized, with the time inside at the end of the last line of
+   text; the message box is a slim toolbar above one bar: + for files, the message, send. */
+.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }
+.fid-wa-numbers .fid-wa-top { justify-content:flex-end; }
+.fidelity .fid-wa .chat-heading { min-height:0; padding:8px 14px; }
+.fidelity .fid-wa .chat-person { min-width:0; }
+.fidelity .fid-wa .chat-person .customer-sub { flex-wrap:nowrap; white-space:nowrap; overflow:hidden; min-width:0; }
+.fidelity .fid-wa .chat-person .customer-sub>span { flex:none; }
+.fidelity .fid-wa .chat-person .customer-sub>span:last-child { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.fidelity .fid-wa .chat-pane .source-strip { display:none; }
+.fidelity .messages { gap:4px; padding:10px 6% 8px; }
+.fidelity .message-row,.fidelity .message-row.out { max-width:min(65%,520px); }
+.fidelity .message-row + .message-row { margin-top:0; }
+.fidelity .message-bubble { padding:6px 9px 7px; border-radius:8px; display:flow-root; }
+.fidelity .message-row.out .message-bubble { border-radius:8px; }
+.fidelity .message-text { line-height:19px; display:flow-root; }
+.fidelity .message-translation { margin-top:4px; padding-top:4px; line-height:18px; }
+.fidelity .message-translation>div { display:flow-root; }
+.fidelity .translation-label { margin-bottom:1px; font-size:11px; }
+.fidelity .message-meta { float:right; display:inline-flex; align-items:center; gap:3px; margin:5px 0 -4px 10px; font-size:11px; line-height:15px; color:var(--color-text-muted); user-select:none; }
+.fidelity .message-meta .icon { width:14px; height:14px; }
+.fidelity .day-separator { width:max-content; margin:6px auto; padding:2px 10px; border-radius:7px; background:var(--color-surface); }
+.fidelity .day-separator::before,.fidelity .day-separator::after { display:none; }
+.fidelity .fid-wa .composer { display:grid; gap:6px; padding:6px 14px 10px; }
+.fidelity .fid-wa .composer-tools { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; min-width:0; font-size:12px; }
+.fidelity .fid-wa .composer-tools>* { flex:none; margin:0; }
+.fidelity .fid-wa .composer-tools .ai-language-pick { margin:0; }
+.fidelity .fid-wa .composer-tools .ai-language-pick .fid-select { width:auto; max-width:120px; }
+.fidelity .fid-wa .composer-tools .language-hint { max-width:none; }
+.fidelity .fid-wa .composer-tools .ai-shortcut-gear { width:26px; height:26px; color:var(--color-text-muted); }
+.fidelity .fid-wa .composer-tools .ai-shortcut-gear .icon { width:15px; height:15px; }
+.composer-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border:1px solid var(--fid-frame); border-radius:999px; background:var(--color-surface); color:var(--fid-ink); font:inherit; font-size:12px; cursor:pointer; }
+.composer-chip:hover { border-color:var(--color-accent); color:var(--color-accent); }
+.composer-chip:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }
+.composer-chip .icon { width:14px; height:14px; }
+.fidelity .fid-wa .composer-tools .composer-keys { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; color:var(--color-text-muted); }
+.composer-keys .icon { width:13px; height:13px; margin-right:3px; vertical-align:-2px; }
+.fidelity .fid-wa .composer-input { display:flex; align-items:flex-end; gap:8px; padding:0; border:0; background:none; box-shadow:none; }
+.fidelity .fid-wa .composer-input [data-action="openwaAttach"] { width:42px; height:42px; border-radius:50%; flex:none; }
+.fidelity .fid-wa .composer-input textarea { flex:1; min-width:0; min-height:42px; height:42px; max-height:140px; field-sizing:content; padding:10px 16px; border:1px solid var(--color-border-input); border-radius:21px; background:var(--color-surface); resize:none; font-size:14px; line-height:20px; }
+.fidelity .fid-wa .composer-input textarea:focus-visible { outline:2px solid var(--color-accent); outline-offset:1px; }
+.fidelity .fid-wa .send-button { width:42px; height:42px; min-height:0; padding:0; border-radius:50%; display:grid; place-items:center; flex:none; }
+.fidelity .fid-wa .send-button .icon { display:block; width:18px; height:18px; }
+@media(max-width:760px) { .fidelity .fid-wa .composer-tools .composer-keys { display:none; } }

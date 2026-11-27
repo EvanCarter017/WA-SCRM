@@ -5,8 +5,8 @@ window.WA_START = () => {
   const UI_KEY=KEY+':'+window.WA_SITE.user.username;
   let saved=null;try{saved=JSON.parse(localStorage.getItem(UI_KEY)||'null')}catch(e){}
   let data=window.WA_SITE.data;
-  const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',team:'组织架构',members:'账号管理',ai:'AI 能力',prices:'价格表'};
-  const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';
+  const views={dashboard:'首页',inbox:'WhatsApp API',numbers:'号码管理',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',team:'组织架构',members:'账号管理',ai:'AI 能力',prices:'价格表'};
+  const defaultTab=new URLSearchParams(location.search).get('tab'),defaultView=defaultTab==='numbers'?'numbers':defaultTab==='chat'?'inbox':'dashboard';
   const subsiteMember=data.members.find(m=>m.id===window.WA_SITE.user.username);
   const ui={view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView,persona:subsiteMember.id,customer:data.customers[0]?.id||'',account:'all',conversationFilter:'all',query:'',customerQuery:'',customerTag:'all',customerStage:'all',customerOwner:'all',tagScope:'team',taskFilter:'pending',profileTab:'details',mobileChat:false,selected:new Set(),drafts:saved?.drafts||{},noteDrafts:saved?.noteDrafts||{},attachments:saved?.attachments||{},profileOpen:saved?.profileOpen!==false,receiveTranslation:saved?.receiveTranslation!==false,attachment:null};
   Object.assign(ui,{openTabs:saved?.openTabs||['inbox','accounts','customers','tags','followups'],navCollapsed:saved?.navCollapsed||false,customerNavOpen:true,accountQuery:'',accountStatus:'all',tagGroup:'all',tagQuery:'',pages:{},pageSizes:{}});
@@ -83,7 +83,7 @@ window.WA_START = () => {
     if(!renderSignInState())return;
     const active=document.activeElement,action=active?.dataset?.action,actionId=active?.dataset?.id,activeId=active?.id,stage=active?.dataset?.stage,nav=active?.dataset?.nav;
     const old=$('#messages'),position=old?{customer:old.dataset.customer,top:old.scrollTop,bottom:old.scrollHeight-old.clientHeight-old.scrollTop}:null;
-    renderNav();const pages={dashboard:renderDashboard,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,ai:renderAiPage,prices:renderPriceList};
+    renderNav();const pages={dashboard:renderDashboard,numbers:renderOpenwaNumbers,inbox:renderInbox,accounts:renderAccounts,customers:renderCustomers,tags:renderTags,followups:renderFollowups,team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,ai:renderAiPage,prices:renderPriceList};
     $('#view').innerHTML=pages[ui.view]();paintIcons();
     if(ui.view==='inbox')requestAnimationFrame(()=>{const el=$('#messages');if(el)el.scrollTop=position&&position.customer===el.dataset.customer&&position.bottom>40?position.top:el.scrollHeight});
     let target=activeId?document.getElementById(activeId):null;
@@ -103,18 +103,18 @@ window.WA_START = () => {
     return '<section class="inbox-page"><div class="workspace-switch" aria-label="WhatsApp 工作区"><a class="active" href="#inbox" data-nav="inbox">'+icon('MessagesSquare')+'聚合会话</a><a href="#accounts" data-nav="accounts">'+icon('PanelsTopLeft')+'账号列表</a></div><div class="inbox-layout '+(ui.mobileChat?'mobile-chat':'mobile-list')+'"><section class="conversation-pane" aria-label="会话列表"><div class="conversation-top"><div class="conversation-title"><h1>客户会话 <span>'+myCustomers().filter(c=>ui.account==='all'||c.account===ui.account).length+'</span></h1><button class="icon-button" data-action="addCustomer" aria-label="新增客户">'+icon('SquarePen')+'</button></div><div class="account-select">'+icon('MessageCircle')+'<select id="account-filter" aria-label="按 WhatsApp 账号查看">'+option('all',manager()?'全部团队账号':'我的全部账号',ui.account)+myAccounts().map(a=>option(a.id,a.name+(a.state!=='online'?' · 待连接':''),ui.account)).join('')+'</select>'+icon('ChevronDown')+'</div><label class="search-field">'+icon('Search')+'<input id="conversation-search" aria-label="搜索会话" placeholder="搜索客户或号码…" value="'+esc(ui.query)+'"></label><div class="chips" role="group" aria-label="会话筛选">'+[['all','全部'],['unread','未读'],['reply','待回复'],['star','星标']].map(([id,title])=>'<button class="chip '+(ui.conversationFilter===id?'active':'')+'" data-action="conversationFilter" data-id="'+id+'" aria-pressed="'+(ui.conversationFilter===id)+'">'+title+'</button>').join('')+'</div></div><div class="conversation-list" id="conversation-list">'+conversationRows()+'</div><div class="conversation-footer">'+icon('ShieldCheck')+(manager()?'当前为团队视角':'当前为我的工作范围')+'</div></section>'+(c?chatHTML(c):'<section class="chat-pane"><div class="chat-empty">'+empty('选择客户后继续沟通','也可以新建一位客户。')+'</div></section>')+toolsRailHTML(c)+'</div></section>';
   }
   function chatHTML(c) {
-    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(aiLanguageLabel(c))+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span>'+aiLanguagePicker(c)+'</div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
+    const a=account(c.account),online=a?.state==='online';return '<section class="chat-pane" aria-label="'+esc(c.name)+'的会话"><div class="chat-heading"><button class="icon-button back-list" data-action="backList" aria-label="返回会话列表">'+icon('ArrowLeft')+'</button>'+avatar(c)+'<div class="chat-person"><h2>'+esc(c.name)+'</h2><div class="customer-sub"><span>'+esc(a?.name)+'</span><span class="separator"></span><span>'+esc(aiLanguageLabel(c))+'</span></div></div><div class="chat-heading-actions"><button class="icon-button star-action '+(c.star?'active':'')+'" data-action="star" data-id="'+c.id+'" aria-label="'+(c.star?'取消星标':'星标客户')+'" aria-pressed="'+c.star+'">'+icon('Star')+'</button><button class="button small" data-action="followup" data-id="'+c.id+'">'+icon('CalendarPlus')+'安排跟进</button><button class="icon-button mobile-profile" data-action="profile" data-id="'+c.id+'" aria-label="查看客户资料">'+icon('ContactRound')+'</button><button class="icon-button mobile-tools" data-action="chatTools" data-id="'+c.id+'" aria-label="更多会话工具">'+icon('EllipsisVertical')+'</button></div></div><div class="source-strip">'+icon(c.source==='Facebook 广告'?'Target':'Link')+'<strong>'+esc(c.source)+'</strong><span>'+esc(c.campaign||'客户来源')+'</span></div>'+(online?'':'<div class="connection-banner">'+icon('WifiOff')+'<div><strong>'+esc(a?.name||'账号')+' 待连接</strong><span>当前草稿会保留，连接后可继续处理。</span></div><button class="button small" data-action="connect" data-id="'+c.account+'">重新连接</button></div>')+'<div class="messages" id="messages" data-customer="'+c.id+'" role="log" aria-label="会话消息" tabindex="0">'+messagesHTML(c)+'</div>'+composerHTML(c)+'</section>';
   }
   function conversationMessages(c) {
     return data.messages[c.id]||(c.preview==='新建客户档案'?[]:[{id:'seed'+c.id,side:'in',text:c.preview,translated:c.translation,time:c.last}]);
   }
   function messagesHTML(c,{list=conversationMessages(c),showTranslation=ui.receiveTranslation,emptyHint='输入消息，或选择快捷回复开始。'}={}) {
     if(!list.length)return empty('还没有会话消息',emptyHint);
-    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class="message-text">'+esc(openwaCaption(c,m))+'</div>':'')+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.translated&&showTranslation?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');
+    let lastDay='';return list.map(m=>{const day=openwaDayLabel(m),separator=day!==lastDay?'<div class="day-separator">'+day+'</div>':'';lastDay=day;const meta='<span class="message-meta">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</span>',caption=openwaCaption(c,m),shown=m.translated&&showTranslation;return separator+'<div class="message-row '+(m.side==='out'?'out':'')+'"><div><div class="message-bubble">'+openwaMediaHTML(c,m)+(caption?'<div class="message-text">'+esc(caption)+(shown?'':meta)+'</div>':'')+(m.attachment?'<div class="attachment">'+icon('File')+esc(m.attachment)+'</div>':'')+(shown?'<div class="message-translation"><span class="translation-label">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+meta+'</div></div>':'')+(caption||shown?'':meta)+'</div></div></div>'}).join('');
   }
   function composerHTML(c) {
     const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&(d.text.trim()||ui.attachment);
-    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-input"><textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><div class="composer-controls"><div class="composer-tools">'+openwaAttachButton()+'<button class="icon-button" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'</button>'+priceQuoteButton()+'<span class="language-hint">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class="composer-foot"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'草稿自动保存':'号码待连接 · 草稿已保留')+'</span></div></div>';
+    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-tools">'+aiLanguagePicker(c)+'<span class="language-hint">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()+'<button type="button" class="composer-chip" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'<span>快捷回复</span></button><span class="composer-keys">'+icon('Keyboard')+aiEnterHint(c)+'</span></div><div class="composer-input">'+openwaAttachButton()+'<textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>'+icon('Send')+'</button></div></div>';
   }
   function previewHTML(c){const d=draft(c);if(!d.translated&&!ui.attachment)return '';return (d.translated?'<div class="translation-preview"><small>发送前预览 · '+esc(c.language)+'译文</small>'+esc(d.translated)+'</div>':'')+(ui.attachment?'<div class="translation-preview"><small>附件</small>'+esc(ui.attachment)+' <button class="link" data-action="removeAttachment">移除</button></div>':'')}
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
@@ -199,7 +199,7 @@ window.WA_START = () => {
   function paged(list,view){const size=ui.pageSizes[view]||10,max=Math.max(0,Math.ceil(list.length/size)-1);ui.pages[view]=Math.min(max,Math.max(0,ui.pages[view]||0));return list.slice(ui.pages[view]*size,(ui.pages[view]+1)*size)}
   function rowNumber(view,i){return (ui.pages[view]||0)*(ui.pageSizes[view]||10)+i+1}
   function pagerHTML(total,view){const size=ui.pageSizes[view]||10,max=Math.max(1,Math.ceil(total/size)),page=Math.min(max,(ui.pages[view]||0)+1);return '<div class="pagination" id="'+view+'-pager"><span class="total-count">共 '+total+' 条</span><select data-page-size="'+view+'" aria-label="'+views[view]+'每页数量">'+[10,20,50].map(n=>option(String(n),n+'条/页',String(size))).join('')+'</select><button class="icon-button" data-action="turnPage" data-id="-1" data-view="'+view+'" aria-label="'+views[view]+'上一页"'+(page===1?' disabled':'')+'>'+icon('ChevronLeft')+'</button><span class="page-current">'+page+'</span><button class="icon-button" data-action="turnPage" data-id="1" data-view="'+view+'" aria-label="'+views[view]+'下一页"'+(page===max?' disabled':'')+'>'+icon('ChevronRight')+'</button><span class="jump-label">前往</span><input type="number" min="1" max="'+max+'" value="'+page+'" data-page-jump="'+view+'" aria-label="'+views[view]+'页码"><span class="jump-label">页</span></div>'}
-  function openChatTools(id){modal('会话工具','<div class="modal-body"><div class="mobile-tool-menu"><button data-action="profile" data-id="'+id+'">'+icon('ContactRound')+'客户资料</button><button data-action="quickAll">'+icon('MessageSquareText')+'快捷回复</button><button data-action="followup" data-id="'+id+'">'+icon('CalendarPlus')+'安排跟进</button><button data-action="profileNote" data-id="'+id+'">'+icon('NotebookPen')+'客户备注</button><a href="#accounts" data-nav="accounts">'+icon('Settings2')+'账号管理</a></div></div>')}
+  function openChatTools(id){modal('会话工具','<div class="modal-body"><div class="mobile-tool-menu"><button data-action="profile" data-id="'+id+'">'+icon('ContactRound')+'客户资料</button><button data-action="quickAll">'+icon('MessageSquareText')+'快捷回复</button><button data-action="followup" data-id="'+id+'">'+icon('CalendarPlus')+'安排跟进</button><button data-action="profileNote" data-id="'+id+'">'+icon('NotebookPen')+'客户备注</button><a href="#numbers" data-nav="numbers">'+icon('Smartphone')+'号码管理</a></div></div>')}
   
   document.addEventListener('click',e=>{
     const nav=e.target.closest('[data-nav]');if(nav){if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();if($('#dialog').open)close();if(customerMenu.includes(nav.dataset.nav))ui.customerNavOpen=true;if(operationsMenu.includes(nav.dataset.nav))fid.operationsOpen=true;navigate(nav.dataset.nav);return}
@@ -356,7 +356,7 @@ window.WA_START = () => {
   fidSeed();
   ui.pageSizes.customers=20; ui.pageSizes.followups=20;
   ui.tagGroup=(fidGroupList().find(canEditGroup)||fidGroupList()[0])?.id||'all';
-  ui.openTabs=[...new Set(['dashboard','accounts','inbox',...customerMenu,...ui.openTabs])];
+  ui.openTabs=[...new Set(['dashboard','inbox','numbers',...customerMenu,...ui.openTabs])];
 
   function fidButton(label, action, glyph='', style='', attrs='') {
     return `<button type="button" class="fid-btn ${style}" ${action?`data-action="${action}"`:''} ${attrs}>${glyph?icon(glyph):''}${esc(label)}</button>`;
@@ -726,7 +726,7 @@ window.WA_START = () => {
     fidLogReset:()=>{fid.logFilter={start:'',end:'',app:'all',field:'customer',query:''};ui.pages.followups=0;render();},
     fidTasks:()=>{fid.followMode='todo';ui.pages.followups=0;navigate('followups');},
     fidLogHistory:()=>{fid.followMode='history';ui.pages.followups=0;render();},
-    fidWaTab:id=>{fid.waTab=id==='numbers'?'numbers':'chat';render();},
+    fidWaTab:id=>navigate(id==='numbers'?'numbers':'inbox'),
     fidChatFilters:()=>fidDialog('会话筛选','<div class="modal-body fid-conversation-filters">'+Object.entries(fidConversationFilters).map(([id,label])=>fidButton(label,'fidChatFilter','',ui.conversationFilter===id?'blue':'',`${fidActionID(id)} aria-pressed="${ui.conversationFilter===id}"`)).join('')+'</div>'),
     fidChatFilter:id=>{ui.conversationFilter=id;close();render();},
     fidClearChatFilter:()=>{ui.conversationFilter='all';render();$('#conversation-search')?.focus({preventScroll:true});},
@@ -1555,14 +1555,9 @@ window.WA_START = () => {
     return before !== a.state + '|' + a.linkState + '|' + a.number;
   }
 
-  function openwaTabs() {
-    return `<div class="fid-wa-top">
-      <div class="fid-wa-tabs" role="group" aria-label="WhatsApp 工作区">
-        ${fidButton('号码管理','fidWaTab','Smartphone',fid.waTab==='numbers'?'gradient':'',`${fidActionID('numbers')} aria-pressed="${fid.waTab==='numbers'}"`)}
-        ${fidButton('在线聊天','fidWaTab','MessageCircle',fid.waTab==='chat'?'gradient':'',`${fidActionID('chat')} aria-pressed="${fid.waTab==='chat'}"`)}
-      </div>
-      ${fid.waTab==='numbers'?fidButton('扫码绑定','openwaBind','QrCode','gradient'):''}
-    </div>`;
+  // 号码管理 is a page of its own (plan 090): the menu leads to it, and the chat page has no switch any more.
+  function openwaNumbersTop() {
+    return `<div class="fid-wa-top">${fidButton('扫码绑定','openwaBind','QrCode','gradient')}</div>`;
   }
 
   function renderOpenwaNumbers() {
@@ -1587,7 +1582,7 @@ window.WA_START = () => {
     const notice = !openwaServer ? '' : !openwaServer.configured ? '<span class="tag slate">服务器尚未接入 WhatsApp 连接</span>'
       : !openwaServer.reachable ? '<span class="tag slate">连接服务暂时不可用</span>' : '';
     return `<section class="fid-page fid-wa fid-wa-numbers">
-      ${openwaTabs()}
+      ${openwaNumbersTop()}
       <div class="fid-table-card openwa-panel">
         <div class="openwa-panel-head">${fidHead('号码管理','通过 OpenWA 关联 WhatsApp Business 号码。')}${notice}</div>
         ${fidTable('fid-numbers-table',['WhatsApp 号码','连接状态','负责人','会话','最近活跃','操作'],rows,'还没有号码，点击「扫码绑定」开始。',true,'Smartphone')}
@@ -1701,7 +1696,7 @@ window.WA_START = () => {
     render();
     const bind = pair.mode === 'bind';
     const action = bind ? 'openwaOpenChat' : 'openwaReturnToChat';
-    const inChat = ui.view === 'inbox' && fid.waTab === 'chat';
+    const inChat = ui.view === 'inbox';
     const label = !bind && inChat && fid.chatOpen ? '返回当前会话' : '进入在线聊天';
     openwaDialogContent(bind ? '绑定成功' : '连接已恢复', `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
       <div class="openwa-success-mark">${icon('Check')}</div>
@@ -1740,9 +1735,10 @@ window.WA_START = () => {
     // Beside a conversation, "online" reads as if the customer were online — which WhatsApp does not tell this
     // number. So the state of the employee's number is said here only when it is not connected.
     const state = a.state === 'online' ? '' : `<span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':'offline'}"></span>${openwaState(a)}</span>`;
-    chat = chat.replace('<div class="source-strip">', `<div class="openwa-chat-status">
-      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span>${state}
-    </div><div class="source-strip">`);
+    // The number, its state, and where the customer came from go into the line under the customer's name (plan
+    // 090), so that no rows of their own stand above the messages.
+    const source = `<span class="separator"></span><span>${esc(c.source || '未知来源')}${c.campaign ? ' · ' + esc(c.campaign) : ''}</span>`;
+    chat = chat.replace('</span></div></div><div class="chat-heading-actions">', `</span><span class="separator"></span><span class="openwa-chat-number">${esc(a.number)}</span>${state}${source}</div></div><div class="chat-heading-actions">`);
     if (a.state !== 'online') {
       chat = chat.replace(`${esc(a.name)} 待连接`, '发送已暂停')
         .replace('当前草稿会保留，连接后可继续处理。','草稿和聊天记录已保留。');
@@ -1754,7 +1750,6 @@ window.WA_START = () => {
   };
 
   renderInbox = function() {
-    if (fid.waTab === 'numbers') return renderOpenwaNumbers();
     const scope = myAccounts();
     const c = fid.chatOpen ? selectedCustomer() : null;
     const a = openwaVisibleAccount(ui.account);
@@ -1763,7 +1758,7 @@ window.WA_START = () => {
       ? (hasChat ? '选择左侧的会话开始聊天' : '这个号码还没有会话') : '扫码绑定后开始聊天';
     const rows = hasChat ? conversationRows() : (scope.length ? '<div class="fid-wa-empty">还没有会话</div>'
       : `<div class="fid-wa-empty">${fidButton('前往号码管理','fidWaTab','Smartphone','tint',fidActionID('numbers'))}</div>`);
-    return `<section class="inbox-page fid-wa"><h1 class="sr-only">WhatsApp API 在线聊天</h1>${openwaTabs()}
+    return `<section class="inbox-page fid-wa"><h1 class="sr-only">WhatsApp API 在线聊天</h1>
       <div class="inbox-layout ${ui.mobileChat&&c?'mobile-chat':'mobile-list'}">
         <section class="conversation-pane" aria-label="会话列表"><div class="conversation-top">
           <select class="fid-select fid-wa-select" id="account-filter" aria-label="按 WhatsApp 账号查看">
@@ -2180,7 +2175,7 @@ window.WA_START = () => {
   }
   function openwaRefresh() {
     if (openwaComposing) return void (openwaStale = true);
-    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');
+    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip, .composer-tools');
     if (chosenFrom && openwaHold !== -1) {
       openwaHold ||= setTimeout(() => {
         openwaHold = -1;
@@ -2290,7 +2285,7 @@ window.WA_START = () => {
     },
     openwaOpenChat,
     openwaReturnToChat:id=>{
-      if (ui.view !== 'inbox' || fid.waTab !== 'chat' || !fid.chatOpen) return openwaOpenChat(id);
+      if (ui.view !== 'inbox' || !fid.chatOpen) return openwaOpenChat(id);
       close();
       render();
       $('#composer-text')?.focus({preventScroll:true});
@@ -2726,7 +2721,7 @@ window.WA_START = () => {
   viewIcon = id => ({
     dashboard: 'LayoutDashboard',
     inbox: 'MessageCircle',
-    accounts: 'Smartphone',
+    numbers: 'Smartphone',
     customers: 'ContactRound',
     followups: 'ClipboardList',
     'chat-records': 'MessagesSquare',
@@ -2753,7 +2748,7 @@ window.WA_START = () => {
     return (
       renderItem('dashboard', views.dashboard) +
       renderItem('inbox', views.inbox) +
-      renderItem('accounts', views.accounts) +
+      renderItem('numbers', views.numbers) +
       '<div class="nav-caption">客户与跟进</div>' +
       navGroup('客户与跟进闭环', 'ContactRound', 'fidNavCustomers', ui.customerNavOpen, lcCustomerMenu) +
       (operationsMenu.length ? navGroup('运营管理', 'Images', 'fidNavOperations', fid.operationsOpen, operationsMenu) : '') +
@@ -3408,10 +3403,10 @@ window.WA_START = () => {
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
       <div class="lc-chat-strip-right">
-        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
-        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
-        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
-        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
+        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id) + ` title="${h.closed ? '重新跟进' : '安排跟进'}"`)}
+        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id) + ' title="设置标签"')}
+        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id) + ' title="移入聊天记录"')}
+        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id) + ' title="360° 档案"')}
       </div>
     </div>`;
     return html.replace('<div class="source-strip">', strip + '<div class="source-strip">');
@@ -4171,7 +4166,7 @@ window.WA_START = () => {
       button.outerHTML = aiGuardHTML(c);
       paintIcons($('.composer-tools'));
       aiRefreshDraftPreview(c);
-      const enter = $('.composer-foot span');
+      const enter = $('.composer-keys');
       if (enter) { enter.innerHTML = icon('Keyboard') + aiEnterHint(c); paintIcons(enter); }
     }
     toast(on ? '发送保护已开启。' : '发送保护已关闭，回复按原文直接发送。');

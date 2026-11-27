@@ -178,14 +178,9 @@
     return before !== a.state + '|' + a.linkState + '|' + a.number;
   }
 
-  function openwaTabs() {
-    return `<div class="fid-wa-top">
-      <div class="fid-wa-tabs" role="group" aria-label="WhatsApp 工作区">
-        ${fidButton('号码管理','fidWaTab','Smartphone',fid.waTab==='numbers'?'gradient':'',`${fidActionID('numbers')} aria-pressed="${fid.waTab==='numbers'}"`)}
-        ${fidButton('在线聊天','fidWaTab','MessageCircle',fid.waTab==='chat'?'gradient':'',`${fidActionID('chat')} aria-pressed="${fid.waTab==='chat'}"`)}
-      </div>
-      ${fid.waTab==='numbers'?fidButton('扫码绑定','openwaBind','QrCode','gradient'):''}
-    </div>`;
+  // 号码管理 is a page of its own (plan 090): the menu leads to it, and the chat page has no switch any more.
+  function openwaNumbersTop() {
+    return `<div class="fid-wa-top">${fidButton('扫码绑定','openwaBind','QrCode','gradient')}</div>`;
   }
 
   function renderOpenwaNumbers() {
@@ -210,7 +205,7 @@
     const notice = !openwaServer ? '' : !openwaServer.configured ? '<span class="tag slate">服务器尚未接入 WhatsApp 连接</span>'
       : !openwaServer.reachable ? '<span class="tag slate">连接服务暂时不可用</span>' : '';
     return `<section class="fid-page fid-wa fid-wa-numbers">
-      ${openwaTabs()}
+      ${openwaNumbersTop()}
       <div class="fid-table-card openwa-panel">
         <div class="openwa-panel-head">${fidHead('号码管理','通过 OpenWA 关联 WhatsApp Business 号码。')}${notice}</div>
         ${fidTable('fid-numbers-table',['WhatsApp 号码','连接状态','负责人','会话','最近活跃','操作'],rows,'还没有号码，点击「扫码绑定」开始。',true,'Smartphone')}
@@ -324,7 +319,7 @@
     render();
     const bind = pair.mode === 'bind';
     const action = bind ? 'openwaOpenChat' : 'openwaReturnToChat';
-    const inChat = ui.view === 'inbox' && fid.waTab === 'chat';
+    const inChat = ui.view === 'inbox';
     const label = !bind && inChat && fid.chatOpen ? '返回当前会话' : '进入在线聊天';
     openwaDialogContent(bind ? '绑定成功' : '连接已恢复', `<div id="openwa-dialog-body" class="modal-body openwa-pair-body">
       <div class="openwa-success-mark">${icon('Check')}</div>
@@ -363,9 +358,10 @@
     // Beside a conversation, "online" reads as if the customer were online — which WhatsApp does not tell this
     // number. So the state of the employee's number is said here only when it is not connected.
     const state = a.state === 'online' ? '' : `<span class="state-text ${a.state==='reconnect'?'warn':''}" role="status"><span class="state-dot ${a.state==='reconnect'?'warning':'offline'}"></span>${openwaState(a)}</span>`;
-    chat = chat.replace('<div class="source-strip">', `<div class="openwa-chat-status">
-      <span>${icon('Smartphone')}<b>${esc(a.number)}</b></span>${state}
-    </div><div class="source-strip">`);
+    // The number, its state, and where the customer came from go into the line under the customer's name (plan
+    // 090), so that no rows of their own stand above the messages.
+    const source = `<span class="separator"></span><span>${esc(c.source || '未知来源')}${c.campaign ? ' · ' + esc(c.campaign) : ''}</span>`;
+    chat = chat.replace('</span></div></div><div class="chat-heading-actions">', `</span><span class="separator"></span><span class="openwa-chat-number">${esc(a.number)}</span>${state}${source}</div></div><div class="chat-heading-actions">`);
     if (a.state !== 'online') {
       chat = chat.replace(`${esc(a.name)} 待连接`, '发送已暂停')
         .replace('当前草稿会保留，连接后可继续处理。','草稿和聊天记录已保留。');
@@ -377,7 +373,6 @@
   };
 
   renderInbox = function() {
-    if (fid.waTab === 'numbers') return renderOpenwaNumbers();
     const scope = myAccounts();
     const c = fid.chatOpen ? selectedCustomer() : null;
     const a = openwaVisibleAccount(ui.account);
@@ -386,7 +381,7 @@
       ? (hasChat ? '选择左侧的会话开始聊天' : '这个号码还没有会话') : '扫码绑定后开始聊天';
     const rows = hasChat ? conversationRows() : (scope.length ? '<div class="fid-wa-empty">还没有会话</div>'
       : `<div class="fid-wa-empty">${fidButton('前往号码管理','fidWaTab','Smartphone','tint',fidActionID('numbers'))}</div>`);
-    return `<section class="inbox-page fid-wa"><h1 class="sr-only">WhatsApp API 在线聊天</h1>${openwaTabs()}
+    return `<section class="inbox-page fid-wa"><h1 class="sr-only">WhatsApp API 在线聊天</h1>
       <div class="inbox-layout ${ui.mobileChat&&c?'mobile-chat':'mobile-list'}">
         <section class="conversation-pane" aria-label="会话列表"><div class="conversation-top">
           <select class="fid-select fid-wa-select" id="account-filter" aria-label="按 WhatsApp 账号查看">
@@ -803,7 +798,7 @@
   }
   function openwaRefresh() {
     if (openwaComposing) return void (openwaStale = true);
-    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip');
+    const chosenFrom = document.activeElement?.tagName === 'SELECT' && document.activeElement.closest('.lc-chat-strip, .source-strip, .composer-tools');
     if (chosenFrom && openwaHold !== -1) {
       openwaHold ||= setTimeout(() => {
         openwaHold = -1;
@@ -913,7 +908,7 @@
     },
     openwaOpenChat,
     openwaReturnToChat:id=>{
-      if (ui.view !== 'inbox' || fid.waTab !== 'chat' || !fid.chatOpen) return openwaOpenChat(id);
+      if (ui.view !== 'inbox' || !fid.chatOpen) return openwaOpenChat(id);
       close();
       render();
       $('#composer-text')?.focus({preventScroll:true});

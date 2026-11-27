@@ -40,8 +40,8 @@ swap('if(previous){module.decision=previous.decision;module.notes=previous.notes
       if(!revisedScope)module.decision=previous.decision;
       if(!revisedScope||previous.notes!==previousDefaultNotes[module.id])module.notes=previous.notes;
     }`);
-swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',inbox:'WhatsApp API',accounts:'账号列表',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
-  const defaultView=['numbers','chat'].includes(new URLSearchParams(location.search).get('tab'))?'inbox':'dashboard';`);
+swap("const views={inbox:'聚合会话',accounts:'WhatsApp账号',customers:'客户列表',tags:'标签管理',followups:'跟进管理',team:'团队与权限',scope:'功能范围'};", `const views={dashboard:'首页',inbox:'WhatsApp API',numbers:'号码管理',customers:'客户列表',followups:'跟进闭环','chat-records':'聊天记录',tags:'标签管理','tag-stats':'标签统计',materials:'素材管理',team:'组织架构',members:'账号管理',ai:'AI 能力',scope:'功能范围'};
+  const defaultTab=new URLSearchParams(location.search).get('tab'),defaultView=defaultTab==='numbers'?'numbers':defaultTab==='chat'?'inbox':'dashboard';`);
 swap("view:views[location.hash.slice(1)]?location.hash.slice(1):'inbox'", "view:Object.hasOwn(views,location.hash.slice(1))?location.hash.slice(1):defaultView");
 swap('  const ui={', "  const subsiteMember=window.WA_DEMO.members.find(m=>m.id==='lin');\n  const ui={");
 swap("persona:saved?.persona||'lin'", 'persona:subsiteMember.id');
@@ -56,7 +56,7 @@ swap('切换主管视角查看团队</h2><p>聊手默认只查看自己负责的
 swap('当前聊手只能使用公共标签，请切换主管视角维护。', '当前聊手可以使用公共标签，由主管维护。');
 js = js.replaceAll("ui.view==='team'&&!manager()", "['team','members'].includes(ui.view)&&!manager()").replaceAll("id!=='team'||manager()", "!['team','members'].includes(id)||manager()");
 swap('  function render() {\n', '  function render() {\n    if(!renderSignInState())return;\n');
-swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,inbox:renderInbox');
+swap('const pages={inbox:renderInbox', 'const pages={dashboard:renderDashboard,numbers:renderOpenwaNumbers,inbox:renderInbox');
 swap('team:renderTeam,scope:renderScope', "team:renderTeam,members:renderMembers,'chat-records':renderChatRecords,'tag-stats':renderTagStats,materials:renderMaterials,ai:renderAiPage,scope:renderScope");
 swap("'P-AUTO':'关键词自动回复、欢迎语及群发是否需要，本轮未预先纳入。'", "'P-AUTO':'关键词回复和欢迎语回复暂缓。','P-BROADCAST':'群发任务和在线聊天的群发功能暂缓。','P-LIFECYCLE':'客户全生命周期看板与阶段漏斗暂缓。','P-PIPELINES':'生命周期流程配置暂缓。','P-DEALS':'报价、订单与复购台账暂缓。','P-CHAT-REVIEW':'把 WhatsApp 会话的快照移入聊天记录，用于绩效复盘与审核。','P-AI':'翻译等 AI 功能经由统一接入点调用，可逐项启停并逐次记录用量。'");
 swap("'P-FOLLOW':'把跟进安排成待办，完成后回写客户记录。'", "'P-FOLLOW':'每位客户要么有下一步跟进，要么已明确结束跟进；以自定义标签辅助筛选。'");
@@ -241,10 +241,20 @@ swap(`<div class="message-bubble"><div class="message-text">'+esc(m.text)+'</div
 swap("<span>'+esc(c.language)+'</span></div></div><div class=\"chat-heading-acti", "<span>'+esc(aiLanguageLabel(c))+'</span></div></div><div class=\"chat-heading-acti");
 swap("<span class=\"language-hint\">'+icon('Languages')+esc(c.language)+' · '+aiDraftHint(c)+'</span>'", "<span class=\"language-hint\">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'");
 swap("hint.innerHTML=icon('Languages')+esc(c.language)+' · '+aiDraftHint(c);", "hint.innerHTML=icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c);");
-swap("<span>'+esc(c.campaign||'客户来源')+'</span></div>'", "<span>'+esc(c.campaign||'客户来源')+'</span>'+aiLanguagePicker(c)+'</div>'");
 // The price list (plan 037): the message box gets the button "报价" from fidelity-pricelist.js, after the button of
 // the quick replies.
 swap("+icon('MessageSquareText')+'</button><span class=\"language-hint\">'", "+icon('MessageSquareText')+'</button>'+priceQuoteButton()+'<span class=\"language-hint\">'");
+// The WhatsApp API page (plan 090). The time of a message sits inside its bubble, at the end of its last line of
+// text, as in WhatsApp.
+swap("lastDay=day;return separator+'<div class=\"message-row '+(m.side==='out'?'out':'')+'\"><div><div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(openwaCaption(c,m)?'<div class=\"message-text\">'+esc(openwaCaption(c,m))+'</div>':'')+(m.attachment?'<div class=\"attachment\">'+icon('File')+esc(m.attachment)+'</div>':'')+(m.translated&&showTranslation?'<div class=\"message-translation\"><span class=\"translation-label\">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+'</div></div>':'')+'</div><div class=\"message-meta\">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</div></div></div>'}).join('');",
+  "lastDay=day;const meta='<span class=\"message-meta\">'+esc(openwaTimeLabel(m))+(m.side==='out'?openwaMessageMark(m):'')+'</span>',caption=openwaCaption(c,m),shown=m.translated&&showTranslation;return separator+'<div class=\"message-row '+(m.side==='out'?'out':'')+'\"><div><div class=\"message-bubble\">'+openwaMediaHTML(c,m)+(caption?'<div class=\"message-text\">'+esc(caption)+(shown?'':meta)+'</div>':'')+(m.attachment?'<div class=\"attachment\">'+icon('File')+esc(m.attachment)+'</div>':'')+(shown?'<div class=\"message-translation\"><span class=\"translation-label\">'+icon('Languages')+'译文</span><div>'+esc(m.translated)+meta+'</div></div>':'')+(caption||shown?'':meta)+'</div></div></div>'}).join('');");
+// The message box: a slim toolbar — the customer's language (it was in the strip above the messages), what happens
+// to a reply, the send guard, 报价, 快捷回复 and the keys — above one bar like WhatsApp's: + for files, the message,
+// send.
+swap("return '<div class=\"composer\"><div id=\"translation-preview\">'+previewHTML(c)+'</div><div class=\"composer-input\"><textarea id=\"composer-text\" aria-label=\"消息内容\" placeholder=\"输入消息…\">'+esc(d.text)+'</textarea><div class=\"composer-controls\"><div class=\"composer-tools\">'+openwaAttachButton()+'<button class=\"icon-button\" data-action=\"quickAll\" aria-label=\"选择快捷回复\">'+icon('MessageSquareText')+'</button>'+priceQuoteButton()+'<span class=\"language-hint\">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+'</div><button class=\"send-button\" data-action=\"send\" aria-label=\"发送消息\"'+(!enabled?' disabled':'')+'>发送 '+icon('Send')+'</button></div></div><div class=\"composer-foot\"><span>'+icon('Keyboard')+aiEnterHint(c)+'</span><span>'+(online?'草稿自动保存':'号码待连接 · 草稿已保留')+'</span></div></div>';",
+  "return '<div class=\"composer\"><div id=\"translation-preview\">'+previewHTML(c)+'</div><div class=\"composer-tools\">'+aiLanguagePicker(c)+'<span class=\"language-hint\">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()+'<button type=\"button\" class=\"composer-chip\" data-action=\"quickAll\" aria-label=\"选择快捷回复\">'+icon('MessageSquareText')+'<span>快捷回复</span></button><span class=\"composer-keys\">'+icon('Keyboard')+aiEnterHint(c)+'</span></div><div class=\"composer-input\">'+openwaAttachButton()+'<textarea id=\"composer-text\" aria-label=\"消息内容\" placeholder=\"输入消息…\">'+esc(d.text)+'</textarea><button class=\"send-button\" data-action=\"send\" aria-label=\"发送消息\"'+(!enabled?' disabled':'')+'>'+icon('Send')+'</button></div></div>';");
+// The narrow-screen tools of a conversation lead to 号码管理, which took the place of 账号列表.
+swap("<a href=\"#accounts\" data-nav=\"accounts\">'+icon('Settings2')+'账号管理</a></div></div>')}", "<a href=\"#numbers\" data-nav=\"numbers\">'+icon('Smartphone')+'号码管理</a></div></div>')}");
 new vm.Script(js, {filename:'app.js'});
 
 const requirement = JSON.parse(read(base, 'requirements.json'));
