@@ -114,7 +114,7 @@ window.WA_START = () => {
   }
   function composerHTML(c) {
     const d=draft(c),online=account(c.account)?.state==='online',enabled=online&&(d.text.trim()||ui.attachment);
-    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-tools">'+aiLanguagePicker(c)+'<span class="language-hint">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()+'<button type="button" class="composer-chip" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'<span>快捷回复</span></button><span class="composer-keys">'+icon('Keyboard')+aiEnterHint(c)+'</span></div><div class="composer-input">'+openwaAttachButton()+'<textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>'+icon('Send')+'</button></div></div>';
+    return '<div class="composer"><div id="translation-preview">'+previewHTML(c)+'</div><div class="composer-tools">'+aiLanguagePicker(c)+'<span class="language-hint">'+icon('Languages')+esc(aiLanguageLabel(c))+' · '+aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()+'<button type="button" class="composer-chip" data-action="quickAll" aria-label="选择快捷回复">'+icon('MessageSquareText')+'<span>快捷回复</span></button>'+aiRewriteButton()+'<span class="composer-keys">'+icon('Keyboard')+aiEnterHint(c)+'</span></div><div class="composer-input">'+openwaAttachButton()+'<textarea id="composer-text" aria-label="消息内容" placeholder="输入消息…">'+esc(d.text)+'</textarea><button class="send-button" data-action="send" aria-label="发送消息"'+(!enabled?' disabled':'')+'>'+icon('Send')+'</button></div></div>';
   }
   function previewHTML(c){const d=draft(c);if(!d.translated&&!ui.attachment)return '';return (d.translated?'<div class="translation-preview"><small>发送前预览 · '+esc(c.language)+'译文</small>'+esc(d.translated)+'</div>':'')+(ui.attachment?'<div class="translation-preview"><small>附件</small>'+esc(ui.attachment)+' <button class="link" data-action="removeAttachment">移除</button></div>':'')}
   function localTime(c){try{return new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:c.timezone}).format(new Date())}catch(e){return '—'}}
@@ -3900,12 +3900,13 @@ window.WA_START = () => {
     { id: 'translate.inbound', name: '会话消息翻译', description: '把会话里的消息译为所选的译文语言，显示在原文下方。每条消息只翻译一次，译文保存后不再重复翻译；打开会话时补译还没有译文的消息。' },
     { id: 'translate.outbound', name: '发送前翻译', description: '把你输入的回复和快捷回复译为客户的语言，发送前可预览。' },
     { id: 'voice.transcribe', name: '语音转文字', description: '点击语音消息下方的「转文字」，把语音转成文字显示在语音下方；客户发来的语音还会译为所选的译文语言。' },
+    { id: 'reply.rewrite', name: '改写回复', description: '点击消息框上方的「改写」，按你的要求、以所选人设的身份和口吻改写输入的回复，并写成客户的语言；改写结果和它的意思显示在消息框上方，确认后再发送。' },
   ];
-  // The provider answers run(capabilityId, input) with a Promise of { text }: the page's own server relays the
-  // request to the model service (ai-relay.cjs), so the service key never reaches the browser. Without a server
-  // that has a model service configured there is no provider, and no capability runs.
+  // The provider answers run(capabilityId, input) with a Promise of { text } (a rewrite also with its preview): the
+  // page's own server relays the request to the model service (ai-relay.cjs), so the service key never reaches the
+  // browser. Without a server that has a model service configured there is no provider, and no capability runs.
   const AI_PROVIDERS = {
-    server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
+    server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'reply.rewrite' ? aiRelayRewrite(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },
   };
   // Languages offered for a customer: the language replies are put into. Any other language can be typed in.
   const AI_CUSTOMER_LANGUAGES = ['英语', '西班牙语', '葡萄牙语', '法语', '德语', '意大利语', '荷兰语', '波兰语', '俄语', '土耳其语', '阿拉伯语', '印地语', '印尼语', '马来语', '越南语', '泰语', '菲律宾语', '日语', '韩语', '中文'];
@@ -3926,10 +3927,19 @@ window.WA_START = () => {
   // How a reply should sound when it is translated: [value sent to the relay, label].
   const AI_TONES = [['casual', '轻松随意'], ['friendly', '亲切专业']];
   const AI_BUSINESS_MAX = 600;
+  // Personas for 改写 (plan 092): at most this many, a name and a text of at most this length each, and the template a
+  // new one starts from (the headings of the wa-translation plugin's template). An instruction for a rewrite is at
+  // most AI_INSTRUCTION_MAX long. The relay allows the same lengths (ai-relay.cjs).
+  const AI_PERSONAS_MAX = 20;
+  const AI_PERSONA_NAME_MAX = 30;
+  const AI_PERSONA_MAX = 4000;
+  const AI_INSTRUCTION_MAX = 300;
+  const AI_PERSONA_TEMPLATE = ['我是谁：', '我提供什么：', '产品详情与政策（具体报价请用「报价」选择）：', '优势与案例：', '沟通目标（例如：弄清需求、给出报价、约电话）：', '语气：', '需要避免的说法或承诺：', '参考回复（可选）：'].join('\n');
   // Which provider this page uses: none until the page's own server reports that a model service is configured,
   // then the server relay. A page opened as a file has none.
   const aiRuntime = { provider: null, status: null };
-  // Drafts waiting for their translation: customer id → a token of the newest request.
+  // Drafts waiting for their translation, or for a rewrite (plan 092; its token then says rewrite): customer id → a
+  // token of the newest request.
   const aiDraftPending = new Map();
   const AI_USAGE_KEPT = 200;
   const AI_USAGE_SHOWN = 20;
@@ -3949,6 +3959,9 @@ window.WA_START = () => {
     if (!AI_TONES.some(tone => tone[0] === settings.tone)) settings.tone = AI_TONES[0][0];
     if (typeof settings.business !== 'string') settings.business = '';
     if (typeof settings.sendGuard !== 'boolean') settings.sendGuard = true;
+    // Personas (plan 092): [{ id, name, text }]; while there are any, the default is one of them.
+    if (!Array.isArray(settings.personas)) settings.personas = [];
+    if (!settings.personas.some(persona => persona.id === settings.defaultPersona)) settings.defaultPersona = settings.personas[0]?.id || '';
     return settings;
   }
 
@@ -3969,7 +3982,7 @@ window.WA_START = () => {
     persist();
   }
 
-  // The single entry point for every AI call. Resolves to { ok, text }; it never rejects.
+  // The single entry point for every AI call. Resolves to { ok, text } (a rewrite also with preview); it never rejects.
   // A capability that is switched off, and every capability while no model service is connected, is not run
   // and leaves no usage record.
   function aiRun(capabilityId, input, meta = {}) {
@@ -3978,11 +3991,12 @@ window.WA_START = () => {
     const providerId = aiRuntime.provider;
     return Promise.resolve()
       .then(() => AI_PROVIDERS[providerId].run(capabilityId, input))
-      .then(output => ({ text: String(output?.text || ''), kept: output?.cached === true }), () => ({ text: '', kept: false }))
-      .then(({ text, kept }) => {
+      .then(output => ({ text: String(output?.text || ''), kept: output?.cached === true, preview: String(output?.preview || '') }), () => ({ text: '', kept: false, preview: '' }))
+      .then(({ text, kept, preview }) => {
         const result = { ok: Boolean(text), text };
         // A translation the server had kept was not made again: it is no call to the model service.
         if (!kept) aiRecordUsage(capabilityId, providerId, input, result, meta);
+        if (preview) result.preview = preview;
         return result;
       });
   }
@@ -4005,6 +4019,16 @@ window.WA_START = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: input.text, to: input.to, tone: input.tone, business: input.business, context: input.context }),
     }).then(response => response.json().then(body => response.ok ? { text: body.text } : Promise.reject(new Error('relay ' + body.error))));
+  }
+
+  // The server relay for a rewrite (plan 092): the text is edited on the instruction, as the persona, in the
+  // customer's language; the answer brings the same message in the reading language as its preview.
+  function aiRelayRewrite(input) {
+    return fetch('/api/ai/rewrite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.text, to: input.to, instruction: input.instruction, persona: input.persona, previewLanguage: input.previewLanguage }),
+    }).then(response => response.json().then(body => response.ok ? { text: body.text, preview: body.preview } : Promise.reject(new Error('relay ' + body.error))));
   }
 
   // The server turns the voice note of a message into text: it holds the file and calls the speech service.
@@ -4134,9 +4158,9 @@ window.WA_START = () => {
 
   // The words beside the message box: what Enter will do with the draft.
   function aiDraftHint(c) {
-    if (aiDraftPending.has(c.id)) return '翻译中…';
+    if (aiDraftPending.has(c.id)) return aiDraftPending.get(c.id).rewrite ? '改写中…' : '翻译中…';
     const d = draft(c), text = d.text.trim();
-    if (d.translated) return '发送译文';
+    if (d.translated) return d.rewritten === d.translated ? '发送改写' : '发送译文';
     return aiGuardActive(c) && text && !aiGuardNeutral(text) ? '待翻译' : '发送原文';
   }
   // The line under the message box that explains the Enter key, and the translation shortcut where it works. A
@@ -4400,6 +4424,143 @@ window.WA_START = () => {
     if (event.target.id === 'ai-shortcut-key' && aiRecording) aiShortcutRecord(false);
   });
 
+  // ---- 改写: a reply rewritten as a persona (plan 092) ----
+  // As in the wa-translation browser plugin: personas, each a name and a text written to a template, one of them the
+  // default. A chat writes as the persona chosen for it (aiPersona on the customer: the id of a persona, or 'none'),
+  // otherwise as the default. The 改写 chip above the message box asks for an instruction ("更热情一点", "更简短")
+  // and has what was typed rewritten on it, as the chat's persona, in the customer's language. The result goes into
+  // the draft like a translation — translated, with what was typed as its source —, so that Enter sends it and what
+  // was typed stays in the box; rewritten marks it as a rewrite and meaning holds what it means in the reading
+  // language, shown below it above the box. Translating replies does not use personas.
+  // The persona a chat writes as, or null for none.
+  function aiChatPersona(c) {
+    const settings = aiSettings();
+    if (c.aiPersona === 'none') return null;
+    return settings.personas.find(persona => persona.id === c.aiPersona) || settings.personas.find(persona => persona.id === settings.defaultPersona) || null;
+  }
+  // The chip in the toolbar of the message box. Shown while the relay is in use and 改写回复 is switched on.
+  function aiRewriteButton() {
+    if (aiRuntime.provider !== 'server' || data.ai?.enabled?.['reply.rewrite'] === false) return '';
+    return `<button type="button" class="composer-chip" data-ai-rewrite aria-label="改写回复" title="按你的要求和人设改写输入的回复">${icon('Sparkles')}<span>改写</span></button>`;
+  }
+  // The dialog of the chip: the persona, which starts on the chat's own, and the instruction.
+  function aiRewriteOpen() {
+    const c = selectedCustomer(), box = $('#composer-text'), text = box ? box.value.trim() : '';
+    if (!c) return;
+    if (aiRuntime.provider !== 'server') return toast('没有可用的 AI 服务，无法改写。');
+    if (!aiCustomerLanguage(c)) return toast('请先在上方选择客户语言。');
+    if (!text) return toast('请先在消息框输入要改写的回复。');
+    if (aiDraftPending.has(c.id)) return toast('正在处理上一个请求，请稍候。');
+    const settings = aiSettings(), chosen = aiChatPersona(c)?.id || 'none';
+    const personas = settings.personas.map(persona => option(persona.id, persona.id === settings.defaultPersona ? `${persona.name}（默认）` : persona.name, chosen)).join('');
+    fidForm('改写回复', 'ai-rewrite', `<input type="hidden" name="customer" value="${esc(c.id)}">
+      ${fidFormRow('人设', `<select class="fid-select" id="ai-rewrite-persona" name="persona" style="width:100%">${personas}${option('none', '不使用人设', chosen)}</select><span class="fid-field-help">${settings.personas.length ? '按所选人设的身份和口吻来写；这个会话会记住你的选择。' : '还没有人设，可在「AI 能力」页面添加。'}</span>`, 'ai-rewrite-persona')}
+      ${fidFormRow('改写要求', `<input class="fid-input" style="width:100%" id="ai-rewrite-instruction" name="instruction" maxlength="${AI_INSTRUCTION_MAX}" placeholder="例如：更热情一点、更简短、语气更正式">`, 'ai-rewrite-instruction', true)}
+      <p class="fid-field-help">改写结果会写成${esc(aiCustomerLanguage(c))}，连同它的意思显示在消息框上方，确认后再发送；消息框里输入的内容保持不变。</p>`, '改 写');
+  }
+  fidForms['ai-rewrite-form'] = (f, v) => {
+    const c = customer(v('customer')), instruction = v('instruction').replace(/\s+/g, ' ');
+    if (!c) return;
+    if (!instruction) return error('请填写改写要求，例如：更热情一点。');
+    const persona = aiSettings().personas.find(item => item.id === v('persona')) || null;
+    // The chat remembers a persona chosen here; the one it writes as already (the default too) is not written down.
+    if ((persona?.id || 'none') !== (aiChatPersona(c)?.id || 'none')) {
+      c.aiPersona = persona?.id || 'none';
+      persist();
+    }
+    close();
+    aiRewriteDraft(c, instruction, persona);
+  };
+  // Has what was typed rewritten. A result that comes back after the box was changed is not used.
+  function aiRewriteDraft(c, instruction, persona) {
+    const text = draft(c).text.trim();
+    if (!text) return;
+    const request = { rewrite: true };
+    aiDraftPending.set(c.id, request);
+    aiRefreshDraftPreview(c);
+    aiRun('reply.rewrite', { text, to: aiCustomerLanguage(c), instruction, persona: persona?.text || '', previewLanguage: aiSettings().readLanguage }, { customerId: c.id }).then(result => {
+      if (aiDraftPending.get(c.id) === request) aiDraftPending.delete(c.id);
+      const current = ui.drafts[c.id];
+      if (!result.ok) {
+        if (!result.skipped) toast('未能改写，消息框的内容保持不变。请稍后再试。');
+      } else if (current && current.text.trim() === text) {
+        Object.assign(current, { translated: result.text, source: text, rewritten: result.text, meaning: result.preview || '' });
+        persist();
+        toast(`已改写为${aiCustomerLanguage(c)}，${aiEnterTaken() ? '确认后点击「发送」发出' : '确认后按 Enter 发送'}。`);
+      } else toast('消息框的内容已改动，改写结果没有使用。');
+      aiRefreshDraftPreview(c);
+    });
+  }
+  // Above the message box a rewrite shows as such, with what it means below it.
+  const aiBasePreview = previewHTML;
+  previewHTML = function(c) {
+    const d = draft(c), html = aiBasePreview(c);
+    if (!d.translated || d.rewritten !== d.translated) return html;
+    return html.replace(`<small>发送前预览 · ${esc(c.language)}译文</small>${esc(d.translated)}</div>`,
+      `<small>改写后 · ${esc(c.language)}</small>${esc(d.translated)}${d.meaning ? `<span class="ai-rewrite-meaning"><b>意思</b>${esc(d.meaning)}</span>` : ''}</div>`);
+  };
+
+  // The personas on the AI page: a table that names the default, and the dialog that adds or edits one. The first
+  // persona becomes the default; when the default is deleted the first of the others takes its place, and a chat
+  // that had chosen a deleted persona writes as the default.
+  function aiPersonaRows(settings) {
+    return settings.personas.map(persona => `<tr>
+        <td><strong>${esc(persona.name)}</strong></td>
+        <td><span class="fid-ai-persona-text">${esc(persona.text.replace(/\s+/g, ' ').slice(0, 120))}</span></td>
+        <td>${persona.id === settings.defaultPersona ? '<span class="lc-pill ok">默认</span>' : fidButton('设为默认', 'aiPersonaDefault', '', 'slim', fidActionID(persona.id))}</td>
+        <td><div class="fid-icon-actions">${fidIcon('编辑人设' + persona.name, 'aiPersonaEdit', 'SquarePen', persona.id)}${fidIcon('删除人设' + persona.name, 'aiPersonaDelete', 'Trash2', persona.id, 'fid-danger')}</div></td>
+      </tr>`).join('');
+  }
+  function aiPersonaEdit(id) {
+    const settings = aiSettings(), persona = settings.personas.find(item => item.id === id);
+    if (!persona && settings.personas.length >= AI_PERSONAS_MAX) return toast(`最多可以建 ${AI_PERSONAS_MAX} 个人设。`);
+    fidForm(persona ? '编辑人设' : '添加人设', 'ai-persona', `<input type="hidden" name="id" value="${esc(persona?.id || '')}">
+      ${fidFormRow('名称', fidCountField('ai-persona-name', 'name', persona?.name || '', AI_PERSONA_NAME_MAX, '例如：外贸销售小王', true), 'ai-persona-name', true)}
+      ${fidFormRow('人设内容', `<textarea class="fid-input ai-persona-text" id="ai-persona-text" name="text" rows="12" maxlength="${AI_PERSONA_MAX}" style="width:100%">${esc(persona ? persona.text : AI_PERSONA_TEMPLATE)}</textarea><span class="fid-field-help">按每一项填写，用不到的项可以删掉，最多 ${AI_PERSONA_MAX} 字。改写时 AI 以这个身份和口吻来写，不会自行报价：报价请用「报价」选择。</span>`, 'ai-persona-text', true)}`, '保 存', { wide: true });
+  }
+  fidForms['ai-persona-form'] = (f, v) => {
+    const settings = aiSettings(), id = v('id'), persona = settings.personas.find(item => item.id === id), name = v('name'), text = v('text');
+    if (id && !persona) return close();
+    if (!name) return error('请填写人设名称。');
+    if (settings.personas.some(item => item !== persona && item.name.toLowerCase() === name.toLowerCase())) return error('已有同名的人设，请换一个名称。');
+    if (!text) return error('请填写人设内容。');
+    if (!persona && settings.personas.length >= AI_PERSONAS_MAX) return error(`最多可以建 ${AI_PERSONAS_MAX} 个人设。`);
+    const values = { name: name.slice(0, AI_PERSONA_NAME_MAX), text: text.slice(0, AI_PERSONA_MAX) };
+    if (persona) Object.assign(persona, values);
+    else settings.personas.push({ id: nextId('persona'), ...values });
+    if (!settings.defaultPersona) settings.defaultPersona = settings.personas[0].id;
+    persist();
+    close();
+    render();
+    toast(persona ? '人设已保存。' : `人设「${values.name}」已添加。`);
+  };
+  Object.assign(fidActions, {
+    aiPersonaAdd: () => aiPersonaEdit(''),
+    aiPersonaEdit,
+    aiPersonaDefault: id => {
+      const settings = aiSettings(), persona = settings.personas.find(item => item.id === id);
+      if (!persona) return;
+      settings.defaultPersona = persona.id;
+      persist();
+      render();
+      toast(`「${persona.name}」已设为默认人设。`);
+    },
+    aiPersonaDelete: id => {
+      const persona = aiSettings().personas.find(item => item.id === id);
+      if (persona) fidConfirm('删除人设', `删除人设「${persona.name}」？选择了它的会话改用默认人设。`, 'aiPersonaDeleteDo', persona.id, 'danger');
+    },
+    aiPersonaDeleteDo: id => {
+      const settings = aiSettings(), persona = settings.personas.find(item => item.id === id);
+      close();
+      if (!persona) return;
+      settings.personas = settings.personas.filter(item => item !== persona);
+      if (settings.defaultPersona === persona.id) settings.defaultPersona = settings.personas[0]?.id || '';
+      persist();
+      render();
+      toast(`人设「${persona.name}」已删除。`);
+    },
+  });
+
   function renderAiPage() {
     const settings = aiSettings();
     const capabilityName = id => AI_CAPABILITIES.find(item => item.id === id)?.name || id;
@@ -4433,6 +4594,10 @@ window.WA_START = () => {
       <div class="fid-ai-provider"><strong>回复语气</strong><select class="fid-select" data-ai-setting="tone" aria-label="回复语气">${AI_TONES.map(([value, label]) => option(value, label, settings.tone)).join('')}</select><span>把你的回复译给客户时采用的语气。</span></div>
       <div class="fid-ai-provider fid-ai-business"><strong>业务说明</strong><textarea class="fid-input" data-ai-setting="business" aria-label="业务说明" maxlength="${AI_BUSINESS_MAX}" rows="2" placeholder="选填，例如：我们向美国和波多黎各的小型餐饮企业销售厨房设备。">${esc(settings.business)}</textarea><span>选填。翻译回复时一并提供给模型，让用词贴合你的业务；同时提供的还有该会话最近 6 条消息。</span></div>
       <div class="fid-ai-provider"><strong>发送保护</strong><label class="fid-ai-switch"><input type="checkbox" role="switch" data-ai-setting="sendGuard" ${settings.sendGuard ? 'checked' : ''} aria-label="发送保护">${settings.sendGuard ? '已开启' : '已关闭'}</label><span>开启后，不是客户语言的回复不会直接发出：第一次按 Enter 先翻译，确认译文后再按一次发送。也可在输入框旁切换。</span></div>
+      <h2>人设</h2>
+      <p class="fid-field-help">点击消息框上方的「改写」，AI 以人设的身份和口吻改写你输入的回复。可以建多个人设，改写时为会话选择；没有选择过的会话使用默认人设。翻译回复不使用人设。</p>
+      ${fidTable('fid-ai-personas', ['名称', '内容', '默认', '操作'], aiPersonaRows(settings), '还没有人设。点击「添加人设」，按模板写下你是谁、提供什么、怎样沟通。')}
+      <div class="fid-actions">${fidButton('添加人设', 'aiPersonaAdd', 'Plus', 'tint', settings.personas.length >= AI_PERSONAS_MAX ? 'disabled' : '')}</div>
       <h2>能力清单</h2>
       ${fidTable('fid-ai-capabilities', ['能力', '说明', '状态', '调用次数', '输入字符', '输出字符'], capabilityRows)}
       <p class="fid-field-help">停用后该能力不再被调用，也不产生用量记录。</p>
@@ -4565,6 +4730,7 @@ window.WA_START = () => {
   document.addEventListener('click', event => {
     if (event.target.closest?.('[data-ai-guard]')) aiSetGuard(!aiGuardOn());
     if (event.target.closest?.('[data-ai-shortcut]')) aiShortcutOpen();
+    if (event.target.closest?.('[data-ai-rewrite]')) aiRewriteOpen();
     if (event.target.closest?.('[data-ai-shortcut-default]')) aiShortcutShow(AI_SHORTCUT_DEFAULT);
     if (event.target.id === 'ai-shortcut-key') aiShortcutRecord(true);
     const ask = event.target.closest?.('[data-ai-transcribe]');

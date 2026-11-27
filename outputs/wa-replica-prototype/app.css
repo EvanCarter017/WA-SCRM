@@ -1202,6 +1202,12 @@ dialog>#toast,dialog>#toast.show{transform:none}
 .fidelity .fid-wa .send-button .icon { display:block; width:var(--fid-px-18); height:var(--fid-px-18); }
 @media(max-width:760px) { .fidelity .fid-wa .composer-tools .composer-keys { display:none; } }
 
+/* 改写 (plan 092): what a rewritten reply means, under it above the message box; the personas on the AI page. */
+.fidelity .ai-rewrite-meaning { display:block; margin-top:var(--fid-px-4); padding-top:var(--fid-px-4); border-top:var(--fid-px-1) dashed var(--fid-frame); color:var(--color-text-muted); }
+.fidelity .ai-rewrite-meaning b { margin-right:var(--fid-px-6); font-weight:600; }
+.fidelity .fid-ai-persona-text { display:block; max-width:var(--fid-px-420); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--color-text-muted); }
+.fidelity .ai-persona-text { min-height:var(--fid-px-240); resize:vertical; line-height:1.6; }
+
 .dash {
   --dash-ink: var(--color-text);
   --dash-muted: var(--color-text-muted);

@@ -186,10 +186,10 @@ assert(appJs.includes('fid-record-translation'), 'the chat-history page keeps it
 // 15. Real translation goes through the server relay; the page falls back to the demo when no relay is configured
 const relaySource = read(path.join(__dirname, 'ai-relay.cjs'));
 const serveSource = read(path.join(__dirname, 'serve.cjs'));
-for (const required of ["server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },", "fetch('/api/ai/translate', {", "fetch('/api/ai/status')", 'const providerId = aiRuntime.provider;', "to: aiSettings().readLanguage }", 'data-ai-setting="readLanguage"', 'aiDetectRelay();']) {
+for (const required of ["server: { name: '服务器中转', run: (capabilityId, input) => capabilityId === 'voice.transcribe' ? aiRelayTranscribe(input) : capabilityId === 'reply.rewrite' ? aiRelayRewrite(input) : capabilityId === 'translate.outbound' ? aiRelayReply(input) : aiRelayTranslate(input) },", "fetch('/api/ai/translate', {", "fetch('/api/ai/status')", 'const providerId = aiRuntime.provider;', "to: aiSettings().readLanguage }", 'data-ai-setting="readLanguage"', 'aiDetectRelay();']) {
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
 }
-for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' + config.key", 'module.exports = { handle, loadConfig, loadVoiceConfig, parseEnv, transcribeAudio, translationPrompt, replyPrompt };', "gemini: { name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.5-transcribe', native: 'gemini' },", "headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.key }", "const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'];", '...(config.reasoning ? { reasoning_effort: config.reasoning } : {}),', 'if (bytes.length > (gemini ? GEMINI_VOICE_MAX : MAX_VOICE_BYTES)) throw failure(413, \'too-long\');']) {
+for (const required of ['process.env.WA_SCRM_AI_ENV', "Authorization: 'Bearer ' + config.key", 'module.exports = { handle, loadConfig, loadVoiceConfig, parseEnv, transcribeAudio, translationPrompt, replyPrompt, rewritePrompt };', "gemini: { name: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-3.5-transcribe', native: 'gemini' },", "headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.key }", "const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high'];", '...(config.reasoning ? { reasoning_effort: config.reasoning } : {}),', 'if (bytes.length > (gemini ? GEMINI_VOICE_MAX : MAX_VOICE_BYTES)) throw failure(413, \'too-long\');']) {
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
 assert(!/console\.(log|error)\([^\n]*(config\.key|\.text\b(?!\.length)|input\b)/.test(relaySource), 'the relay must not log the key or message text');
@@ -215,7 +215,7 @@ assert(fs.existsSync(path.join(out, 'requirements.json')), 'the requirement reco
 for (const required of ["fetch('/api/ai/reply', {", 'function aiTranslateDraft(c, text)', 'function aiGuardActive(c)', 'function aiGuardNeutral(text)', 'function aiDraftHint(c)', 'function aiEnterHint(c)', 'function aiGuardHTML(c)', 'const aiOldSend = send;', 'data-ai-setting="tone"', 'data-ai-setting="business"', 'data-ai-setting="sendGuard"']) {
   assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
 }
-for (const required of ["const ACTIONS = { '/api/ai/translate': ['translate', translate], '/api/ai/reply': ['reply', reply] };", 'function replyPrompt({ to, tone, business })', 'const MAX_CONTEXT_MESSAGES = 6;']) {
+for (const required of ["const ACTIONS = { '/api/ai/translate': ['translate', translate], '/api/ai/reply': ['reply', reply], '/api/ai/rewrite': ['rewrite', rewrite] };", 'function replyPrompt({ to, tone, business })', 'const MAX_CONTEXT_MESSAGES = 6;']) {
   assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
 }
 for (const required of ["aiDraftHint(c)+'</span>'+aiGuardHTML(c)+priceQuoteButton()", "<span class=\"composer-keys\">'+icon('Keyboard')+aiEnterHint(c)+'</span>"]) {
@@ -668,6 +668,18 @@ const whatsappCss = read(path.join(__dirname, 'fidelity.css'));
 for (const required of ['.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }', '.fidelity .fid-wa .inbox-layout { height:calc(100dvh - 92px);', '.fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 240px); }', '.fidelity .message-meta { float:right;', '.fidelity .fid-wa .send-button .icon { display:block;']) {
   assert(whatsappCss.includes(required), `fidelity.css is missing ${required}`);
 }
+// 改写 (plan 092): personas as in the wa-translation browser plugin — several, named, written to its template, one the
+// default; a chat writes as the persona chosen for it, otherwise as the default; the 改写 chip has a typed reply
+// rewritten on an instruction, as the persona, in the customer's language, shown with what it means and sent by
+// Enter like a translation; translating replies does not use personas.
+for (const required of ["{ id: 'reply.rewrite', name: '改写回复',", "capabilityId === 'reply.rewrite' ? aiRelayRewrite(input)", "fetch('/api/ai/rewrite', {", 'if (!Array.isArray(settings.personas)) settings.personas = [];', 'function aiChatPersona(c) {', "if (c.aiPersona === 'none') return null;", "fidForms['ai-rewrite-form'] = (f, v) => {", "fidForms['ai-persona-form'] = (f, v) => {", "Object.assign(current, { translated: result.text, source: text, rewritten: result.text, meaning: result.preview || '' });", "if (!d.translated || d.rewritten !== d.translated) return html;"]) {
+  assert(aiSource.includes(required), `fidelity-ai.js is missing ${required}`);
+}
+for (const required of ["'/api/ai/rewrite': ['rewrite', rewrite]", 'function rewritePrompt({ to, persona, previewLanguage })', 'const MAX_INSTRUCTION = 300;', 'const MAX_PERSONA = 4000;', "result.preview === undefined ? { text: result.text } : { text: result.text, preview: result.preview }"]) {
+  assert(relaySource.includes(required), `ai-relay.cjs is missing ${required}`);
+}
+assert(!/persona/i.test(relaySource.slice(relaySource.indexOf('function replyPrompt('), relaySource.indexOf('function replyTurn('))) && !/persona/i.test(aiSource.slice(aiSource.indexOf('function aiOutboundInput('), aiSource.indexOf('// Send guard.'))), 'translating a reply must not use a persona');
+assert(appJs.includes("<span>快捷回复</span></button>'+aiRewriteButton()+'<span class=\"composer-keys\">"), 'the 改写 chip must sit in the toolbar of the message box');
 const summary = {
   version: req.version,
   status: 'passed',
@@ -683,7 +695,7 @@ const summary = {
   chatHistory: 'archive of moved-in snapshots, no rating',
   aiCapabilities: ['translate.inbound', 'translate.outbound', 'voice.transcribe'],
   aiProvider: 'server relay to an OpenAI-compatible model service (key stays on the server); without it no AI capability runs',
-  pageNetworkCalls: 'own server only: /api/ai/status, /api/ai/translate, /api/ai/reply, /api/wa/transcribe',
+  pageNetworkCalls: 'own server only: /api/ai/status, /api/ai/translate, /api/ai/reply, /api/ai/rewrite, /api/wa/transcribe',
   replyTranslation: 'typed replies and quick replies go to /api/ai/reply with tone, business description and the last six messages; send guard on by default: first Enter translates, second Enter sends',
   conversationCardTags: 'first 3 visible tags, then +N; no follow-up status chip',
   chatStripFollowLink: 'status and next-follow-up labels open the follow-up centre on the customer row',
@@ -701,6 +713,7 @@ const summary = {
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
   qrPolling: 'the QR dialog (plan 091): while a code waits to be scanned it asks the server every 10 s (every 2 s while the code is prepared or checked), for at most 3 minutes; then it says the code expired and offers 刷新二维码; a scan that went through is told by the feed at once — a dialog left open no longer uses up OpenWA\'s limit of 1000 questions an hour',
+  rewritePersonas: '改写 (plan 092): personas on the AI page as in the wa-translation plugin (several, named, written to its template, one the default; at most 20); the 改写 chip in the toolbar of the message box rewrites a typed reply on an instruction, as the chat\'s persona (chosen in its dialog and remembered on the customer as aiPersona, otherwise the default), in the customer\'s language, through /api/ai/rewrite; the result shows above the box with what it means in the reading language and Enter sends it like a translation; capability reply.rewrite on the AI page; translating replies does not use personas',
   whatsappPage: 'the WhatsApp API page (plan 090): 号码管理 is a page of its own in the place of 账号列表 (menu, tabs, #numbers; #accounts opens the home page); the chat page has no numbers/chat switch and no row of page tabs; the number and the source sit in the line under the customer\'s name; the strip takes one line where it fits; bubbles are WhatsApp-sized with the time inside; the message box is a toolbar (customer language, what a reply does, send guard, 报价, 快捷回复, keys) above one bar (+ for files, the message, send)',
   uiUpgradeWithdrawn: 'the UI upgrade of plans 081–087 (font, colours, chat-page layout, tables, dialogs, supervisor page) is withdrawn at the owner\'s request; kept: a dialog\'s footer stays in view while a long dialog scrolls, and the customer list\'s thirteen columns add up to 100%',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',

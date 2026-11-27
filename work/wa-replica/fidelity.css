@@ -760,3 +760,9 @@
 .fidelity .fid-wa .send-button { width:42px; height:42px; min-height:0; padding:0; border-radius:50%; display:grid; place-items:center; flex:none; }
 .fidelity .fid-wa .send-button .icon { display:block; width:18px; height:18px; }
 @media(max-width:760px) { .fidelity .fid-wa .composer-tools .composer-keys { display:none; } }
+
+/* 改写 (plan 092): what a rewritten reply means, under it above the message box; the personas on the AI page. */
+.fidelity .ai-rewrite-meaning { display:block; margin-top:4px; padding-top:4px; border-top:1px dashed var(--fid-frame); color:var(--color-text-muted); }
+.fidelity .ai-rewrite-meaning b { margin-right:6px; font-weight:600; }
+.fidelity .fid-ai-persona-text { display:block; max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--color-text-muted); }
+.fidelity .ai-persona-text { min-height:240px; resize:vertical; line-height:1.6; }
