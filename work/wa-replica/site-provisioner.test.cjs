@@ -468,11 +468,46 @@ test('an answer of the engine about a volume that is neither "there" nor "not th
   assert.deepEqual([(await call('/sites/v1/remove', { method: 'POST' })).json, await stateOf('v1')], [{ error: 'unknown-site' }, undefined]);
 });
 
+test('a WhatsApp Web build for the machine: every OpenWA made from then on loads it; one that is there keeps the one it was made with, and one made anew from its data loads it', async () => {
+  // room: the sub-sites that still run from the tests before are stopped
+  for (const c of [...containers.values()]) if (isOpenwa(c) && c.state === 'running') await call(`/sites/${c.spec.Labels['wa-scrm.site']}/stop`, { method: 'POST' });
+  const pin = 'WWEBJS_WEB_VERSION=2.3000.1055837054-alpha';
+  try {
+    // made while the machine has no build: none
+    assert.equal((await call('/sites', { method: 'POST', body: { id: 'w1' } })).status, 202);
+    assert.deepEqual(await settled('w1'), { id: 'w1', state: 'ready' });
+    assert.equal(containers.get('wa-scrm-openwa-w1').spec.Env.some(line => line.startsWith('WWEBJS_WEB_VERSION=')), false);
+    await call('/sites/w1/stop', { method: 'POST' });
+    config.openwaWebVersion = '2.3000.1055837054-alpha';
+    // a new one: the build, before the key it is started with
+    assert.equal((await call('/sites', { method: 'POST', body: { id: 'w2' } })).status, 202);
+    assert.deepEqual(await settled('w2'), { id: 'w2', state: 'ready' });
+    const made = containers.get('wa-scrm-openwa-w2').spec.Env;
+    assert.deepEqual([made.slice(-3, -1), made[made.length - 1].startsWith('API_MASTER_KEY=')], [['RESOLVE_LID_TO_PHONE=true', pin], true]);
+    await call('/sites/w2/stop', { method: 'POST' });
+    // one that is there is started as it is
+    assert.equal((await call('/sites/w1/start', { method: 'POST' })).status, 202);
+    assert.deepEqual(await settled('w1'), { id: 'w1', state: 'ready' });
+    assert.equal(containers.get('wa-scrm-openwa-w1').spec.Env.includes(pin), false, 'an OpenWA that exists keeps its build');
+    await call('/sites/w1/stop', { method: 'POST' });
+    // its container taken away, its data kept: made anew with the build — no key of the platform's choice, no new restricted key
+    containers.delete('wa-scrm-openwa-w1');
+    const asked = keys.length;
+    assert.equal((await call('/sites/w1/start', { method: 'POST' })).status, 202);
+    assert.deepEqual(await settled('w1'), { id: 'w1', state: 'ready' });
+    const anew = containers.get('wa-scrm-openwa-w1').spec.Env;
+    assert.deepEqual([anew[anew.length - 1], anew.some(line => line.startsWith('API_MASTER_KEY=')), keys.length], [pin, false, asked]);
+    await call('/sites/w1/stop', { method: 'POST' });
+  } finally {
+    delete config.openwaWebVersion;
+  }
+});
+
 test('the settings from the environment: what is needed is asked for, the secret is long enough, the rest has its defaults', () => {
   const secretFile = path.join(tmp, 'secret');
   fs.writeFileSync(secretFile, SECRET + '\n');
   const env = { WA_SCRM_PROVISIONER_SECRET_FILE: secretFile, WA_SCRM_SERVER_IMAGE: 'server:1', WA_SCRM_OPENWA_IMAGE: 'openwa:1', WA_SCRM_HOST_DATA_DIR: '/host/data', WA_SCRM_DATA_DIR: '/data' };
-  assert.deepEqual(configFromEnv(env), { secret: SECRET, runAs: '1000:1000', serverImage: 'server:1', openwaImage: 'openwa:1', hostDataDir: '/host/data', dataDir: '/data', hostAiEnv: '', network: 'wa-scrm', maxSites: 4, minFreeMb: 1400, openwaMemoryMb: 1536, serverMemoryMb: 256 });
+  assert.deepEqual(configFromEnv(env), { secret: SECRET, runAs: '1000:1000', serverImage: 'server:1', openwaImage: 'openwa:1', hostDataDir: '/host/data', dataDir: '/data', hostAiEnv: '', network: 'wa-scrm', openwaWebVersion: '', maxSites: 4, minFreeMb: 1400, openwaMemoryMb: 1536, serverMemoryMb: 256 });
   assert.deepEqual(configFromEnv({ ...env, WA_SCRM_MAX_SITES: '3', WA_SCRM_MIN_FREE_MB: '900', WA_SCRM_RUN_AS: '1001:1002', WA_SCRM_NETWORK: 'other', WA_SCRM_HOST_AI_ENV: '/host/ai.env' }).maxSites, 3);
   // a number: a 0 is one and is meant; what is no whole number is refused
   const zero = configFromEnv({ ...env, WA_SCRM_MAX_SITES: '0', WA_SCRM_MIN_FREE_MB: '0', WA_SCRM_OPENWA_MEMORY_MB: '2048' });
@@ -483,6 +518,9 @@ test('the settings from the environment: what is needed is asked for, the secret
   assert.throws(() => configFromEnv(env), /at least 32/);
   fs.writeFileSync(secretFile, SECRET);
   assert.throws(() => configFromEnv({ ...env, WA_SCRM_RUN_AS: 'root' }), /WA_SCRM_RUN_AS/);
+  // a WhatsApp Web build: taken as it is written; anything else is refused
+  for (const value of ['2.3000.1055837054-alpha', '2.3000.1055837054']) assert.equal(configFromEnv({ ...env, WA_SCRM_OPENWA_WEB_VERSION: value }).openwaWebVersion, value);
+  for (const value of ['latest', '2.3000', '2.3000.1055837054 ', '2.3000.1\nAPI_MASTER_KEY=x', 'v2.3000.1', '2.3000.1-ALPHA']) assert.throws(() => configFromEnv({ ...env, WA_SCRM_OPENWA_WEB_VERSION: value }), /WA_SCRM_OPENWA_WEB_VERSION must be a WhatsApp Web build/, JSON.stringify(value));
 });
 
 test('the lines name the action, the sub-site and the outcome — never a key or a secret', () => {

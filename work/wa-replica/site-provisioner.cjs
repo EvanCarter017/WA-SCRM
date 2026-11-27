@@ -13,6 +13,8 @@
 //   WA_SCRM_PROVISIONER_SECRET_FILE   file with the shared secret, at least 32 characters (required)
 //   WA_SCRM_SERVER_IMAGE              image of the sub-site's server (required)
 //   WA_SCRM_OPENWA_IMAGE              image of OpenWA, pinned by digest (required)
+//   WA_SCRM_OPENWA_WEB_VERSION        the WhatsApp Web build each OpenWA made from now on loads (optional; empty:
+//                                     OpenWA's own choice), e.g. 2.3000.1055837054-alpha — see openwaSpec below
 //   WA_SCRM_HOST_DATA_DIR             the platform's data folder as the Docker host names it (required)
 //   WA_SCRM_DATA_DIR                  the same folder as this process sees it (required)
 //   WA_SCRM_HOST_AI_ENV               the model service's settings file on the host (optional)
@@ -137,10 +139,15 @@ function create({ config, docker, freeMb, openwaUrl = openwaAddress, wait = slee
     }
   }
 
+  // The machine's WhatsApp Web build (WA_SCRM_OPENWA_WEB_VERSION), when it has one, goes to every OpenWA made from
+  // now on: since late November 2026 WhatsApp sends a browser that is not signed in to a new /login/ page that
+  // OpenWA 0.31.0 does not know, and a new number then gets no QR code; an older build still shows one. An OpenWA
+  // keeps the build it was made with.
   const openwaSpec = (id, masterKey) => ({
     Image: config.openwaImage,
     Env: ['NODE_ENV=production', 'TZ=UTC', 'HOME=/tmp', 'XDG_CONFIG_HOME=/tmp/.config', 'XDG_CACHE_HOME=/tmp/.cache', 'PORT=2785', 'ENGINE_TYPE=whatsapp-web.js', 'AUTO_START_SESSIONS=true',
-      `SSRF_ALLOWED_HOSTS=${names(id).server}`, 'WEBHOOK_MEDIA_INLINE_MAX_BYTES=0', 'RESOLVE_LID_TO_PHONE=true', ...(masterKey ? [`API_MASTER_KEY=${masterKey}`] : [])],
+      `SSRF_ALLOWED_HOSTS=${names(id).server}`, 'WEBHOOK_MEDIA_INLINE_MAX_BYTES=0', 'RESOLVE_LID_TO_PHONE=true',
+      ...(config.openwaWebVersion ? [`WWEBJS_WEB_VERSION=${config.openwaWebVersion}`] : []), ...(masterKey ? [`API_MASTER_KEY=${masterKey}`] : [])],
     Labels: labels(id, 'openwa'),
     HostConfig: {
       NetworkMode: config.network, RestartPolicy: { Name: 'unless-stopped' }, Memory: config.openwaMemoryMb * 1048576, PidsLimit: 2048, ReadonlyRootfs: true,
@@ -453,6 +460,9 @@ function configFromEnv(env = process.env) {
   if (secret.length < 32) throw new Error('the shared secret must be at least 32 characters long');
   const runAs = env.WA_SCRM_RUN_AS || '1000:1000';
   if (!/^\d+:\d+$/.test(runAs)) throw new Error('WA_SCRM_RUN_AS must be <uid>:<gid>');
+  // A WhatsApp Web build is three numbers with dots between them, maybe followed by a word: 2.3000.1055837054-alpha.
+  const webVersion = env.WA_SCRM_OPENWA_WEB_VERSION || '';
+  if (webVersion && !/^\d+\.\d+\.\d+(-[a-z]+)?$/.test(webVersion)) throw new Error('WA_SCRM_OPENWA_WEB_VERSION must be a WhatsApp Web build like 2.3000.1055837054-alpha');
   // A number among the settings: its default when it is not set, else a whole number — 0 is one, and is meant.
   const number = (name, standard) => {
     if (env[name] === undefined || env[name] === '') return standard;
@@ -461,7 +471,7 @@ function configFromEnv(env = process.env) {
   };
   return {
     secret, runAs, serverImage: need('WA_SCRM_SERVER_IMAGE'), openwaImage: need('WA_SCRM_OPENWA_IMAGE'), hostDataDir: need('WA_SCRM_HOST_DATA_DIR'), dataDir: need('WA_SCRM_DATA_DIR'),
-    hostAiEnv: env.WA_SCRM_HOST_AI_ENV || '', network: env.WA_SCRM_NETWORK || 'wa-scrm',
+    hostAiEnv: env.WA_SCRM_HOST_AI_ENV || '', network: env.WA_SCRM_NETWORK || 'wa-scrm', openwaWebVersion: webVersion,
     maxSites: number('WA_SCRM_MAX_SITES', 4), minFreeMb: number('WA_SCRM_MIN_FREE_MB', 1400), openwaMemoryMb: number('WA_SCRM_OPENWA_MEMORY_MB', 1536), serverMemoryMb: number('WA_SCRM_SERVER_MEMORY_MB', 256),
   };
 }

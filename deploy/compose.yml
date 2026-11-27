@@ -91,6 +91,7 @@ services:
       - WA_SCRM_PROVISIONER_SECRET_FILE=/run/wa-scrm/provisioner.secret
       - WA_SCRM_SERVER_IMAGE=${WA_SCRM_SERVER_IMAGE:-wa-scrm-server:current}
       - WA_SCRM_OPENWA_IMAGE=${WA_SCRM_OPENWA_IMAGE:-ghcr.io/rmyndharis/openwa:0.31.0@sha256:cfa076443c09d5cb7add0b8b446dc4aee857374e8af8168d376fdacc926d599d}
+      - WA_SCRM_OPENWA_WEB_VERSION=${WA_SCRM_OPENWA_WEB_VERSION:-}
       - WA_SCRM_HOST_DATA_DIR=${WA_SCRM_HOST_DATA_DIR:?}
       - WA_SCRM_DATA_DIR=/data
       - WA_SCRM_HOST_AI_ENV=${WA_SCRM_HOST_AI_ENV:?}
