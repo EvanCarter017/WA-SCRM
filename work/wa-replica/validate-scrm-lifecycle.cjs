@@ -329,32 +329,15 @@ assert(appJs.includes("${t('刷新视图', 'refreshUI', 'RefreshCw')}\n    </asi
 const emojiFontDir = path.join(__dirname, 'fonts');
 const emojiParts = Array.from({ length: 11 }, (_, n) => `noto-color-emoji-v50-${n}.woff2`);
 const emojiFiles = [...emojiParts, 'noto-color-emoji-OFL.txt'].sort();
-// The text in HarmonyOS Sans SC (plan 081): Huawei's own files, unmodified as their licence asks — the bytes of
-// HarmonyOS-Sans.zip from developer.huawei.com — with the licence beside them and the notice on the sign-in screen.
-const textFont = {
-  'HarmonyOS_Sans_SC_Regular.ttf': '297b088424be212207df2ce8b98e335468b782aa6b96832af0b8b773d711e2b1',
-  'HarmonyOS_Sans_SC_Bold.ttf': '43a424b85e47fb53a17b3b32026a71801f86f8e022ca6798d186b47d39fa5f01',
-  'HarmonyOS-Sans-LICENSE.txt': 'b2ffec0e6269ee41c3b5fc0345ab37600b46d66ebea6c9c58ff37f517bdfa164',
-};
-const fontFiles = [...emojiFiles, ...Object.keys(textFont)].sort();
-assert.deepEqual(fs.readdirSync(emojiFontDir).sort(), fontFiles, 'work/wa-replica/fonts must hold the eleven parts of the emoji font, the text font and their licences');
-assert.deepEqual(fs.readdirSync(path.join(out, 'fonts')).sort(), fontFiles, 'the built fonts folder must hold the same files');
-for (const [file, hash] of Object.entries(textFont)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(emojiFontDir, file))).digest('hex'), hash, `fonts/${file} must be Huawei's file, unmodified`);
-for (const file of fontFiles) assert(fs.readFileSync(path.join(out, 'fonts', file)).equals(fs.readFileSync(path.join(emojiFontDir, file))), `fonts/${file} must be the built copy`);
+assert.deepEqual(fs.readdirSync(emojiFontDir).sort(), emojiFiles, 'work/wa-replica/fonts must hold the eleven parts of the emoji font and its licence');
+assert.deepEqual(fs.readdirSync(path.join(out, 'fonts')).sort(), emojiFiles, 'the built fonts folder must hold the same files');
+for (const file of emojiFiles) assert(fs.readFileSync(path.join(out, 'fonts', file)).equals(fs.readFileSync(path.join(emojiFontDir, file))), `fonts/${file} must be the built copy`);
 assert(read(path.join(emojiFontDir, 'noto-color-emoji-OFL.txt')).includes('SIL Open Font License, Version 1.1'), 'the licence of the emoji font must be shipped');
 const builtCss = read(path.join(out, 'app.css'));
 for (const file of emojiParts) assert(builtCss.includes(`src:url("fonts/${file}") format("woff2") tech(color-COLRv1); unicode-range:U+`), `app.css must name ${file}`);
 assert.equal((builtCss.match(/font-family:"SCRM Emoji"/g) || []).length, 11, 'app.css must have the eleven parts of the emoji font');
-for (const [weight, file] of [[400, 'HarmonyOS_Sans_SC_Regular.ttf'], [700, 'HarmonyOS_Sans_SC_Bold.ttf']]) {
-  assert(builtCss.includes(`@font-face { font-family:"HarmonyOS Sans SC"; font-style:normal; font-weight:${weight}; font-display:swap; src:url("fonts/${file}") format("truetype"); }`), `app.css must name ${file}`);
-}
-assert(builtCss.includes('font-family:"HarmonyOS Sans SC",system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the text font must come first, the emoji font after the fonts of the text');
-for (const page of [path.join(__dirname, 'fidelity-index.html'), path.join(out, 'index.html')]) {
-  assert(read(page).includes('<p class="fid-sign-in-font">本系统使用 HarmonyOS Sans 字体</p>'), 'the sign-in screen must say that HarmonyOS Sans is used, as its licence asks');
-}
-const textFontEnd = "if (face.family.replace(/\"/g, '') === 'HarmonyOS Sans SC') face.loaded.then(() => { if (openwaAtEnd) openwaShowEnd(); }, () => {});";
-assert(openwaSource.includes(textFontEnd) && appJs.includes(textFontEnd), 'a conversation that shows its end must keep showing it when the text font arrives');
-for (const required of ["'.woff2': 'font/woff2',", "'.ttf': 'font/ttf',", "'Cache-Control': pathname.startsWith('/fonts/') && /\\.(woff2|ttf)$/.test(pathname) ? 'public, max-age=31536000, immutable' : 'no-cache',"]) {
+assert(builtCss.includes('font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","SCRM Emoji",sans-serif;'), 'the emoji font must come after the fonts of the text');
+for (const required of ["'.woff2': 'font/woff2',", "'Cache-Control': pathname.startsWith('/fonts/') && pathname.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache',"]) {
   assert(read(path.join(__dirname, 'serve.cjs')).includes(required), `serve.cjs is missing ${required}`);
 }
 // A page whose saving goes wrong keeps trying and says so (plan 067): every save has a time limit, a guard catches
@@ -414,7 +397,7 @@ assert(!/log_format[^;]*\$(request|request_uri|args|query_string)\b/.test(deploy
 // A lighter page (plan 069): the gateway compresses what goes out as text, also through a proxy or a VPN; the server
 // lets the browser keep the page's files and answers an empty 304, by a tag of their content, when they did not
 // change — a weak tag from a compressing gateway counts the same.
-for (const required of ['gzip on;', 'gzip_proxied any;', 'gzip_vary on;', 'gzip_types text/css application/javascript application/json text/plain font/ttf;']) {
+for (const required of ['gzip on;', 'gzip_proxied any;', 'gzip_vary on;', 'gzip_types text/css application/javascript application/json text/plain;']) {
   assert(deploy('gateway.conf').includes(required), `deploy/gateway.conf is missing ${required}`);
 }
 for (const required of ["const tag = '\"' + crypto.createHash('sha256').update(body).digest('base64url').slice(0, 32) + '\"';", "if (String(req.headers['if-none-match'] || '').split(',').some(asked => asked.trim().replace(/^W\\//, '') === tag)) {", 'res.writeHead(304, kept);']) {
@@ -656,61 +639,13 @@ for (const required of ['return [...list.filter(c => c.pinned), ...list.filter(c
 assert(openwaSource.includes('star: keep.star || drop.star, pinned: keep.pinned || drop.pinned,'), 'merging a duplicate chat must keep its pin');
 for (const name of ['"Pin":[["path"', '"PinOff":[["path"']) assert(read(path.join(out, 'icons.js')).includes(name), `the icon pool must hold ${name}`);
 
-// One colour world for the workbench (plan 082): the UI upgrade's teal accent, cool neutrals, hairlines and greys that
-// read on every surface, declared on :root (where the base works out --accent, --muted, --line…), in the source and in
-// the built style sheet.
-for (const required of [':root {', '--color-accent:#0f766e;', '--color-text-muted:#58667a;', '--fid-quiet:#58667a;', '--color-border:rgba(15,23,42,.08);', '--fid-violet:#0f766e; --fid-royal:#0f766e;', '--fid-sky:#0369a1; --fid-sky-bg:#f0f9ff; --fid-rose-bg:#fff1f2; --fid-ease:cubic-bezier(.16,1,.3,1);']) {
-  assert(read(path.join(__dirname, 'fidelity.css')).includes(required) && read(path.join(out, 'app.css')).includes(required), `the colour world is missing ${required}`);
-}
-// The conversation's room (plan 083): the chat page has no row of page tabs and its dialogs are placed below the
-// header; the layout fills the page instead of a height worked out from the screen; the strip's four buttons carry
-// their names as tooltips (below 1600 px they show their icons only); the follow-up states carry data-state, so that
-// overdue (amber) and re-contact (rose), both "hot", and awaiting a reply (sky) have their own tints.
-const pageCss = read(path.join(__dirname, 'fidelity.css')), lifecycleCss = read(path.join(__dirname, 'fidelity-lifecycle.css'));
-for (const [source, built] of [['.fidelity:has(#view .inbox-page) { --fid-top:56px; }', '.fidelity:has(#view .inbox-page) { --fid-top:var(--fid-px-56); }'], ['.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }', '.fidelity:has(#view .inbox-page) #workspace-tabs { display:none; }'], ['.fidelity .fid-wa .inbox-layout { flex:1; height:auto; min-height:400px;', '.fidelity .fid-wa .inbox-layout { flex:1; height:auto; min-height:var(--fid-px-400);']]) {
-  assert(pageCss.includes(source) && read(path.join(out, 'app.css')).includes(built), `the conversation's room is missing ${source}`);
-}
-assert(!pageCss.includes('100dvh - 203px') && !pageCss.includes('100dvh - 178px'), 'the chat page must fill the page, not a height worked out from the screen');
-for (const required of ['.lc-pill.hot[data-state="recontact"] {', 'background: var(--fid-sky-bg);', 'background: var(--color-warning-soft);', '@media (max-width: 1599px) {']) {
-  assert(lifecycleCss.includes(required), `fidelity-lifecycle.css is missing ${required}`);
-}
-assert.equal((moduleSource.match(/data-state="\$\{h\.primary\.key\}"/g) || []).length, 3, 'the three follow-up state chips must carry data-state');
-assert.equal((appJs.match(/data-state="\$\{h\.primary\.key\}"/g) || []).length, 3, 'the built page must carry data-state on the three follow-up state chips');
-for (const name of ['设置标签', '移入聊天记录', '360° 档案']) assert(moduleSource.includes(`\${fidActionID(c.id)} title="${name}"`), `the strip's button ${name} must carry its name as a tooltip`);
-// Dialogs, the quote dialog and the 360° profile on the closed scale (plan 084): the frame's radius and slate
-// backdrop, the backdrop below the header on the chat page (which has no row of page tabs), the quote list's whole
-// row a target for its box and the count a badge, the confirm window's figures on the right, an overdue to-do amber.
-for (const required of ['border-radius:12px; box-shadow:0 16px 40px rgba(15,23,42,.18);', '.fidelity:has(#view .inbox-page) #dialog.fid-dialog::backdrop { clip-path:inset(56px 0 0 240px); }', '.price-quote-product { flex:1;', '#price-quote-count { padding:2px 8px;', '.price-confirm-table th:nth-child(n+2):nth-child(-n+4),.price-confirm-table td:nth-child(n+2):nth-child(-n+4) { text-align:right; }']) {
-  assert(pageCss.includes(required), `fidelity.css is missing ${required}`);
-}
-assert(lifecycleCss.includes('.lc-card-block.hot-block {\n  border-color: color-mix(in srgb, var(--fid-amber) 35%, var(--fid-frame));\n  background: var(--color-warning-soft);\n}'), 'an overdue to-do must be amber like the overdue follow-ups');
-// 首页 and 跟进闭环 on the closed scale (plan 085): the follow-up signals in the tints of their states (awaiting reply
-// sky, overdue amber, re-contact rose by data-id), a tinted 完成并闭环 in the rows of the to-do list, the home page's
-// title 24 px and labels 14 px; and a dialog's footer stays in view while a long dialog scrolls (a stress check of
-// 确认报价 with 50 products).
-const dashCss = read(path.join(__dirname, 'fidelity-dashboard.css'));
-for (const required of ['.lc-radar-chip.is-hot[data-id="recontact"]:not([aria-pressed="true"]) {', '  background: var(--fid-sky-bg);\n  color: var(--fid-sky);\n}', '.lc-todo-table .fid-btn.blue:not(:disabled) {']) {
-  assert(lifecycleCss.includes(required), `fidelity-lifecycle.css is missing ${required}`);
-}
-for (const required of ['  --dash-radius: 12px;', '.dash-header h1 { margin: 0; font-size: 24px;', '.dash-metric-label { width: 100%; display: flex; gap: 8px; align-items: center; font-size: 14px;']) {
-  assert(dashCss.includes(required), `fidelity-dashboard.css is missing ${required}`);
-}
-assert(pageCss.includes('background:var(--color-surface); position:sticky; bottom:0; z-index:1; box-shadow:0 -1px 0 var(--fid-frame); }'), 'a dialog\'s footer must stay in view while a long dialog scrolls');
-assert(!/font-size: 1[13]px/.test(dashCss), 'the home page uses the closed scale of text sizes (no 11 or 13 px)');
-// Tables read alike (plan 086): text on the left, tick boxes and empty states in the middle, figures on the right; phone
-// numbers and times on one line; the headers of the paged lists stay in view where the tables fit (from 1280 px, the
-// customer list from 1600 px); the customer list's thirteen columns add up to 100% (操作 had none).
-for (const required of ['padding:8px 12px; vertical-align:middle; text-align:left; overflow-wrap:anywhere; }', '.fid-table th:has(>input[type=checkbox]),.fid-table td:has(>input[type=checkbox]),.fid-table td.fid-plain-empty,.fid-table td.fid-large-empty { text-align:center; }', '.fidelity .fid-customer-table thead th { position:sticky; top:0; z-index:1;', '.fid-ai-capabilities :is(th,td):nth-child(n+4)', '.fid-account-table td:nth-child(5),.fid-account-table td:nth-child(9) { white-space:nowrap; }']) {
-  assert(pageCss.includes(required), `fidelity.css is missing ${required}`);
-}
-const customerColumns = [...lifecycleCss.matchAll(/\.fid-customer-table col:nth-child\((\d+)\) \{ width: ([\d.]+)%; \}/g)];
-assert.equal(customerColumns.length, 13, 'the customer list must give its thirteen columns a width each');
-assert.equal(Math.round(customerColumns.reduce((sum, m) => sum + Number(m[2]), 0) * 10) / 10, 100, 'the customer list\'s columns must add up to 100%');
-// The supervisor page on the same visual system (plan 087): the overview's figures on the right, 停用 in the danger
-// colour, overdue amber, the read-only workspace framed in the information tint, titles and notes on the closed scale.
-for (const required of ['.fid-master-table:not(.fid-master-accounts) :is(th,td):nth-child(n+3):nth-child(-n+5):not(:last-child) { text-align:right; }', '.fid-master-acts .link[data-master="disable"] { color:var(--color-danger); }', '.fid-master-table small.fid-master-late { color:var(--fid-amber); }', 'border-radius:999px; background:var(--fid-sky-bg); color:var(--fid-sky); font-size:14px; }', '.fid-master-bar h1 { margin:0 auto 0 0; font-size:20px;']) {
-  assert(pageCss.includes(required), `fidelity.css is missing ${required}`);
-}
+// The UI upgrade of plans 081–087 is withdrawn at the owner's request (plan 088); two fixes made on the way stay: a
+// dialog's footer stays in view while a long dialog scrolls, and the customer list's thirteen columns add up to 100%
+// (操作 had none).
+assert(read(path.join(__dirname, 'fidelity.css')).includes('background:var(--color-surface); position:sticky; bottom:0; z-index:1; border-top:1px solid var(--fid-frame); }'), 'a dialog\'s footer must stay in view while a long dialog scrolls');
+const keptColumns = [...read(path.join(__dirname, 'fidelity-lifecycle.css')).matchAll(/\.fid-customer-table col:nth-child\((\d+)\) \{ width: ([\d.]+)%; \}/g)];
+assert.equal(keptColumns.length, 13, 'the customer list must give its thirteen columns a width each');
+assert.equal(Math.round(keptColumns.reduce((sum, m) => sum + Number(m[2]), 0) * 10) / 10, 100, 'the customer list\'s columns must add up to 100%');
 const summary = {
   version: req.version,
   status: 'passed',
@@ -743,14 +678,8 @@ const summary = {
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
+  uiUpgradeWithdrawn: 'the UI upgrade of plans 081–087 (font, colours, chat-page layout, tables, dialogs, supervisor page) is withdrawn at the owner\'s request; kept: a dialog\'s footer stays in view while a long dialog scrolls, and the customer list\'s thirteen columns add up to 100%',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
-  supervisorAlike: 'the supervisor page on the same visual system (plan 087): the overview\'s figures on the right, 停用 in the danger colour, overdue amber, the read-only workspace framed in the information tint, titles and notes on the closed scale',
-  tablesAlike: 'tables read alike (plan 086): text on the left, tick boxes and empty states in the middle, figures on the right; phone numbers and times on one line; the headers of the paged lists stay in view where the tables fit (from 1280 px; the customer list from 1600 px); the customer list\'s thirteen columns add up to 100%',
-  homeAndFollowups: '首页 and 跟进闭环 on the closed scale (plan 085): the follow-up signals in the tints of their states (awaiting reply sky, overdue amber, re-contact rose), a tinted 完成并闭环 in the to-do list, the home page\'s title 24 px and labels 14 px; a dialog\'s footer stays in view while a long dialog scrolls',
-  dialogsAndProfile: 'dialogs, the quote dialog and the 360° profile on the closed scale (plan 084): radius 12 with a slate backdrop that starts below the header on the chat page; the quote list\'s rows a target for their boxes, the count a badge, the confirm window\'s figures on the right; the profile\'s tabs, labels and fields at 12–14 px on an 8 px grid, an overdue to-do amber',
-  chatRoom: 'the chat page gives the conversation its room (plan 083): no row of page tabs there (the sidebar opens every page), compact rows above the messages, the strip on one line with icon buttons that keep their names as tooltips below 1600 px, the layout filling the page; white incoming bubbles with a hairline, close messages of one side, recessed translations; follow-up states in their own tints (overdue amber, re-contact rose, awaiting reply sky)',
-  colourWorld: 'one colour world (plan 082): a teal accent (#0f766e, white text on it 5.47:1), cool neutrals, hairlines instead of shadows, greys of 4.5:1 and more on every surface, declared on :root so that the base follows; the shell, the shared controls and the sign-in screen on the closed scale of lengths',
-  textFont: 'the page draws its text in HarmonyOS Sans SC: Huawei\'s Regular and Bold files, unmodified, with their licence (work/wa-replica/fonts, copied by the build); the sign-in screen says 本系统使用 HarmonyOS Sans 字体 as the licence asks; the server sends the files as font/ttf that the browser keeps, the gateway compresses them; a conversation that shows its end keeps showing it when the font arrives',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',
   openOutcomeMatched: 'a reply whose outcome is open (结果待确认: the page was closed while it was on its way, or the answer was lost) is matched with its copy from the WhatsApp feed and shows once, with the copy\'s status; before, the copy showed as a second reply (or, for a customer known by phone number only, as a new customer)',
   feedStartsAgain: 'the WhatsApp feed starts also when its first questions fail (the server restarting, a moment without network): the server\'s state and the feed for this page are asked again after 2, 4, 8 … at most 30 s until they are answered; an ended session shows 登录已失效, as the feed loop does',

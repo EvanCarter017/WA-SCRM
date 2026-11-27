@@ -568,7 +568,7 @@
           <td style="text-align:left">${nameCell(c)}</td>
           <td style="text-align:left">${esc(c.closedReason || '未记录原因')}<span class="fid-cell-detail">结束于 ${esc(c.closedAt ? fidDate(c.closedAt).slice(0, 10) : '—')}</span></td>
           <td style="text-align:left">${tagCell(c)}</td>
-          <td><span class="lc-pill ${h.primary.tone}" data-state="${h.primary.key}">${icon(h.primary.icon)}${esc(h.primary.label)}</span></td>
+          <td><span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span></td>
           <td>${c.reactivatedCount || 0} 次</td>
           <td><div class="fid-icon-actions">
             ${fidButton('重新跟进', 'followup', 'RotateCcw', h.recontact ? 'slim blue' : 'slim tint', fidActionID(c.id))}
@@ -678,7 +678,7 @@
         <td>${lcCustomerStatusPill(c)}</td>
         <td><button type="button" class="fid-link fid-tag-cell" data-action="fidViewCustomerTags" ${fidActionID(c.id)} aria-label="查看${esc(c.name)}的标签，共 ${assigned.length} 个">${tagPreview}${tagDetail}</button></td>
         <td>${esc(c.phone)}<span class="fid-cell-detail">${esc(country(c))} · ${esc(aiLanguageLabel(c))}</span></td>
-        <td>${h.primary ? `<span class="lc-pill ${h.primary.tone}" data-state="${h.primary.key}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span>` : '—'}</td>
+        <td>${h.primary ? `<span class="lc-pill ${h.primary.tone}">${icon(h.primary.icon)}${esc(h.primary.label)}</span><span class="fid-cell-detail">${h.nextTask ? esc(dateLabel(h.nextTask.due)) : '无待办'}</span>` : '—'}</td>
         <td>${esc(c.last || '—')}${c.unread ? `<span class="fid-cell-detail">${c.unread} 条未读</span>` : ''}</td>
         <td>${esc(fidDate(c.createdAt))}<span class="fid-cell-detail">更新 ${esc(fidDate(c.updatedAt))}</span></td>
         <td><div class="fid-icon-actions">${fidIcon('打开' + c.name + '会话', 'openConversation', 'MessageCircle', c.id)}${fidIcon('360° 客户档案：' + c.name, 'profile', 'ContactRound', c.id)}${fidIcon('安排跟进：' + c.name, 'followup', 'CalendarPlus', c.id)}</div></td>
@@ -888,15 +888,15 @@
     let html = lcPrevChatHTML(c);
     const h = lcHealth(c);
     const strip = `<div class="lc-chat-strip" aria-label="客户跟进协同栏">
-      ${h.primary ? `<button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" data-state="${h.primary.key}" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon(h.primary.icon)}${esc(h.primary.label)}</button>` : ''}
+      ${h.primary ? `<button type="button" class="lc-pill lc-pill-link ${h.primary.tone}" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon(h.primary.icon)}${esc(h.primary.label)}</button>` : ''}
       ${h.nextTask ? `<button type="button" class="lc-pill lc-pill-link info" data-action="lcTrackFollow" ${fidActionID(c.id)} title="在跟进闭环中查看此客户">${icon('CalendarClock')}下次跟进 ${esc(dateLabel(h.nextTask.due))}</button>` : ''}
       ${lcGradeControls(c)}
       <span class="tag-row">${tagsHTML(c, 3)}</span>
       <div class="lc-chat-strip-right">
-        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', `${fidActionID(c.id)} title="${h.closed ? '重新跟进' : '安排跟进'}"`)}
-        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', `${fidActionID(c.id)} title="设置标签"`)}
-        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', `${fidActionID(c.id)} title="移入聊天记录"`)}
-        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', `${fidActionID(c.id)} title="360° 档案"`)}
+        ${fidButton(h.closed ? '重新跟进' : '安排跟进', 'followup', 'CalendarPlus', h.closed ? 'slim blue' : 'slim tint', fidActionID(c.id))}
+        ${fidButton('设置标签', 'assignTags', 'Tags', 'slim', fidActionID(c.id))}
+        ${fidButton('移入聊天记录', 'fidArchiveOpen', 'Archive', 'slim', fidActionID(c.id))}
+        ${fidButton('360° 档案', 'profile', 'ContactRound', 'slim', fidActionID(c.id))}
       </div>
     </div>`;
     return html.replace('<div class="source-strip">', strip + '<div class="source-strip">');

@@ -752,7 +752,7 @@ test('administration tool: creates an account with a temporary password, lists, 
   assert.equal(spawnSync(process.execPath, [path.join(__dirname, 'site-admin.cjs'), 'user', 'list'], { env: { ...process.env, WA_SCRM_DATA_DIR: '' }, encoding: 'utf8' }).stderr.trim(), 'site-admin: WA_SCRM_DATA_DIR is not set');
 });
 
-test('the preview server: the page\'s files are kept by the browser and asked for again with their tag — an empty 304 when unchanged, also for a weak tag; the parts of the emoji font and the text font go as fonts kept without asking (plans 068, 069, 081)', async () => {
+test('the preview server: the page\'s files are kept by the browser and asked for again with their tag — an empty 304 when unchanged, also for a weak tag; the parts of the emoji font go as fonts kept without asking (plans 068, 069)', async () => {
   const child = spawn(process.execPath, [path.join(__dirname, 'serve.cjs'), '0'], { env: { ...process.env, WA_SCRM_DATA_DIR: '', WA_SCRM_AI_ENV: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
   try {
     const base = await new Promise((resolve, reject) => {
@@ -764,9 +764,6 @@ test('the preview server: the page\'s files are kept by the browser and asked fo
     const font = await fetch(base + '/fonts/noto-color-emoji-v50-9.woff2');
     assert.deepEqual([font.status, font.headers.get('content-type'), font.headers.get('cache-control')], [200, 'font/woff2', 'public, max-age=31536000, immutable']);
     assert.equal(Buffer.from(await font.arrayBuffer()).subarray(0, 4).toString('latin1'), 'wOF2');
-    const text = await fetch(base + '/fonts/HarmonyOS_Sans_SC_Regular.ttf');
-    assert.deepEqual([text.status, text.headers.get('content-type'), text.headers.get('cache-control')], [200, 'font/ttf', 'public, max-age=31536000, immutable']);
-    assert.deepEqual([...Buffer.from(await text.arrayBuffer()).subarray(0, 4)], [0, 1, 0, 0]);
     const tags = new Set();
     for (const file of ['/', '/app.js', '/app.css', '/fonts/noto-color-emoji-OFL.txt']) {
       const answer = await fetch(base + file);
