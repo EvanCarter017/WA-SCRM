@@ -1386,6 +1386,11 @@ window.WA_START = () => {
   // seconds, then nothing for about a minute until the next round. The longest it shows one code is about seventy
   // seconds; a code that has been shown longer than this without a new one is no longer renewed.
   const openwaQrLife = 90000;
+  // While a code waits to be scanned the dialog asks for the current one every ten seconds — WhatsApp renews it about
+  // every twenty — and for three minutes at most; then it says the code has expired and offers a new one, as
+  // WhatsApp Web does (plan 091). While the code is being prepared or checked it asks every two seconds. A scan
+  // that went through is told by the feed at once in either case.
+  const OPENWA_SCAN_POLL_MS = 10000, OPENWA_BUSY_POLL_MS = 2000, OPENWA_SCAN_LIMIT_MS = 180000;
 
   async function openwaCall(method, path, body) {
     try {
@@ -1617,7 +1622,7 @@ window.WA_START = () => {
       <div class="openwa-pair-copy"><strong>在手机上打开 WhatsApp Business</strong><p>选择「关联设备」→「关联新设备」，扫描二维码。</p>${description}</div>
       ${status}
       <p class="openwa-pair-hint">二维码会自动更换；扫码没有成功时，请等新的二维码出现后再扫。绑定后，这个号码的新消息会显示在在线聊天里。</p>
-    </div>`, fidButton('取消','close')+(pair.phase === 'error' ? fidButton('重试','openwaRetry','RefreshCw','blue') : ''),
+    </div>`, fidButton('取消','close')+(pair.phase === 'error' ? fidButton(pair.expired ? '刷新二维码' : '重试','openwaRetry','RefreshCw','blue') : ''),
       pair.phase === 'error' ? '[data-action="openwaRetry"]' : '.openwa-pair-state');
   }
 
@@ -1627,6 +1632,7 @@ window.WA_START = () => {
     const phase = link.state === 'scan' ? 'scan' : link.state === 'verifying' ? 'verifying' : link.state === 'starting' ? 'starting' : 'error';
     const error = phase !== 'error' ? '' : link.state === 'attention' ? (link.error || '需要先在手机上完成 WhatsApp 的验证，然后重试。') : '二维码已失效或连接中断，请重试。';
     const qr = phase === 'scan' ? link.qr || '' : '';
+    if (phase === 'scan' && !pair.scanSince) pair.scanSince = Date.now();
     if (phase === pair.phase && qr === pair.qr && error === pair.error) return;
     if (qr !== pair.qr) pair.qrAt = Date.now();
     Object.assign(pair, { phase, qr, error });
@@ -1642,7 +1648,11 @@ window.WA_START = () => {
       Object.assign(pair, { phase: 'error', qr: '', error: openwaProblem(answer) });
       openwaShowPairing();
     }
-    if (openwaPairing === pair && pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
+    if (openwaPairing === pair && pair.phase !== 'error') openwaNextPoll(pair);
+  }
+
+  function openwaNextPoll(pair) {
+    pair.timer = setTimeout(() => openwaPoll(pair), pair.phase === 'scan' ? OPENWA_SCAN_POLL_MS : OPENWA_BUSY_POLL_MS);
   }
 
   async function openwaPoll(pair) {
@@ -1652,12 +1662,13 @@ window.WA_START = () => {
     if (answer.status === 200) openwaPairStep(pair, answer.body);
     else if (answer.status === 404) openwaPairStep(pair, { state: 'missing' });
     if (openwaPairing !== pair) return;
-    if (pair.phase === 'scan' && Date.now() - pair.qrAt > openwaQrLife) {
-      // The code is no longer renewed. "重试" asks the server for a new one.
-      Object.assign(pair, { phase: 'error', qr: '', error: '二维码已过期，请点击「重试」获取新的二维码。', expired: true });
+    if (pair.phase === 'scan' && (Date.now() - pair.qrAt > openwaQrLife || Date.now() - pair.scanSince > OPENWA_SCAN_LIMIT_MS)) {
+      // The code is no longer renewed, or three minutes have passed: the dialog stops asking. "刷新二维码" asks the
+      // server for a new one.
+      Object.assign(pair, { phase: 'error', qr: '', error: '二维码已过期，请点击「刷新二维码」获取新的二维码。', expired: true });
       return openwaShowPairing();
     }
-    if (pair.phase !== 'error') pair.timer = setTimeout(() => openwaPoll(pair), 2000);
+    if (pair.phase !== 'error') openwaNextPoll(pair);
   }
 
   function openwaBeginPairing(mode, a) {
@@ -2055,7 +2066,7 @@ window.WA_START = () => {
       const pair = openwaPairing;
       if (pair?.accountId !== e.account) return false;
       pair.held.push(e);
-      if (e.kind === 'state' && e.state === 'online' && pair.timer) {
+      if (e.kind === 'state' && e.state === 'online') {
         clearTimeout(pair.timer);
         pair.timer = 0;
         openwaPoll(pair);
@@ -2273,7 +2284,7 @@ window.WA_START = () => {
     openwaRetry:()=>{
       const pair = openwaPairing;
       if (pair?.phase !== 'error') return;
-      Object.assign(pair, { phase: 'starting', qr: '', error: '' });
+      Object.assign(pair, { phase: 'starting', qr: '', error: '', scanSince: 0 });
       openwaShowPairing();
       openwaRequestLink(pair);
     },

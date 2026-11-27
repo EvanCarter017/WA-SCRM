@@ -646,6 +646,12 @@ assert(read(path.join(__dirname, 'fidelity.css')).includes('background:var(--col
 const keptColumns = [...read(path.join(__dirname, 'fidelity-lifecycle.css')).matchAll(/\.fid-customer-table col:nth-child\((\d+)\) \{ width: ([\d.]+)%; \}/g)];
 assert.equal(keptColumns.length, 13, 'the customer list must give its thirteen columns a width each');
 assert.equal(Math.round(keptColumns.reduce((sum, m) => sum + Number(m[2]), 0) * 10) / 10, 100, 'the customer list\'s columns must add up to 100%');
+// The QR dialog (plan 091): while a code waits to be scanned it asks every ten seconds and for three minutes at most,
+// then offers 刷新二维码; a scan that went through is told by the feed whenever it comes.
+for (const required of ['const OPENWA_SCAN_POLL_MS = 10000, OPENWA_BUSY_POLL_MS = 2000, OPENWA_SCAN_LIMIT_MS = 180000;', "pair.timer = setTimeout(() => openwaPoll(pair), pair.phase === 'scan' ? OPENWA_SCAN_POLL_MS : OPENWA_BUSY_POLL_MS);", 'Date.now() - pair.scanSince > OPENWA_SCAN_LIMIT_MS', "fidButton(pair.expired ? '刷新二维码' : '重试','openwaRetry'", "if (e.kind === 'state' && e.state === 'online') {"]) {
+  assert(appJs.includes(required), `the QR dialog must ask the server less often (plan 091): ${required}`);
+}
+assert(!appJs.includes('setTimeout(() => openwaPoll(pair), 2000)'), 'the QR dialog must not ask every two seconds while a code waits to be scanned');
 const summary = {
   version: req.version,
   status: 'passed',
@@ -678,6 +684,7 @@ const summary = {
   customerPictures: 'the profile picture WhatsApp shows for a chat, over the initials wherever an avatar is drawn; looked up through OpenWA, fetched only from WhatsApp\'s own servers or the gateway, kept for a day; the initials stay when there is none',
   handMadeEmpty: 'a customer made by hand (新增客户) starts with an empty conversation; the 初步需求 stays in the profile and the notes (before, the conversation showed it as a message from the customer, and the first message sent saved it so)',
   personaManual: 'the persona of the customer profile (画像与跟进) holds only what a person entered with 保存画像: 意向等级 starts on 请选择, the other fields empty; a customer from WhatsApp or made with 新增客户 gets nothing filled in (the 初步需求 stays in the notes); 广告素材 / 证据 shows — when nothing is recorded; what the page filled in before was cleared once (data.personaManual), except where a person had saved the persona',
+  qrPolling: 'the QR dialog (plan 091): while a code waits to be scanned it asks the server every 10 s (every 2 s while the code is prepared or checked), for at most 3 minutes; then it says the code expired and offers 刷新二维码; a scan that went through is told by the feed at once — a dialog left open no longer uses up OpenWA\'s limit of 1000 questions an hour',
   uiUpgradeWithdrawn: 'the UI upgrade of plans 081–087 (font, colours, chat-page layout, tables, dialogs, supervisor page) is withdrawn at the owner\'s request; kept: a dialog\'s footer stays in view while a long dialog scrolls, and the customer list\'s thirteen columns add up to 100%',
   quotePicks: 'the quote dialog (报价): a box on the left ticks a product, the ticks stay while the search changes; 确认 opens 确认报价 with the ticked products in the order ticked — quantity (whole, at least 1), unit price (and price column), amount, total — where a product can be deleted and 返回列表 goes back; 放入消息框 puts one line per product ("Product Alpha PRDA01: $40 x 10 = $400") and "Total: $440"; a price carries the sign of the list\'s currency ("$40"; HK$, A$, C$, S$, MX$, R$, JP¥ so that "$" and "¥" stay clear; AED and SAR keep their code)',
   handMadePreview: 'the row of a customer made by hand reads 新建客户档案 in its preview line (chat list, supervisor page) until the first message; before, it showed the 初步需求, which looked like the customer\'s last message',
